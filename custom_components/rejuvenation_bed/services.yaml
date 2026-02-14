@@ -1,0 +1,128 @@
+# Home Assistant Services für Rejuvenation Bed
+
+set_boost:
+  name: Boost aktivieren
+  description: Aktiviert den Schnellheizen-Modus für eine Zone
+  target:
+    entity:
+      integration: rejuvenation_bed
+      domain: climate
+  fields:
+    duration_minutes:
+      name: Dauer (Minuten)
+      description: Wie lange der Boost aktiv bleiben soll
+      required: false
+      default: 30
+      selector:
+        number:
+          min: 5
+          max: 120
+          step: 5
+          unit_of_measurement: min
+
+set_sick_mode:
+  name: Krank-Modus aktivieren
+  description: Aktiviert konstante Wärme für die Genesungszeit
+  target:
+    entity:
+      integration: rejuvenation_bed
+      domain: climate
+  fields:
+    temperature:
+      name: Temperatur (°C)
+      description: Konstante Zieltemperatur
+      required: false
+      default: 30
+      selector:
+        number:
+          min: 28
+          max: 35
+          step: 0.5
+          unit_of_measurement: °C
+    days:
+      name: Dauer (Tage)
+      description: Wie viele Tage der Modus aktiv bleibt
+      required: false
+      default: 3
+      selector:
+        number:
+          min: 1
+          max: 14
+          step: 1
+          unit_of_measurement: Tage
+
+set_vacation_mode:
+  name: Urlaub-Modus aktivieren
+  description: Aktiviert Frostschutz-Modus für Abwesenheit
+  target:
+    entity:
+      integration: rejuvenation_bed
+      domain: climate
+  fields:
+    temperature:
+      name: Frostschutz-Temperatur (°C)
+      description: Minimale Haltetemperatur
+      required: false
+      default: 20
+      selector:
+        number:
+          min: 15
+          max: 25
+          step: 1
+          unit_of_measurement: °C
+    end_date:
+      name: Rückkehr-Datum
+      description: Wann der Urlaub endet (optional)
+      required: false
+      selector:
+        date:
+
+cancel_special_mode:
+  name: Sonder-Modus beenden
+  description: Beendet Boost, Krank oder Urlaub-Modus
+  target:
+    entity:
+      integration: rejuvenation_bed
+      domain: climate
+
+reset_energy_budget:
+  name: Energie-Budget zurücksetzen
+  description: Setzt die Energiestatistiken auf Null
+  fields:
+    confirm:
+      name: Bestätigung
+      description: Bestätige das Zurücksetzen
+      required: true
+      selector:
+        boolean:
+
+preheat_bed:
+  name: Bett vorheizen
+  description: Heizt das Bett auf Komfort-Temperatur vor
+  target:
+    entity:
+      integration: rejuvenation_bed
+      domain: climate
+  fields:
+    target_temperature:
+      name: Zieltemperatur (°C)
+      description: Gewünschte Vorheiz-Temperatur
+      required: false
+      default: 29
+      selector:
+        number:
+          min: 26
+          max: 34
+          step: 0.5
+          unit_of_measurement: °C
+    duration_minutes:
+      name: Dauer (Minuten)
+      description: Wie lange vorgeheizt werden soll
+      required: false
+      default: 30
+      selector:
+        number:
+          min: 15
+          max: 60
+          step: 5
+          unit_of_measurement: min
