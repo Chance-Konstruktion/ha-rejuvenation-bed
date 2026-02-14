@@ -1,0 +1,8 @@
+{
+  "name": "Rejuvenation Bed",
+  "content_type": "integration",
+  "render_readme": true,
+  "category": "integration",
+  "homeassistant": "2024.1.0",
+  "iot_class": "local_polling"
+}
