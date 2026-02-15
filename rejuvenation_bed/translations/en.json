@@ -1,0 +1,198 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Bed Setup",
+        "description": "Welcome! How many heating zones does your bed have?",
+        "data": {
+          "zones": "Number of zones"
+        }
+      },
+      "bed_type": {
+        "title": "Bed Type",
+        "description": "What type of bed do you want to control?\n\n**Waterbed:** High thermal mass (300-700L water). Slow heating (~0.7°C/h), stores heat like a battery. Min. 24°C (condensation protection!), gentle ramps (1°C/h max).\n\n**Heating Pad:** Low thermal mass. Fast heating (minutes!), no heat storage. Can be completely OFF, no ramp limits needed.",
+        "data": {
+          "bed_type": "Bed type"
+        }
+      },
+      "safety_info": {
+        "title": "⚠️ Safety Notice",
+        "description": "**IMPORTANT:** Make sure your bed heater's physical thermostat is set to **MAXIMUM (38°C)**!\n\nOnly this way Home Assistant can precisely control the temperature.\n\n**For waterbeds:** The minimum temperature of 24°C prevents condensation and mold. Never turn off the heater completely!\n\n**The hardware thermostat remains as a safety backup!**"
+      },
+      "zone_config": {
+        "title": "Zone Configuration",
+        "description": "Configuration for: {zone_info}",
+        "data": {
+          "heater": "Heater switch / relay",
+          "temp_sensor": "Temperature sensor (optional)",
+          "hardware_max": "Max. safety temperature (°C)",
+          "boost_target_temp": "Boost target temperature (°C)",
+          "power_rating": "Heating power (Watts)",
+          "power_sensor": "Power sensor (optional)",
+          "presence_sensor": "Presence sensor (optional)",
+          "moisture_sensor": "Moisture sensor (optional)",
+          "air_temp_sensor": "Surface temperature (top)"
+        }
+      },
+      "hardware_summary": {
+        "title": "🎯 Your Hardware Setup",
+        "description": "Based on your sensors, the following features are available:\n\n{features}\n\nReady to continue?"
+      },
+      "energy_config": {
+        "title": "⚡ Energy Tracking",
+        "description": "Configure how power consumption is tracked.",
+        "data": {
+          "enable_tracking": "Enable energy tracking",
+          "total_power_rating": "Total heating power (Watts)",
+          "energy_sensor": "Energy meter sensor",
+          "compare_to_legacy": "Compare with classic waterbed",
+          "electricity_price": "Electricity price (€/kWh)"
+        }
+      },
+      "global_config": {
+        "title": "Global Settings",
+        "description": "Configure when your bed should be warm and ready.",
+        "data": {
+          "warm_from": "Warm from (Evening)",
+          "warm_until": "Warm until (Morning)",
+          "alarm_entity": "Alarm sensor (optional)",
+          "chronotype": "Your chronotype",
+          "solar_sensor": "Solar production sensor (Watts)",
+          "price_sensor": "Electricity price sensor",
+          "outdoor_sensor": "Outdoor temperature sensor",
+          "co2_sensor": "CO2 sensor (for sleep score)",
+          "summer_threshold": "Summer shutoff threshold (°C)"
+        }
+      }
+    },
+    "abort": {
+      "already_configured": "This bed is already configured."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Settings",
+        "description": "What would you like to adjust?",
+        "menu_options": {
+          "global_settings": "🌐 Global Settings",
+          "zone_sensors": "📡 Zone Sensors",
+          "zone_settings": "🌡️ Zone Settings",
+          "mode_settings": "🎛️ Mode Settings"
+        }
+      },
+      "global_settings": {
+        "title": "🌐 Global Settings",
+        "description": "Basic settings for the entire system.",
+        "data": {
+          "warm_from": "Warm from (Evening)",
+          "warm_until": "Warm until (Morning)",
+          "summer_threshold": "Summer shutoff threshold",
+          "temperature_offset": "Temperature offset"
+        },
+        "data_description": {
+          "warm_from": "When should the bed start being warm? Preheating starts automatically earlier.",
+          "warm_until": "Until when should the bed stay warm? Also serves as default wake time.",
+          "summer_threshold": "Above this outdoor temperature, summer mode activates. Recommended: 25°C.",
+          "temperature_offset": "Fine-tune all temperatures. +1.0 = everything 1°C warmer, -1.0 = everything 1°C cooler."
+        }
+      },
+      "zone_sensors": {
+        "title": "📡 Select Zone",
+        "description": "Which zone would you like to edit?",
+        "data": {
+          "zone_index": "Zone"
+        },
+        "data_description": {
+          "zone_index": "Select the zone whose sensors you want to change."
+        }
+      },
+      "edit_zone_sensors": {
+        "title": "📡 Sensors – {zone_name}",
+        "description": "Change the hardware assignment for this zone. Optional fields can be left empty.",
+        "data": {
+          "heater": "Heater switch",
+          "temp_sensor": "Temperature sensor",
+          "power_sensor": "Power sensor",
+          "presence_sensor": "Presence sensor",
+          "moisture_sensor": "Moisture sensor",
+          "air_temp_sensor": "Surface temperature (top)"
+        },
+        "data_description": {
+          "heater": "The switch or relay that turns the heater on/off (smart plug, Zigbee switch, input_boolean).",
+          "temp_sensor": "Temperature sensor in the water or on the mattress. Without sensor: basic mode only (timer).",
+          "power_sensor": "Power sensor from smart plug (Watts). Enables precise energy statistics and better presence detection.",
+          "presence_sensor": "Dedicated presence sensor (e.g. pressure mat, mmWave radar). Without sensor: detection via temperature analysis.",
+          "moisture_sensor": "Moisture sensor for sweat detection and leak alarm.",
+          "air_temp_sensor": "🌡️ Optional: Second temperature sensor ON TOP of the core (e.g. SHT41).\n\nMeasures surface temperature between mattress and blanket.\n\n✅ Unlocks:\n\n1. **Blanket Check**: Detects if bed is covered\n2. **Sweat Detection 2.0**: Cross-correlation Temp × Humidity\n3. **Better Presence**: Body heat signal from above"
+        }
+      },
+      "zone_settings": {
+        "title": "🌡️ Zone Settings",
+        "description": "Individual settings per bed zone.",
+        "data": {
+          "zone_index": "Zone"
+        },
+        "data_description": {
+          "zone_index": "Select the zone whose settings you want to adjust."
+        }
+      },
+      "zone_settings_select": {
+        "title": "🌡️ Select Zone",
+        "description": "Which zone would you like to configure?",
+        "data": {
+          "zone_index": "Zone"
+        },
+        "data_description": {
+          "zone_index": "Select the zone whose settings you want to adjust."
+        }
+      },
+      "edit_zone_settings": {
+        "title": "🌡️ Settings – {zone_name}",
+        "description": "Adjust wake time, temperatures and sleep tracking for this zone. Empty temperature fields = seasonal automatic.",
+        "data": {
+          "wake_mode": "Wake time mode",
+          "wake_time": "Fixed wake time",
+          "alarm_entity": "Alarm entity",
+          "weekend_offset_hours": "Weekend sleep-in",
+          "sleep_temp": "Sleep onset temperature",
+          "deep_sleep_temp": "Deep sleep temperature",
+          "wake_temp": "Wake temperature",
+          "sleep_stage_entity": "Wearable sleep stage sensor"
+        },
+        "data_description": {
+          "wake_mode": "How is the wake time determined? Fixed = always same time, Alarm = from your phone/alarm entity, Hybrid = alarm if set, otherwise fixed time.",
+          "wake_time": "Fixed wake time. Used in 'Fixed' mode and as fallback in 'Hybrid' mode.",
+          "alarm_entity": "Sensor containing the next alarm time (e.g. sensor.next_alarm). Used in 'Alarm' and 'Hybrid' modes.",
+          "weekend_offset_hours": "How many hours the wake time is shifted on weekends and holidays.",
+          "sleep_temp": "Temperature at sleep onset. Empty = seasonal automatic (Summer ~27°C, Winter ~29°C).",
+          "deep_sleep_temp": "Coolest point during deep sleep for optimal recovery. Empty = seasonal automatic.",
+          "wake_temp": "Temperature at wake time – gentle warming supports natural waking. Empty = seasonal automatic.",
+          "sleep_stage_entity": "Sleep stages from a wearable (Fitbit, Withings, Apple Watch etc.). Overrides the biorhythm curve with real sleep data."
+        }
+      },
+      "mode_settings": {
+        "title": "🎛️ Mode Settings",
+        "description": "Configure temperature settings for each special mode.",
+        "data": {
+          "sick_mode_temp": "Sick mode temperature",
+          "sick_mode_days": "Sick mode duration",
+          "boost_offset": "Boost temperature offset",
+          "away_temp": "Vacation temperature",
+          "comfort_offset": "Sleep-in offset"
+        },
+        "data_description": {
+          "sick_mode_temp": "Constant temperature during sick mode. Recommended: 30-32°C for muscle relaxation and recovery.",
+          "sick_mode_days": "How many days sick mode stays active before auto-deactivating.",
+          "boost_offset": "Temperature increase above current curve during quick heat (boost). Recommended: +2-3°C.",
+          "away_temp": "Minimum holding temperature in vacation mode. For waterbeds never below 24°C (condensation protection)!",
+          "comfort_offset": "Extra warmth for sleeping in on weekends. The wake curve is delayed accordingly."
+        }
+      }
+    },
+    "abort": {
+      "no_zones": "No zones configured. Please set up the integration first.",
+      "invalid_zone": "Invalid zone selected."
+    }
+  }
+}
