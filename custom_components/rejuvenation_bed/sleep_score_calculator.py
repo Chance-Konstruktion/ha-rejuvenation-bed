@@ -17,6 +17,8 @@ from typing import Dict, List, Optional, Tuple
 from dataclasses import dataclass, field
 from collections import deque
 from homeassistant.core import HomeAssistant
+from .const import local_now
+from homeassistant.util import dt as dt_util
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -41,6 +43,10 @@ class NightData:
     heating_cycles: int = 0
     total_heating_minutes: float = 0
     short_cycles_prevented: int = 0
+    
+    # Unterbrechungen (Toilette, Kind, etc.)
+    interruptions: int = 0
+    total_interruption_minutes: float = 0
     
     # CO2 (optional)
     co2_readings: List[float] = field(default_factory=list)
@@ -136,14 +142,14 @@ class SleepScoreCalculator:
         
         Wird aufgerufen wenn Präsenz erkannt wird oder zur geplanten Schlafzeit.
         """
-        today = datetime.now().date()
+        today = local_now().date()
         
         self._current_night[zone_index] = NightData(
             date=datetime.combine(today, time(0, 0)),
             zone_index=zone_index,
             bedtime_planned=planned_bedtime,
             wake_time_planned=planned_wake,
-            bedtime_actual=datetime.now()
+            bedtime_actual=local_now()
         )
         
         _LOGGER.info(f"Zone {zone_index}: Nacht-Tracking gestartet")
@@ -172,6 +178,23 @@ class SleepScoreCalculator:
             return
         
         self._current_night[zone_index].short_cycles_prevented += 1
+
+    def record_interruption(self, zone_index: int, duration_minutes: float):
+        """
+        Zeichnet eine Schlaf-Unterbrechung auf (Toilette, Kind, etc.).
+        
+        Fließt negativ in den Score ein: Aufwachen = schlechterer Schlaf.
+        """
+        if zone_index not in self._current_night:
+            return
+        
+        night = self._current_night[zone_index]
+        night.interruptions += 1
+        night.total_interruption_minutes += duration_minutes
+        _LOGGER.debug(
+            f"Zone {zone_index}: Schlaf-Unterbrechung #{night.interruptions} "
+            f"({duration_minutes:.0f} Min)"
+        )
     
     def record_co2(self, zone_index: int, co2_ppm: float):
         """Zeichnet einen CO2-Wert auf."""
@@ -210,7 +233,7 @@ class SleepScoreCalculator:
             return None
         
         night = self._current_night[zone_index]
-        night.wake_time_actual = datetime.now()
+        night.wake_time_actual = local_now()
         
         # Mindestens 2 Stunden Daten?
         if len(night.temp_readings) < 20:  # ~20 Datenpunkte bei 6min Intervall = 2h
@@ -280,11 +303,23 @@ class SleepScoreCalculator:
         
         # Gesamt-Score
         total = temp_contrib + curve_contrib + warmup_contrib + efficiency_contrib + air_contrib
+        
+        # Unterbrechungs-Malus: Jedes Aufwachen kostet Punkte
+        # 1 Unterbrechung: -3 Punkte, 2: -7, 3+: -12
+        interruption_penalty = 0
+        if night.interruptions == 1:
+            interruption_penalty = 3
+        elif night.interruptions == 2:
+            interruption_penalty = 7
+        elif night.interruptions >= 3:
+            interruption_penalty = 12
+        
+        total = max(0, total - interruption_penalty)
         total_score = int(round(total))
         
         # Tipps generieren
         tips = self._generate_tips(
-            temp_score, curve_score, warmup_score, efficiency_score, air_score, has_co2
+            temp_score, curve_score, warmup_score, efficiency_score, air_score, has_co2, night
         )
         
         return SleepScore(
@@ -475,10 +510,17 @@ class SleepScoreCalculator:
         warmup_score: int, 
         efficiency_score: int,
         air_score: int,
-        has_co2: bool
+        has_co2: bool,
+        night: NightData = None
     ) -> List[str]:
         """Generiert personalisierte Tipps basierend auf den Scores."""
         tips = []
+        
+        # Unterbrechungen
+        if night and night.interruptions >= 3:
+            tips.append(f"😴 {night.interruptions}× aufgewacht ({night.total_interruption_minutes:.0f} Min) – häufige Unterbrechungen belasten den Schlaf")
+        elif night and night.interruptions >= 1:
+            tips.append(f"😴 {night.interruptions}× aufgewacht – Unterbrechungen leicht negativ")
         
         # Temperatur-Stabilität (nur bei extremen Abweichungen)
         if temp_score < 40:

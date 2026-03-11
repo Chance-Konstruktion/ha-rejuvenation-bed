@@ -37,10 +37,39 @@ _LOGGER = logging.getLogger(__name__)
 
 
 def get_device_info(coordinator) -> DeviceInfo:
-    """Gibt die Device-Info für alle Entities zurück."""
+    """Hauptgerät (Mono) oder Container-Gerät (Dual)."""
     global_conf = coordinator.config_entry.data.get("global", {})
     bed_type = global_conf.get("bed_type", "wasserbett")
     zones_count = len(coordinator.config_entry.data.get("zones", []))
+    
+    model = "Smart Wasserbett Controller" if bed_type == "wasserbett" else "Smart Heizmatte Controller"
+    zone_suffix = "Dual-Zone" if zones_count > 1 else "Mono"
+    
+    return DeviceInfo(
+        identifiers={(DOMAIN, coordinator.config_entry.entry_id)},
+        manufacturer=MANUFACTURER,
+        model=f"{model} ({zone_suffix})",
+        name="Rejuvenation Bed",
+        sw_version=SW_VERSION,
+    )
+
+
+def get_zone_device_info(coordinator, zone_index: int) -> DeviceInfo:
+    """Zone-Gerät für Dual-Bett (Links/Rechts)."""
+    zones_count = len(coordinator.config_entry.data.get('zones', []))
+    if zones_count <= 1:
+        return get_device_info(coordinator)
+    zone_name = 'Links' if zone_index == 0 else 'Rechts'
+    return DeviceInfo(
+        identifiers={(DOMAIN, f'{coordinator.config_entry.entry_id}_zone_{zone_index}')},
+        manufacturer=MANUFACTURER,
+        model=f'Bett-Zone {zone_name}',
+        name=f'Bett {zone_name}',
+        sw_version=SW_VERSION,
+        via_device=(DOMAIN, coordinator.config_entry.entry_id),
+    )
+
+
     
     model = "Smart Wasserbett Controller" if bed_type == "wasserbett" else "Smart Heizmatte Controller"
     zone_suffix = "Dual-Zone" if zones_count > 1 else "Mono"
@@ -114,7 +143,10 @@ class RejuvenationBedClimate(CoordinatorEntity, ClimateEntity):
         self._zone_idx = zone_index
         self._attr_name = f"Thermostat{display_name}"
         self._attr_unique_id = f"{coordinator.config_entry.entry_id}_zone{zone_index}_climate"
-        self._attr_device_info = get_device_info(coordinator)
+        self._attr_device_info = get_zone_device_info(coordinator, zone_index)
+        
+        # Min-Temp aus Bed-Config (Heizmatte: 0°C, Wasserbett: 24°C)
+        self._attr_min_temp = coordinator.bed_config.get("min_temp", 24.0)
         
         # Ermittle Hardware-Level
         zones_config = coordinator.config_entry.data.get("zones", [])

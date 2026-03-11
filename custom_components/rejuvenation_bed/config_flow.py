@@ -145,9 +145,7 @@ class RejuvenationBedConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 # ═══════════════════════════════════════════════════════════════════
                 vol.Optional("moisture_sensor"): selector.EntitySelector(
                     selector.EntitySelectorConfig(
-                        domain=["sensor", "binary_sensor"],
-                        # KEIN device_class Filter - erlaubt alle Sensoren!
-                        # Der User wählt selbst den richtigen
+                        domain="sensor", device_class="humidity"
                     )
                 ),
                 # ═══════════════════════════════════════════════════════════════════
@@ -331,12 +329,18 @@ class RejuvenationBedConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 # ═══════════════════════════════════════════════════════════════════
                 vol.Optional("co2_sensor"): selector.EntitySelector(
                     selector.EntitySelectorConfig(
-                        domain="sensor",
-                        # KEIN device_class Filter!
+                        domain="sensor", device_class="carbon_dioxide"
                     )
                 ),
                 vol.Optional("summer_threshold", default=DEFAULT_SUMMER_TEMP): vol.All(
                     vol.Coerce(int), vol.Range(min=15, max=35)
+                ),
+                vol.Optional("bed_volume_liters", default=250): selector.NumberSelector(
+                    selector.NumberSelectorConfig(
+                        min=100, max=1200, step=50,
+                        unit_of_measurement="L",
+                        mode=selector.NumberSelectorMode.SLIDER
+                    )
                 ),
             })
         )

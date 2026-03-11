@@ -17,6 +17,7 @@ import logging
 from datetime import datetime, time, timedelta
 from typing import Optional, Tuple
 from homeassistant.core import HomeAssistant, State
+from .const import local_now
 from homeassistant.util import dt as dt_util
 
 _LOGGER = logging.getLogger(__name__)
@@ -117,7 +118,7 @@ class WakeTimeResolver:
             return not is_workday
         
         # Fallback: Wochentag prüfen (5 = Samstag, 6 = Sonntag)
-        today = datetime.now().weekday()
+        today = local_now().weekday()
         return today >= 5
     
     def _apply_time_offset(self, base_time: time, offset_hours: float) -> time:
@@ -131,7 +132,7 @@ class WakeTimeResolver:
         Returns:
             Neue Zeit (mit Überlauf auf nächsten Tag wenn nötig)
         """
-        base_dt = datetime.combine(datetime.today(), base_time)
+        base_dt = datetime.combine(local_now().date(), base_time)
         adjusted_dt = base_dt + timedelta(hours=offset_hours)
         return adjusted_dt.time()
     

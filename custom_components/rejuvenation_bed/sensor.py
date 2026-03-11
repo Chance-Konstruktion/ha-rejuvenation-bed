@@ -13,7 +13,7 @@ _LOGGER = logging.getLogger(__name__)
 
 
 def get_device_info(coordinator) -> DeviceInfo:
-    """Gibt die Device-Info für alle Entities zurück."""
+    """Hauptgerät (Mono) oder Container-Gerät (Dual)."""
     global_conf = coordinator.config_entry.data.get("global", {})
     bed_type = global_conf.get("bed_type", "wasserbett")
     zones_count = len(coordinator.config_entry.data.get("zones", []))
@@ -30,12 +30,77 @@ def get_device_info(coordinator) -> DeviceInfo:
     )
 
 
+def get_zone_device_info(coordinator, zone_index: int) -> DeviceInfo:
+    """Zone-Gerät für Dual-Bett (Links/Rechts)."""
+    zones_count = len(coordinator.config_entry.data.get("zones", []))
+    if zones_count <= 1:
+        return get_device_info(coordinator)  # Mono → Hauptgerät
+    
+    zone_name = "Links" if zone_index == 0 else "Rechts"
+    return DeviceInfo(
+        identifiers={(DOMAIN, f"{coordinator.config_entry.entry_id}_zone_{zone_index}")},
+        manufacturer=MANUFACTURER,
+        model=f"Bett-Zone {zone_name}",
+        name=f"Bett {zone_name}",
+        sw_version=SW_VERSION,
+        via_device=(DOMAIN, coordinator.config_entry.entry_id),
+    )
+
+
+def get_energy_device_info(coordinator) -> DeviceInfo:
+    """Energie-Gerät: Verbrauch, Solar, Ersparnis, Batterie."""
+    return DeviceInfo(
+        identifiers={(DOMAIN, f"{coordinator.config_entry.entry_id}_energy")},
+        manufacturer=MANUFACTURER,
+        model="Energie & Ersparnis",
+        name="Bett Energie",
+        sw_version=SW_VERSION,
+        via_device=(DOMAIN, coordinator.config_entry.entry_id),
+    )
+
+
+def get_sleep_device_info(coordinator) -> DeviceInfo:
+    """Schlaf-Gerät: Score, Vorhersage, Intelligenz."""
+    return DeviceInfo(
+        identifiers={(DOMAIN, f"{coordinator.config_entry.entry_id}_sleep")},
+        manufacturer=MANUFACTURER,
+        model="Schlaf, Analyse & Intelligenz",
+        name="Bett Schlaf",
+        sw_version=SW_VERSION,
+        via_device=(DOMAIN, coordinator.config_entry.entry_id),
+    )
+
+
+class RejuvenationBedZoneSensor(CoordinatorEntity, SensorEntity):
+    """Base class: Zone-Gerät (pro Bett-Seite bei Dual)."""
+    
+    def __init__(self, coordinator, zone_index: int = 0):
+        super().__init__(coordinator)
+        self._attr_device_info = get_zone_device_info(coordinator, zone_index)
+
+
 class RejuvenationBedSensorBase(CoordinatorEntity, SensorEntity):
-    """Base class für alle Rejuvenation Bed Sensoren mit Device Info."""
+    """Base class: Hauptgerät (Climate, Status, Steuerung)."""
     
     def __init__(self, coordinator):
         super().__init__(coordinator)
         self._attr_device_info = get_device_info(coordinator)
+
+
+class RejuvenationBedEnergySensor(CoordinatorEntity, SensorEntity):
+    """Base class: Energie-Gerät (Verbrauch, Solar, Ersparnis)."""
+    
+    def __init__(self, coordinator):
+        super().__init__(coordinator)
+        self._attr_device_info = get_energy_device_info(coordinator)
+
+
+class RejuvenationBedSleepSensor(CoordinatorEntity, SensorEntity):
+    """Base class: Schlaf-Gerät (Score, Vorhersage, Intelligenz)."""
+    
+    def __init__(self, coordinator):
+        super().__init__(coordinator)
+        self._attr_device_info = get_sleep_device_info(coordinator)
 
 
 async def async_setup_entry(hass, config_entry, async_add_entities):
@@ -45,6 +110,7 @@ async def async_setup_entry(hass, config_entry, async_add_entities):
     zones_config = config_entry.data.get("zones", [])
     global_config = config_entry.data.get("global", {})
     is_dual_zone = len(zones_config) > 1
+    is_waterbed = global_config.get("bed_type", "wasserbett") == "wasserbett"
 
     for zone_idx, zone_config in enumerate(zones_config):
         # Namens-Logik für Dual-Zone
@@ -70,12 +136,11 @@ async def async_setup_entry(hass, config_entry, async_add_entities):
         # Braucht: Temperatursensor + CO2-Sensor für aussagekräftige Bewertung
         # ═══════════════════════════════════════════════════════════
         has_temp_sensor = bool(zone_config.get("temp_sensor"))
-        has_co2_sensor = bool(global_config.get("co2_sensor"))
+        has_co2_sensor = bool(config_entry.options.get("co2_sensor") or global_config.get("co2_sensor"))
         
         if has_temp_sensor and has_co2_sensor:
             entities.append(BedSleepScoreSensor(coordinator, zone_idx, display_name))
             entities.append(BedSleepScoreWeeklySensor(coordinator, zone_idx, display_name))
-            entities.append(BedSleepScoreTrendSensor(coordinator, zone_idx, display_name))
         
         # ═══════════════════════════════════════════════════════════
         # BEDINGTE SENSOREN (nur wenn konfiguriert)
@@ -120,43 +185,47 @@ async def async_setup_entry(hass, config_entry, async_add_entities):
     # ═══════════════════════════════════════════════════════════
     # SOLAR-SENSOREN (nur wenn solar_sensor konfiguriert)
     # ═══════════════════════════════════════════════════════════
-    if global_config.get("solar_sensor"):
+    has_solar = config_entry.options.get("solar_sensor") or global_config.get("solar_sensor")
+    if has_solar:
         entities.append(BedSolarPercentageSensor(coordinator))
         entities.append(BedSolarEnergyTodaySensor(coordinator))
         entities.append(BedGridEnergyTodaySensor(coordinator))
 
+    # ═══════════════════════════════════════════════════════════
+    # THERMISCHE BATTERIE (nur Wasserbett — Heizmatte hat keinen Wärmespeicher)
+    # ═══════════════════════════════════════════════════════════
+    has_any_temp = any(bool(z.get("temp_sensor")) for z in zones_config)
+    if is_waterbed and has_any_temp:
+        entities.append(BedThermalBatterySensor(coordinator))
+
     # Zähle Schlaf-Score Sensoren
     has_sleep_score = any(
         bool(z.get("temp_sensor")) for z in zones_config
-    ) and bool(global_config.get("co2_sensor"))
+    ) and bool(config_entry.options.get("co2_sensor") or global_config.get("co2_sensor"))
     
     # ═══════════════════════════════════════════════════════════
     # BED-INTELLIGENCE SENSOR (Kalibrierung + Status)
     # ═══════════════════════════════════════════════════════════
     entities.append(BedIntelligenceSensor(coordinator))
     
-    # Bedtime-Learning Sensor pro Zone
-    for zone_idx in range(len(zones_config)):
-        entities.append(BedtimePredictionSensor(coordinator, zone_idx))
-    
     async_add_entities(entities)
     
     _LOGGER.info(
         f"Rejuvenation Bed: {len(entities)} Sensoren erstellt "
-        f"(Solar: {'✓' if global_config.get('solar_sensor') else '✗'}, "
+        f"(Solar: {'✓' if has_solar else '✗'}, "
         f"Energie: {'✓' if has_any_power else '✗'}, "
-        f"Preis: {'✓' if global_config.get('price_sensor') else '✗'}, "
+        f"Preis: {'✓' if config_entry.options.get('price_sensor') or global_config.get('price_sensor') else '✗'}, "
         f"Schlaf-Score: {'✓' if has_sleep_score else '✗ (braucht Temp+CO2)'})"
     )
 
-class BedTemperatureSensor(RejuvenationBedSensorBase):
+class BedTemperatureSensor(RejuvenationBedZoneSensor):
     """Zeigt die vom System berechnete Zieltemperatur."""
     _attr_device_class = SensorDeviceClass.TEMPERATURE
     _attr_native_unit_of_measurement = UnitOfTemperature.CELSIUS
     _attr_state_class = SensorStateClass.MEASUREMENT
 
     def __init__(self, coordinator, zone_idx, display_name):
-        super().__init__(coordinator)
+        super().__init__(coordinator, zone_idx)
         self.zone_idx = zone_idx
         self.internal_zone_name = f"Zone {zone_idx + 1}"
         self._attr_name = f"Bett{display_name} Zieltemperatur"
@@ -169,11 +238,11 @@ class BedTemperatureSensor(RejuvenationBedSensorBase):
             return data["zones"].get(self.internal_zone_name, {}).get("target")
         return None
 
-class BedStatusSensor(RejuvenationBedSensorBase):
+class BedStatusSensor(RejuvenationBedZoneSensor):
     """Zeigt den aktuellen Betriebsmodus der Zone (Textform)."""
     
     def __init__(self, coordinator, zone_idx, display_name):
-        super().__init__(coordinator)
+        super().__init__(coordinator, zone_idx)
         self.zone_idx = zone_idx
         self.internal_zone_name = f"Zone {zone_idx + 1}"
         self._attr_name = f"Bett{display_name} Status"
@@ -201,14 +270,14 @@ class BedStatusSensor(RejuvenationBedSensorBase):
             return "Heizen"
         return "Bereit"
 
-class BedZonePowerSensor(RejuvenationBedSensorBase):
+class BedZonePowerSensor(RejuvenationBedZoneSensor):
     """Zeigt den aktuellen Verbrauch pro Zone in Watt."""
     _attr_device_class = SensorDeviceClass.POWER
     _attr_native_unit_of_measurement = "W"
     _attr_state_class = SensorStateClass.MEASUREMENT
 
     def __init__(self, coordinator, zone_idx, display_name):
-        super().__init__(coordinator)
+        super().__init__(coordinator, zone_idx)
         self.internal_zone_name = f"Zone {zone_idx + 1}"
         self._attr_name = f"Bett{display_name} Leistung"
         self._attr_unique_id = f"{coordinator.config_entry.entry_id}_zone_{zone_idx}_power"
@@ -220,7 +289,7 @@ class BedZonePowerSensor(RejuvenationBedSensorBase):
             return data["zones"].get(self.internal_zone_name, {}).get("watt", 0.0)
         return 0.0
 
-class BedTotalPowerSensor(RejuvenationBedSensorBase):
+class BedTotalPowerSensor(RejuvenationBedEnergySensor):
     """Zeigt den Gesamtverbrauch des Betts."""
     _attr_device_class = SensorDeviceClass.POWER
     _attr_native_unit_of_measurement = "W"
@@ -239,7 +308,7 @@ class BedTotalPowerSensor(RejuvenationBedSensorBase):
             return energy.get("total_power", 0.0)
         return 0.0
 
-class BedEnergyPriceStatusSensor(RejuvenationBedSensorBase):
+class BedEnergyPriceStatusSensor(RejuvenationBedEnergySensor):
     """Zeigt, ob der Strompreis gerade günstig, teuer oder normal ist."""
     
     def __init__(self, coordinator):
@@ -264,11 +333,11 @@ class BedEnergyPriceStatusSensor(RejuvenationBedSensorBase):
         return "mdi:currency-eur"
 
 
-class BedThermalSummarySensor(RejuvenationBedSensorBase):
+class BedThermalSummarySensor(RejuvenationBedZoneSensor):
     """Zeigt detaillierte Thermal Summary (Temperature Breakdown)."""
     
     def __init__(self, coordinator, zone_idx, display_name):
-        super().__init__(coordinator)
+        super().__init__(coordinator, zone_idx)
         self.zone_idx = zone_idx
         self._attr_name = f"Bett{display_name} Thermal Summary"
         self._attr_unique_id = f"{coordinator.config_entry.entry_id}_zone_{zone_idx}_thermal_summary"
@@ -306,7 +375,7 @@ class BedThermalSummarySensor(RejuvenationBedSensorBase):
         }
 
 
-class BedRampStatusSensor(RejuvenationBedSensorBase):
+class BedRampStatusSensor(RejuvenationBedZoneSensor):
     """
     Zeigt den Status der Temperatur-Rampe (Materialschutz).
     
@@ -316,7 +385,7 @@ class BedRampStatusSensor(RejuvenationBedSensorBase):
     _attr_icon = "mdi:chart-timeline-variant"
     
     def __init__(self, coordinator, zone_idx, display_name):
-        super().__init__(coordinator)
+        super().__init__(coordinator, zone_idx)
         self.zone_idx = zone_idx
         self._attr_name = f"Bett{display_name} Rampen-Status"
         self._attr_unique_id = f"{coordinator.config_entry.entry_id}_zone_{zone_idx}_ramp"
@@ -365,7 +434,7 @@ class BedRampStatusSensor(RejuvenationBedSensorBase):
         return attrs
 
 
-class BedEnergyBudgetSensor(RejuvenationBedSensorBase):
+class BedEnergyBudgetSensor(RejuvenationBedEnergySensor):
     """Zeigt gesamtes Energy Budget."""
     _attr_device_class = SensorDeviceClass.ENERGY
     _attr_native_unit_of_measurement = "kWh"
@@ -388,7 +457,7 @@ class BedEnergyBudgetSensor(RejuvenationBedSensorBase):
         return self.coordinator.diagnostics_manager.get_energy_budget()
 
 
-class BedSolarPercentageSensor(RejuvenationBedSensorBase):
+class BedSolarPercentageSensor(RejuvenationBedEnergySensor):
     """Zeigt Solar-Anteil am Gesamtverbrauch."""
     _attr_native_unit_of_measurement = "%"
     _attr_icon = "mdi:solar-power"
@@ -404,7 +473,7 @@ class BedSolarPercentageSensor(RejuvenationBedSensorBase):
         return budget.get("solar_percentage", 0.0)
 
 
-class BedEstimatedSavingsSensor(RejuvenationBedSensorBase):
+class BedEstimatedSavingsSensor(RejuvenationBedEnergySensor):
     """Zeigt geschätzte Geld-Ersparnis."""
     _attr_device_class = SensorDeviceClass.MONETARY
     _attr_native_unit_of_measurement = "EUR"
@@ -422,17 +491,106 @@ class BedEstimatedSavingsSensor(RejuvenationBedSensorBase):
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
+# THERMISCHE BATTERIE
+# ═══════════════════════════════════════════════════════════════════════════════
+
+class BedThermalBatterySensor(RejuvenationBedEnergySensor):
+    """
+    Zeigt den Ladezustand der thermischen Batterie.
+    
+    Das Wasserbett speichert Wärmeenergie wie eine Batterie.
+    0% = Standby-Temperatur (26°C), 100% = Solar-Boost-Maximum (32°C).
+    
+    Physik: E = m × c × ΔT
+    250L Wasser, ΔT 6°C → ~1.7 kWh gespeichert
+    """
+    _attr_icon = "mdi:battery-charging"
+    _attr_state_class = SensorStateClass.MEASUREMENT
+    _attr_native_unit_of_measurement = "%"
+    
+    # Temperatur-Grenzen für die Batterie-Berechnung
+    TEMP_MIN = 26.0  # Standby = 0%
+    TEMP_MAX = 32.0  # Solar-Boost-Maximum = 100%
+    SPECIFIC_HEAT = 4.186  # kJ/(kg·°C) für Wasser
+    
+    def __init__(self, coordinator):
+        super().__init__(coordinator)
+        self._attr_name = "Bett Thermische Batterie"
+        self._attr_unique_id = f"{coordinator.config_entry.entry_id}_thermal_battery"
+    
+    def _get_volume(self) -> float:
+        """Bett-Volumen in Litern aus Config."""
+        opts = self.coordinator.config_entry.options
+        global_conf = self.coordinator.config_entry.data.get("global", {})
+        return float(
+            opts.get("bed_volume_liters")
+            or global_conf.get("bed_volume_liters")
+            or 250
+        )
+    
+    def _get_avg_water_temp(self) -> float:
+        """Durchschnittstemperatur aller Zonen."""
+        data = self.coordinator.data or {}
+        zones = data.get("zones", {})
+        temps = []
+        for zone_data in zones.values():
+            t = zone_data.get("current")
+            if t is not None:
+                temps.append(t)
+        return sum(temps) / len(temps) if temps else 28.0
+    
+    @property
+    def native_value(self):
+        temp = self._get_avg_water_temp()
+        pct = (temp - self.TEMP_MIN) / (self.TEMP_MAX - self.TEMP_MIN) * 100
+        return round(max(0, min(100, pct)), 1)
+    
+    @property
+    def icon(self):
+        pct = self.native_value or 0
+        if pct >= 80:
+            return "mdi:battery-high"
+        elif pct >= 40:
+            return "mdi:battery-medium"
+        elif pct >= 10:
+            return "mdi:battery-low"
+        return "mdi:battery-outline"
+    
+    @property
+    def extra_state_attributes(self):
+        temp = self._get_avg_water_temp()
+        volume = self._get_volume()
+        
+        # Gespeicherte Energie in kWh
+        delta_t = max(0, temp - self.TEMP_MIN)
+        energy_kwh = volume * self.SPECIFIC_HEAT * delta_t / 3600
+        
+        # Maximale Kapazität
+        max_delta = self.TEMP_MAX - self.TEMP_MIN
+        max_kwh = volume * self.SPECIFIC_HEAT * max_delta / 3600
+        
+        return {
+            "wassertemperatur": round(temp, 1),
+            "volumen_liter": volume,
+            "gespeichert_kwh": round(energy_kwh, 2),
+            "kapazität_kwh": round(max_kwh, 2),
+            "min_temp": self.TEMP_MIN,
+            "max_temp": self.TEMP_MAX,
+        }
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
 # SLEEP SCORE SENSOREN
 # ═══════════════════════════════════════════════════════════════════════════════
 
-class BedSleepScoreSensor(RejuvenationBedSensorBase):
+class BedSleepScoreSensor(RejuvenationBedZoneSensor):
     """Zeigt den Schlaf-Score der letzten Nacht (0-100)."""
     _attr_icon = "mdi:sleep"
     _attr_state_class = SensorStateClass.MEASUREMENT
     _attr_native_unit_of_measurement = "Punkte"
     
     def __init__(self, coordinator, zone_idx, display_name):
-        super().__init__(coordinator)
+        super().__init__(coordinator, zone_idx)
         self.zone_idx = zone_idx
         self._attr_name = f"Bett{display_name} Schlaf-Score"
         self._attr_unique_id = f"{coordinator.config_entry.entry_id}_zone_{zone_idx}_sleep_score"
@@ -465,14 +623,14 @@ class BedSleepScoreSensor(RejuvenationBedSensorBase):
         return attrs
 
 
-class BedSleepScoreWeeklySensor(RejuvenationBedSensorBase):
+class BedSleepScoreWeeklySensor(RejuvenationBedZoneSensor):
     """Zeigt den Wochen-Durchschnitt des Schlaf-Scores."""
     _attr_icon = "mdi:calendar-week"
     _attr_state_class = SensorStateClass.MEASUREMENT
     _attr_native_unit_of_measurement = "Punkte"
     
     def __init__(self, coordinator, zone_idx, display_name):
-        super().__init__(coordinator)
+        super().__init__(coordinator, zone_idx)
         self.zone_idx = zone_idx
         self._attr_name = f"Bett{display_name} Schlaf-Score Woche"
         self._attr_unique_id = f"{coordinator.config_entry.entry_id}_zone_{zone_idx}_sleep_score_weekly"
@@ -497,51 +655,11 @@ class BedSleepScoreWeeklySensor(RejuvenationBedSensorBase):
         }
 
 
-class BedSleepScoreTrendSensor(RejuvenationBedSensorBase):
-    """Zeigt den Trend des Schlaf-Scores."""
-    _attr_icon = "mdi:trending-up"
-    
-    def __init__(self, coordinator, zone_idx, display_name):
-        super().__init__(coordinator)
-        self.zone_idx = zone_idx
-        self._attr_name = f"Bett{display_name} Schlaf-Trend"
-        self._attr_unique_id = f"{coordinator.config_entry.entry_id}_zone_{zone_idx}_sleep_trend"
-    
-    @property
-    def native_value(self):
-        score = self.coordinator.sleep_score_calculator.get_last_score(self.zone_idx)
-        if score:
-            return f"{score.trend}{score.trend_value:+d}"
-        return "→0"
-    
-    @property
-    def icon(self):
-        score = self.coordinator.sleep_score_calculator.get_last_score(self.zone_idx)
-        if score:
-            if score.trend == "↑":
-                return "mdi:trending-up"
-            elif score.trend == "↓":
-                return "mdi:trending-down"
-        return "mdi:trending-neutral"
-    
-    @property
-    def extra_state_attributes(self):
-        score = self.coordinator.sleep_score_calculator.get_last_score(self.zone_idx)
-        if not score:
-            return {}
-        
-        return {
-            "richtung": "aufwärts" if score.trend == "↑" else ("abwärts" if score.trend == "↓" else "stabil"),
-            "punkte_differenz": score.trend_value,
-            "vergleich": "vs. letzte 7 Tage",
-        }
-
-
 # ═══════════════════════════════════════════════════════════════════════════════
 # ENERGIE-AUSWERTUNGS-SENSOREN
 # ═══════════════════════════════════════════════════════════════════════════════
 
-class BedEnergyTodaySensor(RejuvenationBedSensorBase):
+class BedEnergyTodaySensor(RejuvenationBedEnergySensor):
     """Zeigt den Energieverbrauch heute (resettet sich um Mitternacht)."""
     _attr_device_class = SensorDeviceClass.ENERGY
     _attr_native_unit_of_measurement = UnitOfEnergy.KILO_WATT_HOUR
@@ -568,7 +686,7 @@ class BedEnergyTodaySensor(RejuvenationBedSensorBase):
         }
 
 
-class BedSolarEnergyTodaySensor(RejuvenationBedSensorBase):
+class BedSolarEnergyTodaySensor(RejuvenationBedEnergySensor):
     """Zeigt den Solar-Energieverbrauch."""
     _attr_device_class = SensorDeviceClass.ENERGY
     _attr_native_unit_of_measurement = UnitOfEnergy.KILO_WATT_HOUR
@@ -586,7 +704,7 @@ class BedSolarEnergyTodaySensor(RejuvenationBedSensorBase):
         return round(budget.get("solar_kwh_used", 0.0), 3)
 
 
-class BedGridEnergyTodaySensor(RejuvenationBedSensorBase):
+class BedGridEnergyTodaySensor(RejuvenationBedEnergySensor):
     """Zeigt den Netz-Energieverbrauch."""
     _attr_device_class = SensorDeviceClass.ENERGY
     _attr_native_unit_of_measurement = UnitOfEnergy.KILO_WATT_HOUR
@@ -604,7 +722,7 @@ class BedGridEnergyTodaySensor(RejuvenationBedSensorBase):
         return round(budget.get("grid_kwh_used", 0.0), 3)
 
 
-class BedAvgDailyEnergySensor(RejuvenationBedSensorBase):
+class BedAvgDailyEnergySensor(RejuvenationBedEnergySensor):
     """Zeigt den durchschnittlichen täglichen Energieverbrauch."""
     _attr_device_class = SensorDeviceClass.ENERGY
     _attr_native_unit_of_measurement = UnitOfEnergy.KILO_WATT_HOUR
@@ -629,7 +747,7 @@ class BedAvgDailyEnergySensor(RejuvenationBedSensorBase):
         }
 
 
-class BedHeatingHoursSensor(RejuvenationBedSensorBase):
+class BedHeatingHoursSensor(RejuvenationBedEnergySensor):
     """Zeigt die Gesamtheizstunden."""
     _attr_icon = "mdi:clock-outline"
     _attr_native_unit_of_measurement = "h"
@@ -646,7 +764,7 @@ class BedHeatingHoursSensor(RejuvenationBedSensorBase):
         return round(budget.get("total_runtime_hours", 0.0), 1)
 
 
-class BedLegacyComparisonSensor(RejuvenationBedSensorBase):
+class BedLegacyComparisonSensor(RejuvenationBedEnergySensor):
     """
     Vergleicht Smart-Steuerung mit traditioneller Wasserbett-Heizung.
     
@@ -722,7 +840,7 @@ class BedLegacyComparisonSensor(RejuvenationBedSensorBase):
             ),
         }
 
-class BedIntelligenceSensor(RejuvenationBedSensorBase):
+class BedIntelligenceSensor(RejuvenationBedSleepSensor):
     """
     Zeigt den Status der Bed-Intelligence Engine.
     
@@ -759,58 +877,5 @@ class BedIntelligenceSensor(RejuvenationBedSensorBase):
             attrs[f"zone_{z_idx}_features"] = diag.get("features", {})
             attrs[f"zone_{z_idx}_isolation"] = diag.get("isolation", {})
             attrs[f"zone_{z_idx}_sweat"] = diag.get("sweat", {})
-        
-        return attrs
-
-
-class BedtimePredictionSensor(RejuvenationBedSensorBase):
-    """
-    Zeigt die vom System gelernte Einschlafzeit-Vorhersage.
-    
-    Lernt aus den letzten 28 Nächten, unterscheidet Wochentag/Wochenende.
-    Zeigt auch den vorhergesagten Vorheiz-Start.
-    """
-    _attr_icon = "mdi:crystal-ball"
-    
-    def __init__(self, coordinator, zone_index: int):
-        super().__init__(coordinator)
-        self._zone_idx = zone_index
-        zone_suffix = f" Zone {zone_index + 1}" if len(coordinator.config_entry.data.get("zones", [])) > 1 else ""
-        self._attr_name = f"Bett Einschlafzeit-Vorhersage{zone_suffix}"
-        self._attr_unique_id = f"{coordinator.config_entry.entry_id}_bedtime_prediction_{zone_index}"
-    
-    @property
-    def native_value(self):
-        bi = self.coordinator.bed_intelligence
-        prediction = bi.predict_bedtime(self._zone_idx)
-        if prediction:
-            return prediction["predicted_str"]
-        
-        history = bi._bedtime_history.get(self._zone_idx, []) if hasattr(bi, '_bedtime_history') else []
-        if history:
-            return f"Lerne... ({len(history)}/{bi._MIN_SAMPLES_FOR_PREDICTION} Nächte)"
-        return "Warte auf Daten"
-    
-    @property
-    def extra_state_attributes(self):
-        bi = self.coordinator.bed_intelligence
-        diag = bi.get_bedtime_diagnostics(self._zone_idx)
-        
-        attrs = {
-            "nächte_gespeichert": diag.get("nights_recorded", 0),
-            "mindestens_nötig": diag.get("min_required", 3),
-        }
-        
-        if "prediction" in diag:
-            attrs["vorhersage"] = diag["prediction"]
-            attrs["konfidenz"] = diag.get("confidence", "?")
-            attrs["streuung_minuten"] = diag.get("spread_minutes", 0)
-            attrs["basis"] = diag.get("basis", "?")
-            
-            if "predicted_preheat_start" in diag:
-                attrs["vorheiz_start"] = diag["predicted_preheat_start"]
-        
-        if "recent_bedtimes" in diag:
-            attrs["letzte_nächte"] = diag["recent_bedtimes"]
         
         return attrs

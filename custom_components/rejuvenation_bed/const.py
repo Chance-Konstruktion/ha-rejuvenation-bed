@@ -21,6 +21,7 @@ WATERBED_CONFIG = {
     # Temperatur-Grenzen
     "min_temp": 24.0,              # Kondensationsschutz (PFLICHT!)
     "max_temp": 30.0,              # Schlafkomfort
+    "standby_temp": 26.0,          # Standby: Warmhalten (Kondensation!)
     "away_temp": 24.0,             # Urlaub-Modus (nie unter 24°C!)
     "eco_min_temp": 26.0,          # Eco-Absenkung nicht unter 26°C
     
@@ -62,6 +63,7 @@ HEATING_PAD_CONFIG = {
     # Temperatur-Grenzen
     "min_temp": 0.0,               # Kann komplett AUS sein
     "max_temp": 40.0,              # Höheres Limit OK (kein Wasser)
+    "standby_temp": 0.0,           # Standby: AUS (keine Kondensationsgefahr)
     "away_temp": 0.0,              # Urlaub = AUS
     "eco_min_temp": 0.0,           # Eco = kann AUS sein
     
@@ -131,7 +133,24 @@ DEFAULT_SICK_MODE_TEMP = 30.0       # Konstante Temp im Krank-Modus
 DEFAULT_SICK_MODE_DAYS = 3          # Dauer Krank-Modus in Tagen
 DEFAULT_BOOST_OFFSET = 2.0          # +2°C beim Schnellheizen
 DEFAULT_COMFORT_OFFSET = 0.5        # +0.5°C beim Ausschlafen
+BOOST_MAX_TEMP = 34.0               # Absolute Obergrenze Boost (Hardware-Thermostat = Backup)
 
 # Device Info
 MANUFACTURER = "Rejuvenation Bed"
-SW_VERSION = "0.3.9"
+SW_VERSION = "0.5.4"
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# ZEIT-HELPER
+# ═══════════════════════════════════════════════════════════════════════════════
+
+def local_now():
+    """
+    Aktuelle Lokalzeit als naive Datetime.
+    
+    Nutzt dt_util.now() für die korrekte HA-Zeitzone, 
+    strippt aber tzinfo für Kompatibilität mit dem restlichen Code.
+    Alle internen Zeitvergleiche (Weckzeit, warm_from, etc.) 
+    arbeiten mit naiven Datetimes.
+    """
+    from homeassistant.util import dt as dt_util
+    return dt_util.now().replace(tzinfo=None)

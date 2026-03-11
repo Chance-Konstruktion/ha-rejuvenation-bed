@@ -2,61 +2,39 @@
 
 Alle Änderungen am Rejuvenation Bed Projekt.
 
+## [0.4.2] - 2026-03-06
+
+### Neue Features
+- **Thermische Batterie** – Neuer Sensor `sensor.bett_thermische_batterie` zeigt den Ladezustand des Wärmespeichers in Prozent und kWh. Basiert auf Wassertemperatur, Volumen und physikalischer Wärmekapazität.
+- **Bett-Volumen** – Konfigurierbarer Slider (100–1200 L) unter Zeiten & Temperatur. Fließt in Batterie- und Aufheiz-Berechnung ein.
+- **Drei Geräte** – Sensoren sind jetzt auf drei Devices aufgeteilt: Hauptgerät (Climate, Status, Schalter), Energie (Verbrauch, Solar, Ersparnis, Batterie) und Schlaf (Score, Vorhersage, Intelligenz).
+- **Bedtime Learning** – System lernt wann du typisch einschläfst und passt die Vorheizzeit automatisch an. Unterscheidet Wochentag und Wochenende, nutzt Median statt Durchschnitt. Neuer Sensor `sensor.bett_einschlafzeit_vorhersage`.
+- **Solar-Schwelle konfigurierbar** – Slider 100–2000 W statt fester 500 W. Bei Doppelbett mit 600 W Heizleistung auf 600 W oder höher einstellen.
+- **Strompreis einstellbar** – Fester Tarif (5–80 ct/kWh) als Fallback und für Ersparnis-Berechnung. Dynamischer Preis-Sensor überschreibt ihn bei Verfügbarkeit.
+- **Options-Reload** – Änderungen in den Einstellungen laden die Integration automatisch neu. CO₂-Sensor nachträglich hinzufügen erstellt jetzt sofort die Schlaf-Score-Sensoren.
+
+### Bugfixes
+- **Sensor-Recovery** – Fail-Safe und Degraded-Modus setzen jetzt `hvac_mode: heat`. Bei Sensor-Rückkehr wird `manual_hvac_mode` automatisch gelöscht.
+- **Präsenz-Erkennung** – Heizungs-Zyklen erzeugten ±0.06°C Oszillation die als Präsenz gewertet wurde. Schwellwert wird jetzt bei aktiver Heizung um Faktor 1.8 angehoben.
+- **Vorheizen mit Präsenz-Sensor** – Vorheizen fehlte im Präsenz-Pfad. Jetzt auch dort 3 Stunden vor dem Warmfenster.
+- **Boost relativ** – Boost nutzt jetzt `base_temp + offset` statt absolutem Wert. Safety-Cap bei 36°C.
+- **CO₂-Sensor** – Aus Zone-Sensoren nach Global verschoben. Rückwärtskompatibel: Zone → Options → Global.
+- **Toilettengang-Timeout** – Vor Weckzeit kein Timeout mehr (Kurve läuft weiter). Nach Weckzeit 5 Minuten Timeout.
+- **Abkühlrampe** – Keine Rampe mehr beim Abkühlen. Heizung geht sofort aus, Wasser kühlt durch Wärmeverlust von selbst. Rampe nur noch beim Aufheizen (Vinyl-Schutz).
+- **Bedtime Learning** – Nacht-Datum statt Kalender-Datum (4:30 am 5.März = Nacht vom 4.März). Tagsüber-Präsenz wird nicht mehr aufgezeichnet.
+
+### Sensor-Robustheit
+- **Feature-Flag-Reset** – Wenn SHT41 ausfällt, wird `_has_air_temp` auf False zurückgesetzt. Isolation und Schwitz-Erkennung deaktivieren sich, Kernfunktion läuft weiter.
+- **None-Guards** – Alle BedIntelligence-Funktionen prüfen am Anfang ihre Inputs.
+- **try/except** – Präsenz-Erkennung, BedIntelligence und Leak-Check sind gewrappt. Ein Crash dort legt nie die Heizung lahm.
+
+### Options-Flow überarbeitet
+- Sub-Menü für Globale Einstellungen: Zeiten & Temperatur / Sensoren & Strompreis.
+- Jeder Sensor hat eine ausführliche Beschreibung in der Step-Description.
+- Keine verwaisten Translation-Keys mehr. DE, EN und strings.json synchron.
+- Biorhythmus-Phasen optimiert: Einschlaf 15→8%, Tiefschlaf 50→55%.
+
 ## [0.1.0-rc] - 2026-02-21
 
 ### Erstveröffentlichung (Release Candidate)
-
-Erster öffentlicher Release nach intensiver Entwicklungs- und Testphase auf einem echten 2×2m Dual-Kern Wasserbett.
-
-### Kern-Features
-- **22 Module** mit ~9.500 Zeilen Python
-- **Biorhythmus-Kurve** mit Chronotyp-Anpassung (Lerche/Normal/Eule)
-- **Wecker-Integration** – Fest, Handy-Alarm oder Hybrid
-- **Saisonale Anpassung** via Außentemperatur
-- **Dual-Zone** – Zwei getrennte Heizzonen
-- **Bilingual** – Deutsch und Englisch
-
-### Energie-Management
-- **Solar-Boost** – PV-Überschuss als thermische Batterie
-- **Tarifmodus** – Dynamische Strompreise
-- **Energie-Tracking** – kWh, Heizstunden, Ø-Verbrauch, Ersparnis vs. Klassisch
-
-### Intelligenz
-- **Präsenz-Erkennung v3** – Varianz-basiert (σ > 0.04°C), kalibriert auf 126.771 Datenpunkte
-- **Auto-Kalibrierung** – Lernt Schwellwerte in 3–5 Tagen
-- **Drift-Korrektur** – Passt sich nach Erstkalibierung saisonal an (EMA α=0.15)
-- **Ausreißer-Filter** – ESP-Glitches und Sensor-Boot werden ignoriert
-- **Isolations-Erkennung 2.0** – Kalibriert auf echte Messdaten (4.592 Datenpunkte)
-  - Heizungs-Korrektur: −0.4°C wenn Heizung aktiv (verhindert Fehlalarme)
-  - 30-Minuten-Mittelwert statt Einzelmessung
-  - Schwellwerte: Δ < 0.15° = gut, Δ < 0.25° = mäßig, Δ > 0.40° = offen
-- **Schwitz-Erkennung 2.0** – Kreuzkorrelation Temperatur × Feuchtigkeit
-- **Schlaf-Score** – 0–100 mit optionaler CO₂-Gewichtung (25%)
-- **CO₂-Sensor** – Im Setup und Options-Flow konfigurierbar
-
-### Sicherheit
-- **Überhitzungsschutz** – Max 36°C, Fail-Safe bei Sensor-Ausfall
-- **Startup-Grace-Period** – 3 Minuten Geduld nach HA-Restart für ESP-Boot
-- **Anti-Short-Cycle** – Relay-Schutz (umgangen bei Boost/Krank-Modus)
-- **Kalibrierung überlebt HA-Neustarts** – Auto-Save alle 50 Samples
-- **Persistente Energiezähler** – kWh und Heizstunden gehen nicht verloren
-
-### Modi
-- **Boost** – Schnellheizen 60 Min (umgeht Anti-Short-Cycle)
-- **Krank-Modus** – Konstante Temperatur für konfigurierbare Tage
-- **Urlaub** – Minimale 24°C Haltetemperatur
-- **Eco** – Tarifbasiertes Heizen
-
-### Bugfixes (aus Entwicklungsphase)
-- Time-Parser: HH:MM:SS Format (HA TimeSelector) wird korrekt geparst
-- Options-Flow: Zone-Settings werden als Flat-Keys korrekt gelesen
-- CO₂-Sensor: Aus Options UND Config lesbar
-- duty_cycle KeyError behoben (SafetyManager gibt Key nicht zurück)
-- Sensor-Ausfall meldet nicht mehr sofort nach HA-Restart (Grace-Period)
-- Boost/Krank-Modus schalten jetzt sofort (Anti-Short-Cycle umgangen)
-- Kalibrierungsdaten (Rohdaten) überleben HA-Neustarts
-
-### Bekannte Einschränkungen
-- Isolations-Erkennung funktioniert am besten wenn der SHT41 OBEN auf dem Kern liegt
-- Schlaf-Score benötigt mindestens Hardware-Level C für aussagekräftige Werte
-- Wearable-Anbindung (Schlafphasen) ist vorbereitet aber noch nicht aktiv
+Erster öffentlicher Release. 22 Module, ~9.500 Zeilen Python. Biorhythmus-Kurve, Solar-Boost, Präsenz-Erkennung, Auto-Kalibrierung, Schlaf-Score, Dual-Zone, bilingual (DE/EN).

@@ -4,8 +4,9 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, ServiceCall
 from homeassistant.helpers import config_validation as cv, device_registry as dr
 import voluptuous as vol
-from .const import DOMAIN, SW_VERSION
+from .const import DOMAIN, SW_VERSION, local_now
 from .coordinator import RejuvenationBedCoordinator
+from homeassistant.util import dt as dt_util
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -105,7 +106,17 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     # 7. Services registrieren
     await _async_setup_services(hass, entry)
 
+    # 8. Options-Change-Listener: Bei Änderungen Integration neu laden
+    #    (z.B. CO₂-Sensor nachträglich hinzugefügt → Score-Sensoren erstellen)
+    entry.async_on_unload(entry.add_update_listener(_async_options_updated))
+
     return True
+
+
+async def _async_options_updated(hass: HomeAssistant, entry: ConfigEntry):
+    """Wird aufgerufen wenn Options geändert werden → Integration neu laden."""
+    _LOGGER.info("Options geändert → Integration wird neu geladen")
+    await hass.config_entries.async_reload(entry.entry_id)
 
 
 async def _async_register_device(hass: HomeAssistant, entry: ConfigEntry):
@@ -148,7 +159,7 @@ async def _async_setup_services(hass: HomeAssistant, entry: ConfigEntry):
         for zone_idx in range(len(entry.data.get("zones", []))):
             coordinator.manual_boost[zone_idx] = True
             coordinator.boost_until = coordinator.boost_until if hasattr(coordinator, 'boost_until') else {}
-            coordinator.boost_until[zone_idx] = datetime.now() + timedelta(minutes=duration)
+            coordinator.boost_until[zone_idx] = local_now() + timedelta(minutes=duration)
         
         _LOGGER.info(f"Boost aktiviert für {duration} Minuten")
         await coordinator.async_request_refresh()
@@ -160,7 +171,7 @@ async def _async_setup_services(hass: HomeAssistant, entry: ConfigEntry):
         days = call.data.get("days", 3)
         
         for zone_idx in range(len(entry.data.get("zones", []))):
-            coordinator.sick_mode_until[zone_idx] = datetime.now() + timedelta(days=days)
+            coordinator.sick_mode_until[zone_idx] = local_now() + timedelta(days=days)
             coordinator.sick_mode_temp = coordinator.sick_mode_temp if hasattr(coordinator, 'sick_mode_temp') else {}
             coordinator.sick_mode_temp[zone_idx] = temperature
         
@@ -170,20 +181,23 @@ async def _async_setup_services(hass: HomeAssistant, entry: ConfigEntry):
     async def handle_set_vacation(call: ServiceCall):
         """Handle set_vacation_mode service."""
         coordinator = hass.data[DOMAIN][entry.entry_id]
-        temperature = call.data.get("temperature", 20)
         end_date = call.data.get("end_date")
         
         from homeassistant.components.climate.const import PRESET_AWAY
         
+        coordinator.vacation_mode_enabled = True
+        if end_date:
+            coordinator.vacation_until = datetime.combine(end_date, datetime.min.time())
+        else:
+            # Default: 14 Tage
+            coordinator.vacation_until = local_now() + timedelta(days=14)
+        
         for zone_idx in range(len(entry.data.get("zones", []))):
             coordinator.manual_preset[zone_idx] = PRESET_AWAY
-            coordinator.vacation_temp = coordinator.vacation_temp if hasattr(coordinator, 'vacation_temp') else {}
-            coordinator.vacation_temp[zone_idx] = temperature
-            if end_date:
-                coordinator.vacation_until = coordinator.vacation_until if hasattr(coordinator, 'vacation_until') else {}
-                coordinator.vacation_until[zone_idx] = datetime.combine(end_date, datetime.min.time())
         
-        _LOGGER.info(f"Urlaub-Modus aktiviert: {temperature}°C")
+        _LOGGER.info(
+            f"Urlaub-Modus aktiviert bis {coordinator.vacation_until.strftime('%d.%m.%Y')}"
+        )
         await coordinator.async_request_refresh()
     
     async def handle_cancel_special_mode(call: ServiceCall):
@@ -198,6 +212,10 @@ async def _async_setup_services(hass: HomeAssistant, entry: ConfigEntry):
             coordinator.manual_preset[zone_idx] = PRESET_NONE
             if hasattr(coordinator, 'boost_until'):
                 coordinator.boost_until[zone_idx] = None
+        
+        # Vacation zurücksetzen
+        coordinator.vacation_mode_enabled = False
+        coordinator.vacation_until = None
         
         _LOGGER.info("Alle Sonder-Modi beendet")
         await coordinator.async_request_refresh()
@@ -221,7 +239,7 @@ async def _async_setup_services(hass: HomeAssistant, entry: ConfigEntry):
         for zone_idx in range(len(entry.data.get("zones", []))):
             coordinator.manual_target_temp[zone_idx] = target_temp
             coordinator.preheat_until = coordinator.preheat_until if hasattr(coordinator, 'preheat_until') else {}
-            coordinator.preheat_until[zone_idx] = datetime.now() + timedelta(minutes=duration)
+            coordinator.preheat_until[zone_idx] = local_now() + timedelta(minutes=duration)
         
         _LOGGER.info(f"Vorheizen auf {target_temp}°C für {duration} Minuten")
         await coordinator.async_request_refresh()

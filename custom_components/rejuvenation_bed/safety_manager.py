@@ -23,8 +23,9 @@ import logging
 from datetime import datetime, timedelta
 from typing import Dict, Optional, Tuple
 from homeassistant.core import HomeAssistant
+from homeassistant.util import dt as dt_util
 
-from .const import ABSOLUTE_MAX_TEMP, WATERBED_CONFIG
+from .const import ABSOLUTE_MAX_TEMP, WATERBED_CONFIG, local_now
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -139,7 +140,7 @@ class SafetyManager:
         Returns:
             (is_safe, status, notification_message)
         """
-        now = datetime.now()
+        now = local_now()
         notification = None
         
         # ═══════════════════════════════════════════════════════════════════════
@@ -298,7 +299,7 @@ class SafetyManager:
         
         Verwendet 30% Duty-Cycle: 3 Min AN, 7 Min AUS
         """
-        now = datetime.now()
+        now = local_now()
         
         if zone_index not in self._degraded_cycle_start:
             self._degraded_cycle_start[zone_index] = now
@@ -322,7 +323,7 @@ class SafetyManager:
         self, zone_index: int, notification_type: str, message: str
     ) -> Optional[str]:
         """Erstellt eine Warnung mit Spam-Schutz (max. 1x pro Stunde)."""
-        now = datetime.now()
+        now = local_now()
         
         tracking = {
             "overheat": self._last_overheat_notification,
@@ -366,12 +367,12 @@ class SafetyManager:
         """Gibt die aktuelle Heizdauer in Stunden zurück."""
         start = self._heating_start_time.get(zone_index)
         if start:
-            return (datetime.now() - start).total_seconds() / 3600
+            return (local_now() - start).total_seconds() / 3600
         return None
     
     def _get_off_duration(self, zone_index: int) -> Optional[float]:
         """Gibt die Dauer seit AUS-Befehl in Minuten zurück."""
         start = self._off_command_time.get(zone_index)
         if start:
-            return (datetime.now() - start).total_seconds() / 60
+            return (local_now() - start).total_seconds() / 60
         return None

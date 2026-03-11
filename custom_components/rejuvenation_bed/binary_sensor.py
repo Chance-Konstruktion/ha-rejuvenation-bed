@@ -11,10 +11,39 @@ _LOGGER = logging.getLogger(__name__)
 
 
 def get_device_info(coordinator) -> DeviceInfo:
-    """Gibt die Device-Info für alle Entities zurück."""
+    """Hauptgerät (Mono) oder Container-Gerät (Dual)."""
     global_conf = coordinator.config_entry.data.get("global", {})
     bed_type = global_conf.get("bed_type", "wasserbett")
     zones_count = len(coordinator.config_entry.data.get("zones", []))
+    
+    model = "Smart Wasserbett Controller" if bed_type == "wasserbett" else "Smart Heizmatte Controller"
+    zone_suffix = "Dual-Zone" if zones_count > 1 else "Mono"
+    
+    return DeviceInfo(
+        identifiers={(DOMAIN, coordinator.config_entry.entry_id)},
+        manufacturer=MANUFACTURER,
+        model=f"{model} ({zone_suffix})",
+        name="Rejuvenation Bed",
+        sw_version=SW_VERSION,
+    )
+
+
+def get_zone_device_info(coordinator, zone_index: int) -> DeviceInfo:
+    """Zone-Gerät für Dual-Bett (Links/Rechts)."""
+    zones_count = len(coordinator.config_entry.data.get('zones', []))
+    if zones_count <= 1:
+        return get_device_info(coordinator)
+    zone_name = 'Links' if zone_index == 0 else 'Rechts'
+    return DeviceInfo(
+        identifiers={(DOMAIN, f'{coordinator.config_entry.entry_id}_zone_{zone_index}')},
+        manufacturer=MANUFACTURER,
+        model=f'Bett-Zone {zone_name}',
+        name=f'Bett {zone_name}',
+        sw_version=SW_VERSION,
+        via_device=(DOMAIN, coordinator.config_entry.entry_id),
+    )
+
+
     
     model = "Smart Wasserbett Controller" if bed_type == "wasserbett" else "Smart Heizmatte Controller"
     zone_suffix = "Dual-Zone" if zones_count > 1 else "Mono"
@@ -76,12 +105,13 @@ async def async_setup_entry(hass, config_entry, async_add_entities):
     if is_waterbed and has_any_temp_sensor:
         entities.append(BedCondensationRiskSensor(coordinator))
     
-    # 6. Isolations-Erkennung (Decken-Check) - pro Zone
-    for zone_idx, zone_config in enumerate(zones_config):
-        suffix = ""
-        if is_dual_zone:
-            suffix = " Links" if zone_idx == 0 else " Rechts"
-        entities.append(BedIsolationSensor(coordinator, zone_idx, suffix))
+    # 6. Isolations-Erkennung (Decken-Check) - nur Wasserbett, pro Zone
+    if is_waterbed:
+        for zone_idx, zone_config in enumerate(zones_config):
+            suffix = ""
+            if is_dual_zone:
+                suffix = " Links" if zone_idx == 0 else " Rechts"
+            entities.append(BedIsolationSensor(coordinator, zone_idx, suffix))
 
     async_add_entities(entities)
 
@@ -96,7 +126,7 @@ class BedMoistureSensor(CoordinatorEntity, BinarySensorEntity):
         self._attr_name = f"Bett{suffix} {name_type}"
         self._attr_device_class = device_class
         self._attr_unique_id = f"{coordinator.config_entry.entry_id}_z{zone_idx}_{data_key}"
-        self._attr_device_info = get_device_info(coordinator)
+        self._attr_device_info = get_zone_device_info(coordinator, zone_idx)
         
         # Icon-Anpassung für Schwitzen
         if data_key == "is_sweating":
@@ -207,7 +237,7 @@ class BedPresenceSensor(CoordinatorEntity, BinarySensorEntity):
         self._zone_name = f"Zone {zone_idx + 1}"
         self._attr_name = f"Bett{suffix} Präsenz"
         self._attr_unique_id = f"{coordinator.config_entry.entry_id}_z{zone_idx}_presence"
-        self._attr_device_info = get_device_info(coordinator)
+        self._attr_device_info = get_zone_device_info(coordinator, zone_idx)
 
     @property
     def is_on(self) -> bool:
@@ -321,7 +351,7 @@ class BedIsolationSensor(CoordinatorEntity, BinarySensorEntity):
         self._zone_name = f"Zone {zone_idx + 1}"
         self._attr_name = f"Bett{suffix} Isolation"
         self._attr_unique_id = f"{coordinator.config_entry.entry_id}_z{zone_idx}_isolation"
-        self._attr_device_info = get_device_info(coordinator)
+        self._attr_device_info = get_zone_device_info(coordinator, zone_idx)
 
     @property
     def is_on(self) -> bool:

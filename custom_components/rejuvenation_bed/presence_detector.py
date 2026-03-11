@@ -55,8 +55,8 @@ class PresenceThresholds:
 
     # SCHWITZ-ERKENNUNG (nach User-Feedback angepasst!)
     # Feuchtigkeit 50-80% ist NORMAL wenn jemand unter der Decke liegt!
-    # Über 93% = richtig NASS (Schwitzen oder Leckage)
-    sweat_humidity_abs: float = 93.0          # Absolut >93% = NASS/echtes Schwitzen
+    # Über 93% = stark feucht (Schwitzen oder Leckage)
+    sweat_humidity_abs: float = 93.0          # Absolut >93% = STARK FEUCHT (Schwitzen)
     sweat_humidity_rise: float = 35.0         # Anstieg >35% über Baseline
     sweat_confirm_minutes: int = 15           # Muss 15 min anhalten
     
@@ -65,7 +65,7 @@ class PresenceThresholds:
     # 50-70% = normal (Person unter Decke)
     # 70-85% = feucht (warm, viel Decke)
     # 85-93% = sehr feucht (Achtung)
-    # >93%  = nass (Schwitzen/Alarm)
+    # >93%  = stark feucht (Schwitzen/Alarm)
 
     # LECKAGE (Sicherheit)
     leak_humidity_abs: float = 85.0           # >85% über 3h = Alarm
@@ -114,13 +114,14 @@ class PresenceDetector:
         power_watts: Optional[float] = None,
         heater_active: bool = False,
         presence_sensor_state: Optional[bool] = None,
+        is_heating_pad: bool = False,
     ) -> Tuple[bool, float, str]:
         """
         Erkennt ob jemand im Bett liegt.
 
-        Minimal-Setup: Nur water_temp reicht!
-        Besser mit: water_temp + air_temp
-        Optional: humidity (nur für Leckage, nicht für Präsenz)
+        Zwei Algorithmen:
+        - Wasserbett: Varianz-basiert (σ der Wassertemperatur)
+        - Heizmatte: Trend-basiert (Temperaturanstieg ohne Heizung = Körperwärme)
 
         Returns:
             (is_present, confidence, reason)
@@ -137,6 +138,14 @@ class PresenceDetector:
             self._set_state(zone_index, presence_sensor_state, 1.0,
                           "Präsenz-Sensor", now)
             return presence_sensor_state, 1.0, "Präsenz-Sensor"
+
+        # ─────────────────────────────────────────────────────────────
+        # Heizmatte: Trend-basierte Erkennung (Körperwärme)
+        # ─────────────────────────────────────────────────────────────
+        if is_heating_pad:
+            return self._detect_presence_heating_pad(
+                zone_index, water_temp, heater_active, now
+            )
 
         # ─────────────────────────────────────────────────────────────
         # PRIMÄR: Wassertemperatur-Varianz
@@ -170,8 +179,15 @@ class PresenceDetector:
         confidence = 0.0
         reasons = []
 
-        # Primär: Wasser-Varianz
+        # ─── Heizungs-Korrektur ───────────────────────────────────
+        # Heizung ON/OFF-Zyklen erzeugen ±0.06°C Oszillation die wie
+        # Präsenz aussieht. Threshold dynamisch anheben wenn Heizung aktiv.
         wt = self.thresholds.water_variance_threshold
+        if heater_active:
+            wt = wt * 1.8  # 0.040 → 0.072 (Heizrauschen ignorieren)
+            reasons.append("⚡Heiz")
+
+        # Primär: Wasser-Varianz
         if water_std > wt * 2:
             confidence = 0.95
             raw_present = True
@@ -190,6 +206,8 @@ class PresenceDetector:
         # Sekundär: Luft-Varianz (nur verstärkend, nie allein entscheidend)
         if air_std is not None:
             at = self.thresholds.air_variance_threshold
+            if heater_active:
+                at = at * 1.5  # Heizung beeinflusst auch Luft
             if air_std > at:
                 confidence = min(1.0, confidence + 0.15)
                 if not raw_present and air_std > at * 2:
@@ -204,6 +222,79 @@ class PresenceDetector:
         reason = f"{'🛏️' if is_present else '○'} {', '.join(reasons)}"
         self._set_state(zone_index, is_present, confidence, reason, now)
 
+        return is_present, round(confidence, 2), reason
+
+    # ═══════════════════════════════════════════════════════════════════════
+    # HEIZMATTE: TREND-BASIERTE PRÄSENZ (Körperwärme-Erkennung)
+    # ═══════════════════════════════════════════════════════════════════════
+
+    def _detect_presence_heating_pad(
+        self,
+        zone_index: int,
+        temp: Optional[float],
+        heater_active: bool,
+        now: datetime,
+    ) -> Tuple[bool, float, str]:
+        """
+        Erkennt Präsenz auf einer Heizmatte über Temperatur-Trend.
+        
+        Logik:
+        - Heizung AUS + Temp steigt → Körperwärme → Person liegt drauf
+        - Heizung AUS + Temp fällt → Bett kühlt ab → niemand da
+        - Heizung AN → Trend-Steigung prüfen (Körperwärme > erwartete Heizrate)
+        
+        Bestätigung nach 3 Minuten (6 Datenpunkte bei 30s).
+        """
+        buffer = self._water_temps.get(zone_index)
+        if buffer is None or len(buffer) < 6:
+            current = self._is_present.get(zone_index, False)
+            return current, 0.0, "Sammle Daten..."
+        
+        # Trend der letzten 3 Minuten
+        cutoff = now - timedelta(minutes=3)
+        recent = [val for ts, val in buffer if ts > cutoff and val is not None]
+        
+        if len(recent) < 4:
+            current = self._is_present.get(zone_index, False)
+            return current, 0.0, "Sammle Daten..."
+        
+        trend = recent[-1] - recent[0]  # Positiv = steigend
+        raw_present = False
+        confidence = 0.0
+        reasons = []
+        
+        if not heater_active:
+            # Heizung AUS: Temperaturanstieg = Körperwärme
+            if trend > 0.2:
+                raw_present = True
+                confidence = 0.85
+                reasons.append(f"Körperwärme +{trend:.2f}°C/3min")
+            elif trend > 0.05:
+                raw_present = True
+                confidence = 0.50
+                reasons.append(f"Leichter Anstieg +{trend:.2f}°C")
+            else:
+                confidence = 0.10
+                reasons.append(f"Trend {trend:+.2f}°C (kühlt)")
+        else:
+            # Heizung AN: Temperatur steigt schneller als erwartet = Körperwärme + Heizung
+            # Erwarteter Anstieg bei Heizmatte: ~0.25°C/3min (5°C/h)
+            expected_rise = 0.25
+            excess = trend - expected_rise
+            if excess > 0.1:
+                raw_present = True
+                confidence = 0.70
+                reasons.append(f"⚡+Körper ({trend:.2f}°C, erwartet {expected_rise:.2f})")
+            else:
+                confidence = 0.15
+                reasons.append(f"⚡Heizen ({trend:.2f}°C)")
+        
+        # Hysterese
+        is_present = self._apply_hysteresis(zone_index, raw_present, now)
+        
+        reason = f"{'🛏️' if is_present else '○'} {', '.join(reasons)}"
+        self._set_state(zone_index, is_present, confidence, reason, now)
+        
         return is_present, round(confidence, 2), reason
 
     # ═══════════════════════════════════════════════════════════════════════
@@ -282,10 +373,10 @@ class PresenceDetector:
 
     def is_sweating(self, zone_index: int) -> bool:
         """
-        Erkennt ECHTES Schwitzen/Nässe – nicht einfach "Feuchtigkeit erhöht".
+        Erkennt ECHTES Schwitzen/Feuchtigkeit – nicht einfach "Feuchtigkeit erhöht".
 
         Feuchtigkeit 50-85% ist NORMAL wenn jemand unter der Decke liegt!
-        Erst ab 93% absolut UND >35% Anstieg über Baseline = NASS.
+        Erst ab 93% absolut UND >35% Anstieg über Baseline = STARK FEUCHT.
         Muss außerdem 15 Minuten anhalten.
         """
         buffer = self._humidity.get(zone_index)
@@ -330,7 +421,7 @@ class PresenceDetector:
           50-70% = normal
           70-85% = feucht
           85-93% = sehr feucht
-          >93%  = nass
+          >93%  = stark feucht
         """
         buffer = self._humidity.get(zone_index)
         if not buffer or len(buffer) < 3:
@@ -343,7 +434,7 @@ class PresenceDetector:
         avg = sum(recent) / len(recent)
 
         if avg > 93:
-            return "nass"
+            return "stark feucht"
         elif avg > 85:
             return "sehr feucht"
         elif avg > 70:

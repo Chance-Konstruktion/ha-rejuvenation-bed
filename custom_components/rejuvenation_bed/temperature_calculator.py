@@ -18,12 +18,13 @@ import logging
 from datetime import datetime, time, timedelta
 from typing import Optional
 from homeassistant.core import HomeAssistant
+from homeassistant.util import dt as dt_util
 
 from .biorhythmus_curve import BiorhythmusCurve
 from .wake_time_resolver import WakeTimeResolver
 from .sleep_stage_resolver import SleepStageResolver
 from .energy_state_resolver import EnergyStateResolver
-from .const import ABSOLUTE_MAX_TEMP, WATERBED_CONFIG
+from .const import ABSOLUTE_MAX_TEMP, WATERBED_CONFIG, local_now
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -128,7 +129,7 @@ class TemperatureCalculator:
             
             # Krank-Modus prüfen
             sick_until = getattr(coordinator, "sick_mode_until", {}).get(zone_index)
-            if sick_until and datetime.now() < sick_until:
+            if sick_until and local_now() < sick_until:
                 sick_mode_active = True
                 sick_temp = getattr(coordinator, "sick_mode_temp", {}).get(zone_index, 30.0)
         
@@ -165,14 +166,23 @@ class TemperatureCalculator:
         
         # NEU: Entscheide ob Biorhythmus-Kurve aktiv sein soll
         use_biorhythmus = False
-        standby_temp = 26.0  # Basis-Temperatur wenn Bett leer/wartend
+        standby_temp = self.bed_config.get("standby_temp", 26.0)
         
         global_conf = self.config_entry.data.get("global", {})
         options = self.config_entry.options
         
-        # Warmhalte-Zeitfenster (für Vorheizen und Fallback)
-        warm_from_str = options.get("warm_from", global_conf.get("warm_from", "22:00"))
-        warm_until_str = options.get("warm_until", global_conf.get("warm_until", "07:00"))
+        # Warmhalte-Zeitfenster: Zone → Global Options → Global Config → Default
+        prefix = f"zone_{zone_index}_"
+        warm_from_str = (
+            options.get(f"{prefix}warm_from")
+            or options.get("warm_from")
+            or global_conf.get("warm_from", "22:00")
+        )
+        warm_until_str = (
+            options.get(f"{prefix}warm_until")
+            or options.get("warm_until")
+            or global_conf.get("warm_until", "07:00")
+        )
         warm_from = self._parse_time(warm_from_str)
         warm_until = self._parse_time(warm_until_str)
         
@@ -191,7 +201,7 @@ class TemperatureCalculator:
                     f"(statt konfiguriert {warm_from_str})"
                 )
         
-        now = datetime.now()
+        now = local_now()
         current_time = now.time()
         
         in_warm_window = self._is_in_time_range(current_time, warm_from, warm_until)
@@ -296,7 +306,7 @@ class TemperatureCalculator:
         final_temp = curve_temp + energy_offset + sleep_stage_offset
         
         # Schritt 10: Anti-Kalt-Garantie + Hard-Limit
-        final_temp = max(final_temp, EnergyStateResolver.ABSOLUTE_MIN_TEMP)
+        final_temp = max(final_temp, self.min_temp)
         final_temp = min(final_temp, ABSOLUTE_MAX_TEMP)
         
         _LOGGER.debug(
@@ -337,13 +347,20 @@ class TemperatureCalculator:
             if k.startswith(prefix)
         }
         
-        # NEU: Warmhalte-Zeitfenster verwenden
-        # Options überschreiben Config! (User hat in UI geändert)
-        warm_from_str = options.get("warm_from", global_conf.get("warm_from", "22:00"))
-        warm_until_str = options.get("warm_until", global_conf.get("warm_until", "07:00"))
-        bedtime = self._parse_time(warm_from_str)  # "bedtime" ist jetzt warm_from
+        # Warmhalte-Zeitfenster: Zone → Global Options → Global Config → Default
+        warm_from_str = (
+            zone_options.get("warm_from")
+            or options.get("warm_from")
+            or global_conf.get("warm_from", "22:00")
+        )
+        warm_until_str = (
+            zone_options.get("warm_until")
+            or options.get("warm_until")
+            or global_conf.get("warm_until", "07:00")
+        )
+        bedtime = self._parse_time(warm_from_str)
         
-        # Wake-Time = warm_until (eine Stelle, kein Konfusions-Potenzial)
+        # Wake-Time = warm_until
         wake_time_fixed = self._parse_time(warm_until_str)
         
         # Wake-Mode: Hybrid als Default (Wecker-Entity nutzen wenn vorhanden, sonst warm_until)
@@ -381,8 +398,12 @@ class TemperatureCalculator:
         # User-Offset für Feinjustierung
         user_temp_offset = float(global_options.get("temperature_offset", 0.0))
         
-        # Chronotyp
-        chronotype = global_options.get("chronotype") or global_conf.get("chronotype", "normal")
+        # Chronotyp: Zone → Global Options → Global Config → Default
+        chronotype = (
+            zone_options.get("chronotype")
+            or global_options.get("chronotype")
+            or global_conf.get("chronotype", "normal")
+        )
         
         # ═══════════════════════════════════════════════════════════════════════
         # Außentemperatur für saisonale Anpassung
