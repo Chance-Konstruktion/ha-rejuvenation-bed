@@ -70,16 +70,39 @@ class EnergyStateResolver:
         self.config_entry = config_entry
         self.global_config = config_entry.data.get("global", {})
         
-        # Sensor-Entity-IDs (Options überschreiben Config!)
-        options = config_entry.options
-        self.solar_sensor = options.get("solar_sensor", self.global_config.get("solar_sensor"))
-        self.price_sensor = options.get("price_sensor", self.global_config.get("price_sensor"))
-        
         # NEU: Zustand für Hysterese merken
         self._current_mode = EnergyMode.NORMAL
         
         # Referenz zum Coordinator (wird gesetzt nach init)
         self._coordinator = None
+    
+    @property
+    def solar_sensor(self) -> str:
+        """Solar-Sensor frisch aus Options lesen (damit Änderungen sofort wirken)."""
+        return self.config_entry.options.get(
+            "solar_sensor", self.global_config.get("solar_sensor")
+        )
+    
+    @property
+    def price_sensor(self) -> str:
+        """Preis-Sensor frisch aus Options lesen."""
+        return self.config_entry.options.get(
+            "price_sensor", self.global_config.get("price_sensor")
+        )
+
+    @property
+    def solar_boost_on_w(self) -> float:
+        """Solar-Schwellwert aus Options lesen (Default: 500W)."""
+        val = self.config_entry.options.get(
+            "solar_boost_threshold",
+            self.global_config.get("solar_boost_threshold", 500)
+        )
+        return float(val)
+
+    @property
+    def solar_boost_off_w(self) -> float:
+        """Solar-Aus-Schwellwert = Ein-Schwellwert minus 50W Hysterese."""
+        return self.solar_boost_on_w - 50
     
     def resolve(self) -> dict:
         """
@@ -150,24 +173,39 @@ class EnergyStateResolver:
             )
             return 0.0
     
+    @property
+    def _fallback_price(self) -> float:
+        """Konfigurierter Strompreis als Fallback (ct/kWh → EUR/kWh)."""
+        # Aus Options oder Config lesen, Default 30 ct/kWh
+        ct_price = (
+            self.config_entry.options.get("electricity_price")
+            or self.global_config.get("electricity_price")
+            or 30.0
+        )
+        return float(ct_price) / 100.0
+
     def _read_energy_price(self) -> float:
         """
         Liest den aktuellen Strompreis aus dem Sensor.
+        
+        Priorität:
+        1. Dynamischer Preis-Sensor (Tibber, aWATTar, ENTSO-E)
+        2. Manuell konfigurierter Festpreis
         
         Auto-Detect: Tibber/ENTSO-E liefern €/kWh (z.B. 0.2543),
         manche Custom-Sensoren liefern ct/kWh (z.B. 25.43).
         Werte > 1.0 werden als ct/kWh interpretiert und konvertiert.
         
         Returns:
-            Preis in EUR/kWh (0.30 als Default-Fallback)
+            Preis in EUR/kWh
         """
         if not self.price_sensor:
-            return 0.30
+            return self._fallback_price
         
         state = self.hass.states.get(self.price_sensor)
         
         if not state or state.state in ["unknown", "unavailable"]:
-            return 0.30
+            return self._fallback_price
         
         try:
             price = float(state.state)
@@ -179,8 +217,11 @@ class EnergyStateResolver:
             
             # Plausibilitäts-Check: Negative Preise möglich (Börse), aber > 2€ ist Fehler
             if price > 2.0:
-                _LOGGER.warning(f"Strompreis unplausibel hoch: {price:.2f} €/kWh → Fallback 0.30")
-                return 0.30
+                _LOGGER.warning(
+                    f"Strompreis unplausibel hoch: {price:.2f} €/kWh "
+                    f"→ Fallback {self._fallback_price:.2f}"
+                )
+                return self._fallback_price
             
             return price
             
@@ -189,7 +230,7 @@ class EnergyStateResolver:
                 f"Konnte Preis-Sensor '{self.price_sensor}' nicht als Zahl lesen: "
                 f"{state.state}"
             )
-            return 0.30
+            return self._fallback_price
     
     def _determine_mode(
         self,
@@ -214,10 +255,10 @@ class EnergyStateResolver:
         # Solar-Boost nur wenn Switch AN
         if solar_enabled:
             if self._current_mode == EnergyMode.SOLAR_BOOST:
-                if solar_power >= self.SOLAR_BOOST_OFF_W:
+                if solar_power >= self.solar_boost_off_w:
                     return EnergyMode.SOLAR_BOOST
             else:
-                if solar_power >= self.SOLAR_BOOST_ON_W:
+                if solar_power >= self.solar_boost_on_w:
                     self._current_mode = EnergyMode.SOLAR_BOOST
                     return EnergyMode.SOLAR_BOOST
             
@@ -280,33 +321,6 @@ class EnergyStateResolver:
         else:
             return "✅ Normal-Betrieb"
     
-    def apply_offset_safely(
-        self,
-        base_temp: float,
-        offset: float
-    ) -> float:
-        """
-        Wendet den Offset an, aber garantiert ABSOLUTE_MIN_TEMP.
-        
-        Args:
-            base_temp: Temperatur aus der Biorhythmus-Kurve
-            offset: Energie-Offset (kann negativ sein)
-        
-        Returns:
-            Finale Temperatur (niemals < ABSOLUTE_MIN_TEMP)
-        """
-        final_temp = base_temp + offset
-        
-        # Anti-Kalt-Garantie!
-        if final_temp < self.ABSOLUTE_MIN_TEMP:
-            _LOGGER.warning(
-                f"Energie-Offset würde zu {final_temp:.1f}°C führen. "
-                f"Limitiere auf {self.ABSOLUTE_MIN_TEMP}°C (Anti-Kalt-Garantie)."
-            )
-            return self.ABSOLUTE_MIN_TEMP
-        
-        return round(final_temp, 2)
-    
     def get_diagnostics(self) -> dict:
         """
         Gibt Debug-Informationen zurück.
@@ -322,8 +336,8 @@ class EnergyStateResolver:
             "solar_sensor": self.solar_sensor or "Nicht konfiguriert",
             "price_sensor": self.price_sensor or "Nicht konfiguriert",
             "thresholds": {
-                "solar_boost_on_w": self.SOLAR_BOOST_ON_W,
-                "solar_boost_off_w": self.SOLAR_BOOST_OFF_W,
+                "solar_boost_on_w": self.solar_boost_on_w,
+                "solar_boost_off_w": self.solar_boost_off_w,
                 "eco_price_on_eur": self.ECO_PRICE_ON_EUR,
                 "eco_price_off_eur": self.ECO_PRICE_OFF_EUR,
                 "cheap_price_eur": self.CHEAP_PRICE_THRESHOLD_EUR,

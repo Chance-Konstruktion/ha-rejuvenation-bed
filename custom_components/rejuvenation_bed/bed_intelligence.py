@@ -34,6 +34,8 @@ from datetime import datetime, timedelta
 from typing import Optional, Dict
 
 from homeassistant.helpers.storage import Store
+from .const import local_now
+from homeassistant.util import dt as dt_util
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -70,7 +72,7 @@ class CalibrationData:
     # Gelernte Werte: Feuchtigkeit
     humidity_baseline: float = 40.0              # Leer-Bett Baseline
     humidity_occupied_normal: float = 60.0       # Normal unter Decke
-    humidity_sweat_threshold: float = 93.0       # Ab hier = NASS
+    humidity_sweat_threshold: float = 93.0       # Ab hier = stark feucht
 
     # Roh-Daten für Kalibrierung (werden nach Abschluss gelöscht)
     _empty_water_stds: list = field(default_factory=list)
@@ -144,7 +146,7 @@ class IsolationStatus:
 class SweatStatus:
     """Detaillierter Schwitz-Status mit Kreuzkorrelation."""
     is_sweating: bool = False
-    is_wet: bool = False                         # >93% = richtig nass
+    is_moist: bool = False                         # >93% = stark feucht (Schwitzen)
     humidity_level: str = "unbekannt"            # trocken/normal/feucht/...
     current_humidity: float = 0.0
     humidity_baseline: float = 40.0
@@ -272,7 +274,7 @@ class BedIntelligence:
             is_present: Aktueller Präsenz-Status
             water_std: Aktuelle Wassertemp-Varianz (vom PresenceDetector)
         """
-        now = datetime.now()
+        now = local_now()
 
         # Feature-Flags aktualisieren (bei Ausfall zurücksetzen!)
         if air_temp is not None:
@@ -679,7 +681,7 @@ class BedIntelligence:
         # Reset wenn niemand im Bett
         if not is_present:
             sweat.is_sweating = False
-            sweat.is_wet = False
+            sweat.is_moist = False
             sweat.cause = "leer"
             return
 
@@ -699,8 +701,8 @@ class BedIntelligence:
 
         # ─── Ursachen-Bestimmung ───
         if humidity > self.calibration.humidity_sweat_threshold:
-            # >93%: Definitiv NASS
-            sweat.is_wet = True
+            # >93%: Definitiv STARK FEUCHT
+            sweat.is_moist = True
             if has_temp_rise:
                 sweat.is_sweating = True
                 sweat.cause = "schwitzen"
@@ -710,17 +712,17 @@ class BedIntelligence:
         elif has_temp_rise and has_humidity_rise:
             # Temp steigt UND Feuchtigkeit erhöht → Schwitzen
             sweat.is_sweating = True
-            sweat.is_wet = False
+            sweat.is_moist = False
             sweat.cause = "schwitzen"
         elif has_humidity_rise and not has_temp_rise:
             # Nur Feuchtigkeit erhöht → wahrscheinlich Raum
             sweat.is_sweating = False
-            sweat.is_wet = False
+            sweat.is_moist = False
             sweat.cause = "raum_feuchtigkeit"
         else:
             # Alles normal
             sweat.is_sweating = False
-            sweat.is_wet = False
+            sweat.is_moist = False
             sweat.cause = "normal"
 
     def get_sweat_status(self, zone_index: int) -> SweatStatus:
@@ -730,7 +732,7 @@ class BedIntelligence:
     def _calc_humidity_level(self, humidity: float) -> str:
         """Berechnet die Feuchtigkeitsstufe."""
         if humidity > 93:
-            return "nass"
+            return "stark feucht"
         elif humidity > 85:
             return "sehr feucht"
         elif humidity > 70:
@@ -820,7 +822,7 @@ class BedIntelligence:
             },
             "sweat": {
                 "is_sweating": sweat.is_sweating,
-                "is_wet": sweat.is_wet,
+                "is_moist": sweat.is_moist,
                 "humidity_level": sweat.humidity_level,
                 "humidity": sweat.current_humidity,
                 "humidity_rise": sweat.humidity_rise,
@@ -853,20 +855,27 @@ class BedIntelligence:
         if minutes < 720:  # Vor 12:00 → gehört zur Vornacht (z.B. 00:30 = ging spät ins Bett)
             minutes += 1440  # +24h damit Sortierung stimmt
         
+        # Session-Key: Datum + Tageszeit-Bereich
+        # Wer nach Mitternacht einschläft, gehört zum Vortag (gleiche Schlaf-Session).
+        # Wer um 14:00 einschläft (Schichtarbeiter), bekommt sein eigenes Datum.
+        session_date = bedtime.date()
+        if bedtime.hour < 12:
+            session_date = session_date - timedelta(days=1)
+        session_key = session_date.strftime("%Y-%m-%d")
+        
         entry = {
-            "date": bedtime.strftime("%Y-%m-%d"),
-            "weekday": bedtime.weekday(),  # 0=Mo, 6=So
+            "date": session_key,
+            "weekday": session_date.weekday(),
             "minutes": minutes,
             "time_str": bedtime.strftime("%H:%M"),
         }
         
-        # Duplikat-Check (nur eine Einschlafzeit pro Nacht)
-        today_str = bedtime.strftime("%Y-%m-%d")
-        history = [h for h in history if h["date"] != today_str]
+        # Duplikat-Check (nur eine Einschlafzeit pro Session-Key)
+        history = [h for h in history if h["date"] != session_key]
         history.append(entry)
         
         # Auf N Tage begrenzen
-        cutoff = datetime.now() - timedelta(days=self._BEDTIME_HISTORY_DAYS)
+        cutoff = local_now() - timedelta(days=self._BEDTIME_HISTORY_DAYS)
         cutoff_str = cutoff.strftime("%Y-%m-%d")
         history = [h for h in history if h["date"] >= cutoff_str]
         
@@ -874,7 +883,7 @@ class BedIntelligence:
         
         _LOGGER.info(
             f"Zone {zone_index}: Einschlafzeit gelernt: {entry['time_str']} "
-            f"({'Wochenende' if bedtime.weekday() >= 4 else 'Wochentag'}) "
+            f"({'Wochenende' if session_date.weekday() >= 4 else 'Wochentag'}) "
             f"[{len(history)} Nächte gespeichert]"
         )
         
@@ -899,7 +908,7 @@ class BedIntelligence:
         if len(history) < self._MIN_SAMPLES_FOR_PREDICTION:
             return None
         
-        now = datetime.now()
+        now = local_now()
         is_weekend = now.weekday() >= 4  # Fr, Sa, So
         
         # Einträge filtern: Wochentag vs. Wochenende

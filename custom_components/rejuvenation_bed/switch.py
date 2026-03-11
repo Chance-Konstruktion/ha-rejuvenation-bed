@@ -17,23 +17,54 @@ from datetime import datetime, timedelta
 from homeassistant.components.switch import SwitchEntity, SwitchDeviceClass
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from homeassistant.helpers.entity import DeviceInfo
+from homeassistant.util import dt as dt_util
 from .const import (
     DOMAIN, 
     DEFAULT_SICK_MODE_TEMP, 
     DEFAULT_SICK_MODE_DAYS, 
     MANUFACTURER, 
     SW_VERSION, 
-    BED_TYPE_WATERBED
+    BED_TYPE_WATERBED,
+    local_now,
 )
 
 _LOGGER = logging.getLogger(__name__)
 
 
 def get_device_info(coordinator) -> DeviceInfo:
-    """Gibt die Device-Info für alle Entities zurück."""
+    """Hauptgerät (Mono) oder Container-Gerät (Dual)."""
     global_conf = coordinator.config_entry.data.get("global", {})
     bed_type = global_conf.get("bed_type", "wasserbett")
     zones_count = len(coordinator.config_entry.data.get("zones", []))
+    
+    model = "Smart Wasserbett Controller" if bed_type == "wasserbett" else "Smart Heizmatte Controller"
+    zone_suffix = "Dual-Zone" if zones_count > 1 else "Mono"
+    
+    return DeviceInfo(
+        identifiers={(DOMAIN, coordinator.config_entry.entry_id)},
+        manufacturer=MANUFACTURER,
+        model=f"{model} ({zone_suffix})",
+        name="Rejuvenation Bed",
+        sw_version=SW_VERSION,
+    )
+
+
+def get_zone_device_info(coordinator, zone_index: int) -> DeviceInfo:
+    """Zone-Gerät für Dual-Bett (Links/Rechts)."""
+    zones_count = len(coordinator.config_entry.data.get('zones', []))
+    if zones_count <= 1:
+        return get_device_info(coordinator)
+    zone_name = 'Links' if zone_index == 0 else 'Rechts'
+    return DeviceInfo(
+        identifiers={(DOMAIN, f'{coordinator.config_entry.entry_id}_zone_{zone_index}')},
+        manufacturer=MANUFACTURER,
+        model=f'Bett-Zone {zone_name}',
+        name=f'Bett {zone_name}',
+        sw_version=SW_VERSION,
+        via_device=(DOMAIN, coordinator.config_entry.entry_id),
+    )
+
+
     
     model = "Smart Wasserbett Controller" if bed_type == "wasserbett" else "Smart Heizmatte Controller"
     zone_suffix = "Dual-Zone" if zones_count > 1 else "Mono"
@@ -123,7 +154,7 @@ class BedBoostSwitch(CoordinatorEntity, SwitchEntity):
         self.zone_index = zone_index
         self._attr_name = f"Bett{suffix} Schnellheizen"
         self._attr_unique_id = f"{coordinator.config_entry.entry_id}_zone_{zone_index}_boost"
-        self._attr_device_info = get_device_info(coordinator)
+        self._attr_device_info = get_zone_device_info(coordinator, zone_index)
 
     @property
     def is_on(self) -> bool:
@@ -133,7 +164,7 @@ class BedBoostSwitch(CoordinatorEntity, SwitchEntity):
         boost_until = self.coordinator.boost_until.get(self.zone_index)
         
         if boost_active and boost_until:
-            if datetime.now() > boost_until:
+            if local_now() > boost_until:
                 # Abgelaufen - deaktivieren
                 self.coordinator.manual_boost[self.zone_index] = False
                 return False
@@ -143,7 +174,7 @@ class BedBoostSwitch(CoordinatorEntity, SwitchEntity):
     async def async_turn_on(self, **kwargs):
         """Aktiviert den Boost-Modus für 60 Minuten."""
         self.coordinator.manual_boost[self.zone_index] = True
-        self.coordinator.boost_until[self.zone_index] = datetime.now() + timedelta(minutes=60)
+        self.coordinator.boost_until[self.zone_index] = local_now() + timedelta(minutes=60)
         
         _LOGGER.info(
             f"🔥 Schnellheizen für Zone {self.zone_index} aktiviert! "
@@ -169,7 +200,7 @@ class BedBoostSwitch(CoordinatorEntity, SwitchEntity):
         boost_until = self.coordinator.boost_until.get(self.zone_index)
         
         if self.is_on and boost_until:
-            remaining = boost_until - datetime.now()
+            remaining = boost_until - local_now()
             minutes_left = max(0, int(remaining.total_seconds() / 60))
             return {
                 "endet_um": boost_until.strftime("%H:%M"),
@@ -195,7 +226,7 @@ class BedSickModeSwitch(CoordinatorEntity, SwitchEntity):
         self.zone_index = zone_index
         self._attr_name = f"Bett{suffix} Krank-Modus"
         self._attr_unique_id = f"{coordinator.config_entry.entry_id}_zone_{zone_index}_sick"
-        self._attr_device_info = get_device_info(coordinator)
+        self._attr_device_info = get_zone_device_info(coordinator, zone_index)
         
         # Konfigurierbare Werte aus Options holen
         options = coordinator.config_entry.options
@@ -206,7 +237,7 @@ class BedSickModeSwitch(CoordinatorEntity, SwitchEntity):
     def is_on(self) -> bool:
         """Prüft ob Krank-Modus aktiv und nicht abgelaufen."""
         sick_until = self.coordinator.sick_mode_until.get(self.zone_index)
-        if sick_until and datetime.now() < sick_until:
+        if sick_until and local_now() < sick_until:
             return True
         return False
 
@@ -217,7 +248,7 @@ class BedSickModeSwitch(CoordinatorEntity, SwitchEntity):
         self._sick_temp = options.get("sick_mode_temp", DEFAULT_SICK_MODE_TEMP)
         self._sick_days = options.get("sick_mode_days", DEFAULT_SICK_MODE_DAYS)
         
-        self.coordinator.sick_mode_until[self.zone_index] = datetime.now() + timedelta(days=self._sick_days)
+        self.coordinator.sick_mode_until[self.zone_index] = local_now() + timedelta(days=self._sick_days)
         self.coordinator.sick_mode_temp[self.zone_index] = self._sick_temp
         
         _LOGGER.info(
@@ -243,7 +274,7 @@ class BedSickModeSwitch(CoordinatorEntity, SwitchEntity):
         sick_until = self.coordinator.sick_mode_until.get(self.zone_index)
         
         if self.is_on and sick_until:
-            remaining = sick_until - datetime.now()
+            remaining = sick_until - local_now()
             hours = int(remaining.total_seconds() / 3600)
             return {
                 "endet_am": sick_until.strftime("%d.%m.%Y %H:%M"),
@@ -408,7 +439,7 @@ class BedVacationModeSwitch(CoordinatorEntity, SwitchEntity):
         vacation_until = getattr(self.coordinator, "vacation_until", None)
         
         if vacation_enabled and vacation_until:
-            if datetime.now() > vacation_until:
+            if local_now() > vacation_until:
                 # Urlaub vorbei!
                 self.coordinator.vacation_mode_enabled = False
                 return False
@@ -418,7 +449,7 @@ class BedVacationModeSwitch(CoordinatorEntity, SwitchEntity):
     async def async_turn_on(self, **kwargs):
         """Aktiviert den Urlaub-Modus (14 Tage Standard)."""
         self.coordinator.vacation_mode_enabled = True
-        self.coordinator.vacation_until = datetime.now() + timedelta(days=14)
+        self.coordinator.vacation_until = local_now() + timedelta(days=14)
         
         _LOGGER.info(
             f"✈️ Urlaub-Modus aktiviert! "
@@ -442,7 +473,7 @@ class BedVacationModeSwitch(CoordinatorEntity, SwitchEntity):
         
         base_attrs = {}
         if self.is_on and vacation_until:
-            remaining = vacation_until - datetime.now()
+            remaining = vacation_until - local_now()
             days_left = max(0, remaining.days)
             base_attrs = {
                 "endet_am": vacation_until.strftime("%d.%m.%Y"),

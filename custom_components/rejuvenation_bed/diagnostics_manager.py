@@ -15,6 +15,8 @@ import logging
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional
 from homeassistant.helpers.storage import Store
+from .const import local_now
+from homeassistant.util import dt as dt_util
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -57,7 +59,7 @@ class DiagnosticsManager:
         self._daily_energy = {
             "solar_kwh": 0.0,
             "grid_kwh": 0.0,
-            "date": datetime.now().strftime("%Y-%m-%d"),
+            "date": local_now().strftime("%Y-%m-%d"),
         }
         
         # System-Health-Tracking
@@ -72,7 +74,7 @@ class DiagnosticsManager:
         }
         
         # Auto-Save Timer (alle 15 Minuten)
-        self._last_save = datetime.now()
+        self._last_save = local_now()
         self._save_interval = timedelta(minutes=15)
     
     async def async_load(self):
@@ -90,7 +92,7 @@ class DiagnosticsManager:
                 self._daily_energy = data.get("daily_energy", self._daily_energy)
                 
                 # Tages-Zähler resetten wenn neuer Tag
-                today = datetime.now().strftime("%Y-%m-%d")
+                today = local_now().strftime("%Y-%m-%d")
                 if self._daily_energy.get("date") != today:
                     _LOGGER.info(f"Neuer Tag erkannt ({today}) - Tages-Zähler zurückgesetzt")
                     self._daily_energy = {
@@ -114,7 +116,7 @@ class DiagnosticsManager:
     
     async def async_save(self, force: bool = False):
         """Speichert Daten in den Storage."""
-        now = datetime.now()
+        now = local_now()
         
         # Nur speichern wenn Intervall abgelaufen oder Force
         if not force and (now - self._last_save) < self._save_interval:
@@ -232,7 +234,7 @@ class DiagnosticsManager:
         Resettet sich automatisch um Mitternacht.
         Getrennt vom Gesamt-Zähler!
         """
-        today = datetime.now().strftime("%Y-%m-%d")
+        today = local_now().strftime("%Y-%m-%d")
         if self._daily_energy.get("date") != today:
             self._daily_energy = {
                 "solar_kwh": 0.0,
@@ -282,11 +284,11 @@ class DiagnosticsManager:
             try:
                 last_reset_dt = datetime.fromisoformat(last_reset)
             except:
-                last_reset_dt = datetime.now()
+                last_reset_dt = local_now()
         else:
-            last_reset_dt = last_reset or datetime.now()
+            last_reset_dt = last_reset or local_now()
         
-        elapsed = datetime.now() - last_reset_dt
+        elapsed = local_now() - last_reset_dt
         days_since_reset = elapsed.total_seconds() / 86400
         
         return {
@@ -340,7 +342,7 @@ class DiagnosticsManager:
         
         # last_reset setzen wenn noch nicht geschehen (erster Start)
         if self._energy_budget.get("last_reset") is None:
-            self._energy_budget["last_reset"] = datetime.now().isoformat()
+            self._energy_budget["last_reset"] = local_now().isoformat()
         
         # Energie berechnen (Wh → kWh)
         energy_wh = (corrected_watts * update_interval_seconds) / 3600
@@ -354,7 +356,7 @@ class DiagnosticsManager:
         # ═══════════════════════════════════════════════════════════
         # Tages-Zähler: Prüfe ob Mitternacht überschritten
         # ═══════════════════════════════════════════════════════════
-        today = datetime.now().strftime("%Y-%m-%d")
+        today = local_now().strftime("%Y-%m-%d")
         if self._daily_energy.get("date") != today:
             _LOGGER.info(f"Mitternacht: Tages-Zähler zurückgesetzt ({self._daily_energy.get('date')} → {today})")
             self._daily_energy = {
@@ -411,7 +413,7 @@ class DiagnosticsManager:
             details: Zusätzliche Debug-Daten
         """
         event = {
-            "timestamp": datetime.now().isoformat(),
+            "timestamp": local_now().isoformat(),
             "severity": severity,
             "category": category,
             "message": message,
@@ -482,7 +484,7 @@ class DiagnosticsManager:
             "grid_kwh_used": 0.0,
             "peak_kwh_saved": 0.0,
             "total_runtime_hours": 0.0,
-            "last_reset": datetime.now().isoformat(),
+            "last_reset": local_now().isoformat(),
         }
         
         # Sofort speichern
@@ -508,7 +510,7 @@ class DiagnosticsManager:
             "energy_budget": self.get_energy_budget(),
             "system_health": self.get_system_health(),
             "anti_short_cycle": coordinator.anti_short_cycle_manager.get_diagnostics() if hasattr(coordinator, 'anti_short_cycle_manager') else {},
-            "timestamp": datetime.now().isoformat(),
+            "timestamp": local_now().isoformat(),
         }
 
 

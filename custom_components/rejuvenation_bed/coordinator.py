@@ -17,7 +17,7 @@ from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 from homeassistant.components.persistent_notification import async_create as notify_create
 
-from .const import DOMAIN, UPDATE_INTERVAL, get_bed_config, BED_TYPE_WATERBED, BED_TYPE_HEATING_PAD
+from .const import DOMAIN, UPDATE_INTERVAL, get_bed_config, BED_TYPE_WATERBED, BED_TYPE_HEATING_PAD, BOOST_MAX_TEMP, local_now
 from .safety_manager import SafetyManager
 from .temperature_calculator import TemperatureCalculator
 from .energy_state_resolver import EnergyStateResolver
@@ -27,6 +27,7 @@ from .presence_detector import PresenceDetector
 from .sleep_score_calculator import SleepScoreCalculator
 from .ramp_controller import RampController
 from .bed_intelligence import BedIntelligence
+from homeassistant.util import dt as dt_util
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -97,7 +98,7 @@ class RejuvenationBedCoordinator(DataUpdateCoordinator):
         # ═══════════════════════════════════════════════════════════════════════
         # FIX: Startup-Grace-Period (ESP-Sensoren brauchen Zeit nach HA-Restart)
         # ═══════════════════════════════════════════════════════════════════════
-        self._startup_time = datetime.now()
+        self._startup_time = local_now()
         self._startup_grace_seconds = 180  # 3 Minuten Geduld für ESP-Boot
         self._sensor_failure_notified = {}  # Nur einmal pro Zone benachrichtigen
         
@@ -210,13 +211,17 @@ class RejuvenationBedCoordinator(DataUpdateCoordinator):
             vacation_until = self.vacation_until
             
             # Prüfe ob Urlaub abgelaufen
-            if vacation_until and datetime.now() > vacation_until:
+            if vacation_until and local_now() > vacation_until:
                 self.vacation_mode_enabled = False
                 _LOGGER.info("Urlaub-Modus automatisch beendet.")
             else:
-                # Wasserbett: 24°C, Heizmatte: kann aus
+                # Wasserbett: Konfigurierte Urlaub-Temp, Heizmatte: kann aus
                 if self.bed_type == BED_TYPE_WATERBED:
-                    return 24.0, "vacation", "✈️ Urlaub-Modus (24°C Frostschutz)"
+                    away_temp = float(
+                        self.config_entry.options.get("away_temp")
+                        or self.bed_config.get("away_temp", 24.0)
+                    )
+                    return away_temp, "vacation", f"✈️ Urlaub-Modus ({away_temp}°C Frostschutz)"
                 else:
                     return 0.0, "vacation", "✈️ Urlaub-Modus (Heizmatte AUS)"
         
@@ -224,7 +229,7 @@ class RejuvenationBedCoordinator(DataUpdateCoordinator):
         # PRIORITÄT 2: Krank-Modus
         # ═══════════════════════════════════════════════════════════════════
         sick_until = self.sick_mode_until.get(zone_index)
-        if sick_until and datetime.now() < sick_until:
+        if sick_until and local_now() < sick_until:
             sick_temp = self.sick_mode_temp.get(zone_index, 30.0)
             return sick_temp, "sick", f"🤒 Krank-Modus ({sick_temp}°C konstant)"
         
@@ -236,14 +241,14 @@ class RejuvenationBedCoordinator(DataUpdateCoordinator):
         
         if boost_active:
             # Prüfe ob Boost abgelaufen
-            if boost_until and datetime.now() > boost_until:
+            if boost_until and local_now() > boost_until:
                 self.manual_boost[zone_index] = False
                 _LOGGER.info(f"Boost für Zone {zone_index} automatisch beendet.")
             else:
                 # Boost = Basis + Offset (nicht feste Temperatur!)
                 options = self.config_entry.options
                 boost_offset = float(options.get("boost_offset", 2.0))
-                boost_temp = min(base_temp + boost_offset, 36.0)  # Safety: max 36°C
+                boost_temp = min(base_temp + boost_offset, BOOST_MAX_TEMP)  # Safety: max 34°C
                 return boost_temp, "boost", f"🔥 Schnellheizen ({base_temp:.1f} + {boost_offset}°C = {boost_temp:.1f}°C)"
         
         # ═══════════════════════════════════════════════════════════════════
@@ -292,7 +297,7 @@ class RejuvenationBedCoordinator(DataUpdateCoordinator):
             "status": "FAIL_SAFE",
             "reason": "⚠️ Sensor nicht verfügbar - Heizung AN (Sicherheit)",
             "heater_state": True,
-            "hvac_mode": "heat",  # Damit UI nicht OFF zeigt
+            "hvac_mode": "heat",  # HVACMode.HEAT == "heat"
             "active": True,
         }
 
@@ -300,7 +305,7 @@ class RejuvenationBedCoordinator(DataUpdateCoordinator):
         """Zentraler Loop: Sicherheit -> Energie -> Entscheidung -> Schaltung."""
         try:
             decision = {
-                "timestamp": datetime.now().isoformat(),
+                "timestamp": local_now().isoformat(),
                 "zones": {},
                 "global_state": {"energy": {}, "status": "OK"},
                 "errors": []
@@ -348,7 +353,7 @@ class RejuvenationBedCoordinator(DataUpdateCoordinator):
             
             # NEU: Degraded Mode (Sensor-Ausfall)
             is_degraded_mode = safety_check.get("mode") == "degraded"
-            degraded_zone = safety_check.get("zone_index")
+            degraded_zones = safety_check.get("degraded_zones", [])
             
             if is_degraded_mode:
                 duty_pct = safety_check.get("duty_cycle", 0.30)
@@ -384,7 +389,7 @@ class RejuvenationBedCoordinator(DataUpdateCoordinator):
                     if current_temp is None:
                         if temp_sensor:
                             # Sensor konfiguriert aber nicht verfügbar
-                            elapsed = (datetime.now() - self._startup_time).total_seconds()
+                            elapsed = (local_now() - self._startup_time).total_seconds()
                             
                             if elapsed < self._startup_grace_seconds:
                                 # STARTUP GRACE: ESP noch nicht bereit, warten
@@ -434,17 +439,18 @@ class RejuvenationBedCoordinator(DataUpdateCoordinator):
                             )
                     
                     # NEU: Degraded Mode Override
-                    if is_degraded_mode and degraded_zone == zone_index:
-                        should_heat = safety_check.get("should_heat", False)
+                    if is_degraded_mode and zone_index in degraded_zones:
+                        should_heat = self.safety_manager.should_heat_in_degraded_mode(zone_index)
                         target_temp = 27.0
                         
+                        from homeassistant.components.climate.const import HVACMode as _HVACMode
                         decision["zones"][zone_name] = {
                             "target": round(target_temp, 1),
                             "current": round(current_temp, 1) if current_temp else "unknown",
                             "active": should_heat,
                             "watt": round(current_watt, 1),
                             "mode": "degraded",
-                            "hvac_mode": "heat",  # Nicht OFF zeigen
+                            "hvac_mode": _HVACMode.HEAT,
                             "reason": "⚠️ Degraded Mode: Sensor ausgefallen (30% Duty-Cycle)"
                         }
                         
@@ -511,6 +517,7 @@ class RejuvenationBedCoordinator(DataUpdateCoordinator):
                                 power_watts=current_watt,
                                 heater_active=heater_active,
                                 presence_sensor_state=presence_state,
+                                is_heating_pad=self.is_heating_pad,
                             )
                         )
                     except Exception as pres_err:
@@ -535,15 +542,20 @@ class RejuvenationBedCoordinator(DataUpdateCoordinator):
                     actual_bedtime = self._actual_bedtime.get(zone_index)
                     post_alarm = self._post_alarm_mode.get(zone_index, False)
                     
-                    # Weckzeit ermitteln (einmal für alle Checks)
+                    # Weckzeit ermitteln (pro Zone!)
                     global_c = self.config_entry.data.get("global", {})
                     opts = self.config_entry.options
-                    wake_str = opts.get("warm_until", global_c.get("warm_until", "07:00"))
+                    zone_prefix = f"zone_{zone_index}_"
+                    wake_str = (
+                        opts.get(f"{zone_prefix}warm_until")
+                        or opts.get("warm_until")
+                        or global_c.get("warm_until", "07:00")
+                    )
                     wp = wake_str.split(":")
                     wake_h, wake_m = int(wp[0]), int(wp[1]) if len(wp) > 1 else 0
                     from datetime import time as dt_time
                     wake_t = dt_time(wake_h, wake_m)
-                    now_t = datetime.now().time()
+                    now_t = local_now().time()
                     
                     # Sind wir NACH der Weckzeit? (zwischen Wecker und 14:00)
                     past_wake = now_t >= wake_t and now_t < dt_time(14, 0)
@@ -551,20 +563,28 @@ class RejuvenationBedCoordinator(DataUpdateCoordinator):
                     if is_present and not was_present:
                         # Person kommt ins Bett
                         if actual_bedtime is None:
-                            # Erstes Mal heute Nacht → echte Einschlafzeit merken!
-                            self._actual_bedtime[zone_index] = datetime.now()
+                            # Neue Schlaf-Session → Einschlafzeit merken
+                            self._actual_bedtime[zone_index] = local_now()
                             self._curve_active[zone_index] = True
                             self._post_alarm_mode[zone_index] = False
                             _LOGGER.info(
-                                f"Zone {zone_index}: Einschlafzeit erkannt um "
+                                f"Zone {zone_index}: Schlaf-Session gestartet um "
                                 f"{self._actual_bedtime[zone_index].strftime('%H:%M')}"
                             )
-                            # Bedtime-Learning: Einschlafzeit speichern
-                            self.bed_intelligence.record_bedtime(
-                                zone_index, self._actual_bedtime[zone_index]
-                            )
+                            # Bedtime-Learning: Noch NICHT aufzeichnen!
+                            # Wird erst beim Session-Ende gespeichert,
+                            # aber nur wenn die Session >2h war (echter Schlaf).
+                            # → Schichtarbeiter, Nickerchen, Fehlpräsenz werden korrekt behandelt.
                         else:
-                            # Zurück im Bett
+                            # Zurück im Bett — war es eine Unterbrechung?
+                            left_at = self._presence_left_at.get(zone_index)
+                            if left_at:
+                                away_min = (local_now() - left_at).total_seconds() / 60
+                                if away_min >= 5 and self._night_tracking_active.get(zone_index, False):
+                                    # >5 Min weg = echte Unterbrechung → Score-Malus
+                                    self.sleep_score_calculator.record_interruption(
+                                        zone_index, away_min
+                                    )
                             _LOGGER.debug(f"Zone {zone_index}: Zurück im Bett")
                         
                         # Toiletten-Timer löschen
@@ -572,31 +592,68 @@ class RejuvenationBedCoordinator(DataUpdateCoordinator):
                     
                     elif not is_present and was_present:
                         # Person verlässt Bett
-                        self._presence_left_at[zone_index] = datetime.now()
+                        self._presence_left_at[zone_index] = local_now()
                         if past_wake:
                             _LOGGER.debug(f"Zone {zone_index}: Bett verlassen (nach Weckzeit)")
                         else:
                             _LOGGER.debug(f"Zone {zone_index}: Bett verlassen (Nacht – Kurve läuft weiter)")
                     
                     # ═══════════════════════════════════════════════════
-                    # AUFSTEH-ERKENNUNG: Nur NACH Weckzeit!
-                    # Während der Nacht: Kurve läuft IMMER weiter,
-                    # egal wie lange man aufsteht (Toilette, Kind, etc.)
-                    # Nach Weckzeit: 5 Min Timeout → Standby
+                    # AUFSTEH-ERKENNUNG (Session-basiert)
+                    #
+                    # Zwei Phasen:
+                    # 1. Kurze Unterbrechung (<60 Min): Kurve läuft weiter
+                    #    → Toilette, Kind, Trinken. Score wird nicht beendet
+                    #    aber die Unterbrechung fließt negativ in den Score.
+                    # 2. Lange Abwesenheit (≥60 Min): Session beendet
+                    #    → Echtes Aufstehen. Score wird finalisiert.
+                    #    Bedtime-Learning: Nur wenn Session >2h war.
                     # ═══════════════════════════════════════════════════
                     if not is_present and zone_index in self._presence_left_at:
-                        gone_min = (datetime.now() - self._presence_left_at[zone_index]).total_seconds() / 60
+                        gone_min = (local_now() - self._presence_left_at[zone_index]).total_seconds() / 60
                         
-                        if past_wake and gone_min > 5:
-                            # NACH Wecker + >5 Min weg = aufgestanden
+                        if gone_min >= 60:
+                            # ≥60 Min weg = Session beendet
+                            session_bedtime = self._actual_bedtime.get(zone_index)
+                            session_duration_h = 0
+                            if session_bedtime:
+                                session_duration_h = (local_now() - session_bedtime).total_seconds() / 3600
+                            
+                            # Bedtime Learning: Nur wenn Session >2h (echter Schlaf)
+                            if session_bedtime and session_duration_h >= 2.0:
+                                self.bed_intelligence.record_bedtime(
+                                    zone_index, session_bedtime
+                                )
+                                _LOGGER.info(
+                                    f"Zone {zone_index}: Schlaf-Session beendet nach "
+                                    f"{session_duration_h:.1f}h → Bedtime Learning gespeichert"
+                                )
+                            else:
+                                _LOGGER.info(
+                                    f"Zone {zone_index}: Kurze Session ({session_duration_h:.1f}h) "
+                                    f"→ Nicht für Learning gespeichert"
+                                )
+                            
                             self._curve_active[zone_index] = False
                             self._actual_bedtime.pop(zone_index, None)
                             self._post_alarm_mode.pop(zone_index, None)
                             self._presence_left_at.pop(zone_index, None)
-                            _LOGGER.info(
-                                f"Zone {zone_index}: Nach Weckzeit + >5 Min weg → Aufgestanden"
-                            )
-                        # VOR Wecker: Kein Timeout! Kurve läuft weiter.
+                        
+                        elif gone_min >= 5 and self._night_tracking_active.get(zone_index, False):
+                            # 5-60 Min weg: Unterbrechung registrieren
+                            # Score-Tracking läuft weiter, aber Unterbrechung wird gezählt
+                            if not hasattr(self, '_interruption_logged'):
+                                self._interruption_logged = {}
+                            left_at = self._presence_left_at.get(zone_index)
+                            if left_at and zone_index not in self._interruption_logged:
+                                self._interruption_logged[zone_index] = True
+                                _LOGGER.debug(
+                                    f"Zone {zone_index}: Schlaf-Unterbrechung ({gone_min:.0f} Min)"
+                                )
+                    
+                    # Zurück im Bett → Unterbrechungs-Flag resetten
+                    if is_present and not was_present and hasattr(self, '_interruption_logged'):
+                        self._interruption_logged.pop(zone_index, None)
                     
                     # Wecker-Check: Nach Wecker-Zeit → Post-Alarm-Modus
                     if actual_bedtime and self._curve_active.get(zone_index):
@@ -749,7 +806,7 @@ class RejuvenationBedCoordinator(DataUpdateCoordinator):
                         
                         # Schwitz 2.0 (aus BedIntelligence statt PresenceDetector)
                         sweat_status = self.bed_intelligence.get_sweat_status(zone_index)
-                        is_sweating = sweat_status.is_sweating or sweat_status.is_wet
+                        is_sweating = sweat_status.is_sweating or sweat_status.is_moist
                         
                         # Isolations-Check
                         isolation = self.bed_intelligence.get_isolation_status(zone_index)
@@ -843,10 +900,11 @@ class RejuvenationBedCoordinator(DataUpdateCoordinator):
                 is_solar_active=is_solar_active,
                 is_peak_price=is_peak_price,
                 total_power_rating=total_power_rating,
+                power_correction_factor=self.bed_config.get("power_sensor_correction", 1.0),
             )
 
             self._decision_log.append(decision)
-            self._last_successful_update = datetime.now()
+            self._last_successful_update = local_now()
             self._consecutive_failures = 0
             return decision
         
@@ -871,11 +929,11 @@ class RejuvenationBedCoordinator(DataUpdateCoordinator):
             return
 
         if self._heating_start_time.get(zone_index) is None:
-            self._heating_start_time[zone_index] = datetime.now()
+            self._heating_start_time[zone_index] = local_now()
             self._heating_start_temp[zone_index] = current_temp
             return
 
-        duration = (datetime.now() - self._heating_start_time[zone_index]).total_seconds()
+        duration = (local_now() - self._heating_start_time[zone_index]).total_seconds()
         if duration > 2700: 
             temp_diff = current_temp - self._heating_start_temp[zone_index]
             if temp_diff < 0.2:
@@ -904,10 +962,15 @@ class RejuvenationBedCoordinator(DataUpdateCoordinator):
             options = self.config_entry.options
             
             from datetime import time as dt_time
-            wake_str = options.get("warm_until", global_conf.get("warm_until", "07:00"))
+            z_prefix = f"zone_{zone_index}_"
+            wake_str = (
+                options.get(f"{z_prefix}warm_until")
+                or options.get("warm_until")
+                or global_conf.get("warm_until", "07:00")
+            )
             wp = wake_str.split(":")
             wh, wm = int(wp[0]), int(wp[1]) if len(wp) > 1 else 0
-            planned_wake = datetime.combine(datetime.now().date(), dt_time(wh, wm))
+            planned_wake = datetime.combine(local_now().date(), dt_time(wh, wm))
             if planned_wake <= actual_bedtime:
                 planned_wake += timedelta(days=1)
             
@@ -1048,11 +1111,11 @@ class RejuvenationBedCoordinator(DataUpdateCoordinator):
             return HVACMode.AUTO, PRESET_AWAY
         
         sick_until = self.sick_mode_until.get(zone_index)
-        if sick_until and datetime.now() < sick_until:
-            return HVACMode.HEAT, "sick"
+        if sick_until and local_now() < sick_until:
+            return HVACMode.HEAT, PRESET_NONE  # Krank wird über Status-Sensor angezeigt
         
         if self.eco_mode_enabled:
-            return HVACMode.AUTO, "eco"
+            return HVACMode.AUTO, PRESET_NONE  # Eco wird über Status-Sensor angezeigt
         
         if hardware_level in ["C", "B"]:
             return (HVACMode.HEAT, PRESET_NONE) if is_present else (HVACMode.AUTO, PRESET_NONE)
@@ -1077,12 +1140,14 @@ class RejuvenationBedCoordinator(DataUpdateCoordinator):
     ):
         """Sendet eine persistente Notification an den User."""
         try:
-            await notify_create(
+            result = notify_create(
                 self.hass,
                 message,
                 title=title,
                 notification_id=notification_id
             )
-            _LOGGER.info(f"Notification gesendet: {title}")
+            # HA-Version Kompatibilität: async_create kann sync oder async sein
+            if result is not None:
+                await result
         except Exception as e:
-            _LOGGER.error(f"Fehler beim Senden der Notification: {e}")
+            _LOGGER.debug(f"Notification-Fehler (nicht kritisch): {e}")

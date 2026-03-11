@@ -125,7 +125,7 @@ class RampController:
             ramp_active = True
             
             if diff > 0:
-                # Aufheizen
+                # Aufheizen → Rampe zum Vinyl-Schutz (max 1°C/h)
                 direction = "heating"
                 change = min(diff, max_change)
                 new_setpoint = last_setpoint + change
@@ -136,16 +136,14 @@ class RampController:
                 completion = now + timedelta(hours=hours_remaining)
                 reason = f"Aufheizen: +{change:.1f}°C (max. {self.max_change_per_hour}°C/h)"
             else:
-                # Abkühlen
+                # Abkühlen → SOFORT auf Zieltemperatur, keine Rampe nötig!
+                # Das Wasser kühlt durch Wärmeverlust von selbst langsam ab.
+                # Die Heizung schaltet einfach aus, das Vinyl wird nicht belastet.
                 direction = "cooling"
-                change = max(diff, -max_change)
-                new_setpoint = last_setpoint + change
-                
-                # Geschätzte Dauer
-                remaining = new_setpoint - desired_temp
-                hours_remaining = remaining / self.max_change_per_hour
-                completion = now + timedelta(hours=hours_remaining)
-                reason = f"Abkühlen: {change:.1f}°C (max. {self.max_change_per_hour}°C/h)"
+                new_setpoint = desired_temp
+                ramp_active = False
+                completion = None
+                reason = f"Abkühlen: Heizung aus (Δ{diff:.1f}°C)"
         
         # Sicherheitsgrenzen
         new_setpoint = max(ABSOLUTE_MIN_TEMP, min(SOLAR_BOOST_MAX_TEMP + 2, new_setpoint))

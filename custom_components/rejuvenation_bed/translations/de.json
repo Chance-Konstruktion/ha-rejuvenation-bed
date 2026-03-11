@@ -111,27 +111,17 @@
         "description": "Was möchtest du anpassen?",
         "menu_options": {
           "global_settings": "🌐 Globale Einstellungen",
-          "zone_sensors": "📡 Zonen-Sensoren ändern",
-          "zone_settings": "🌡️ Zonen-Einstellungen",
-          "mode_settings": "🎛️ Modus-Einstellungen"
+          "zone_sensors": "📡 Zonen-Sensoren",
+          "zone_settings": "🌡️ Schlaf-Profil",
+          "mode_settings": "🎛️ Sondermodi"
         }
       },
       "global_settings": {
         "title": "🌐 Globale Einstellungen",
-        "description": "Grundeinstellungen für das gesamte System.",
-        "data": {
-          "warm_from": "Warm ab (Abends)",
-          "warm_until": "Warm bis (Morgens)",
-          "summer_threshold": "Sommer-Abschalt-Schwelle",
-          "temperature_offset": "Temperatur-Offset",
-          "co2_sensor": "CO2-Sensor"
-        },
-        "data_description": {
-          "warm_from": "⏰ Ab wann soll das Bett warm sein? Das Vorheizen startet automatisch früher.",
-          "warm_until": "⏰ Bis wann soll das Bett warm bleiben? Gilt auch als Standard-Aufwachzeit.",
-          "summer_threshold": "🌡️ Ab dieser Außentemperatur gilt Sommer-Modus. Empfohlen: **25°C**.",
-          "temperature_offset": "🌡️ **Feinjustierung** für alle Temperaturen.\n\n• **+1.0**: Alles 1°C wärmer (wenn du leicht frierst)\n• **-1.0**: Alles 1°C kühler (wenn du leicht schwitzt)\n• **0.0**: Saisonale Empfehlung verwenden\n\nEmpfohlen: Erst 2-3 Nächte testen, dann in 0.5°C-Schritten anpassen.",
-          "co2_sensor": "💨 CO2-Sensor im Schlafzimmer. Fließt in den Schlaf-Score ein (25% Gewichtung)."
+        "description": "Was möchtest du anpassen?",
+        "menu_options": {
+          "global_times": "🌡️ Temperatur & Bett",
+          "global_sensors": "📊 Sensoren & Strompreis"
         }
       },
       "zone_sensors": {
@@ -146,90 +136,124 @@
       },
       "edit_zone_sensors": {
         "title": "📡 Sensoren – {zone_name}",
-        "description": "Ändere die Hardware-Zuordnung für diese Zone. Optionale Felder können leer bleiben.",
+        "description": "Hardware-Zuordnung für diese Zone. Nur der Heizungsschalter ist Pflicht, alle anderen Felder sind optional.",
         "data": {
           "heater": "Heizungsschalter",
-          "temp_sensor": "Temperatursensor",
+          "temp_sensor": "Temperatursensor (Wasser)",
           "power_sensor": "Leistungssensor",
           "presence_sensor": "Präsenzsensor",
           "moisture_sensor": "Feuchtigkeitssensor",
           "air_temp_sensor": "Oberflächentemperatur (oben)"
         },
         "data_description": {
-          "heater": "🔌 Der Schalter oder das Relais, das die Heizung ein-/ausschaltet (Smart Plug, Zigbee-Switch, input_boolean).",
-          "temp_sensor": "🌡️ Temperatursensor **IM** Wasser oder an der Matratze.\n\n⚠️ Ohne Sensor: Nur Basic-Modus (Zeitschaltuhr).\n✅ Mit Sensor: Volle Funktionalität!",
-          "power_sensor": "📊 Optional: Leistungssensor vom Smart Plug (Watt).\n\nErmöglicht präzise Energie-Statistiken und bessere Präsenz-Erkennung.",
-          "presence_sensor": "🛏️ Optional: Dedizierter Präsenzsensor (z.B. Druckmatte, mmWave-Radar).\n\nOhne Sensor: Erkennung über Temperatur-Analyse.",
-          "moisture_sensor": "💧 Optional: Feuchtigkeitssensor für Schwitz-Erkennung und Leckage-Alarm.",
-          "air_temp_sensor": "🌡️ Optional: Zweiter Temperatursensor **OBEN** auf dem Kern (z.B. SHT41).\n\nMisst die Oberflächentemperatur zwischen Matratze und Decke.\n\n✅ Schaltet frei:\n\n1. **Decken-Check**: Erkennt ob Bett zugedeckt ist\n2. **Schwitz-Erkennung 2.0**: Kreuzkorrelation Temp × Feuchtigkeit\n3. **Bessere Präsenz**: Körperwärme-Signal von oben"
+          "heater": "Der Schalter oder das Relais, das die Heizung ein- und ausschaltet — z.B. ein Smart Plug, Zigbee-Switch oder input_boolean.",
+          "temp_sensor": "Temperatursensor im Wasser oder an der Matratze. Ohne diesen Sensor läuft nur der Basic-Modus (Zeitschaltuhr). Mit Sensor: volle Biorhythmus-Kurve, Präsenz-Erkennung und Kalibrierung.",
+          "power_sensor": "Leistungssensor vom Smart Plug in Watt. Ermöglicht Energie-Statistiken, Ersparnis-Berechnung und verbessert die Präsenz-Erkennung.",
+          "presence_sensor": "Dedizierter Präsenzsensor wie eine Druckmatte oder ein mmWave-Radar. Ohne diesen Sensor erkennt das System die Belegung über die Temperatur-Analyse.",
+          "moisture_sensor": "Feuchtigkeitssensor für Schwitz-Erkennung und Leckage-Alarm. Kann ein SHT41 oder ein separater Feuchtesensor sein.",
+          "air_temp_sensor": "Zweiter Temperatursensor oben auf dem Matratzenkern, z.B. ein SHT41. Misst die Oberfläche zwischen Matratze und Decke. Damit funktionieren der Decken-Check (erkennt ob zugedeckt), die Schwitz-Erkennung 2.0 (Kreuzkorrelation) und ein besseres Präsenz-Signal durch Körperwärme von oben."
         }
       },
       "zone_settings": {
-        "title": "🌡️ Zonen-Einstellungen",
-        "description": "Individuelle Einstellungen pro Bett-Zone.",
+        "title": "🌡️ Zone auswählen",
+        "description": "Für welche Zone möchtest du das Schlaf-Profil anpassen?",
         "data": {
           "zone_index": "Zone"
         },
         "data_description": {
-          "zone_index": "Wähle die Zone deren Einstellungen du anpassen möchtest."
+          "zone_index": "Wähle die Zone."
         }
       },
       "zone_settings_select": {
         "title": "🌡️ Zone auswählen",
-        "description": "Welche Zone möchtest du konfigurieren?",
+        "description": "Für welche Zone möchtest du das Schlaf-Profil anpassen?",
         "data": {
           "zone_index": "Zone"
         },
         "data_description": {
-          "zone_index": "Wähle die Zone deren Einstellungen du anpassen möchtest."
+          "zone_index": "Wähle die Zone."
         }
       },
       "edit_zone_settings": {
-        "title": "🌡️ Einstellungen – {zone_name}",
-        "description": "Passe Aufwachzeit, Temperaturen und Schlaf-Tracking für diese Zone an. Leere Temperaturfelder = saisonal automatisch.",
+        "title": "🌡️ Schlaf-Profil – {zone_name}",
+        "description": "Schlafenszeiten, Chronotyp, Temperaturen und Wearable für diese Bett-Seite. Bei einem Dual-Bett können beide Seiten unterschiedliche Zeiten und Einstellungen haben.",
         "data": {
-          "wake_mode": "Aufwachzeit-Modus",
-          "wake_time": "Feste Aufwachzeit",
+          "warm_from": "Warm ab (Abends)",
+          "warm_until": "Warm bis / Aufwachzeit",
+          "chronotype": "Chronotyp",
           "alarm_entity": "Wecker-Entity",
           "weekend_offset_hours": "Wochenend-Ausschlafen",
           "sleep_temp": "Einschlaf-Temperatur",
           "deep_sleep_temp": "Tiefschlaf-Temperatur",
           "wake_temp": "Aufwach-Temperatur",
-          "sleep_stage_entity": "Wearable Schlafphasen-Sensor"
+          "sleep_stage_entity": "Schlafphasen-Sensor"
         },
         "data_description": {
-          "wake_mode": "⏰ Wie wird die Aufwachzeit bestimmt?\n\n• **Fest**: Immer zur gleichen Zeit\n• **Wecker**: Von deinem Handy/Wecker-Entity\n• **Hybrid**: Wecker wenn gesetzt, sonst feste Zeit",
-          "wake_time": "⏰ Feste Aufwachzeit. Wird bei Modus 'Fest' und als Fallback bei 'Hybrid' verwendet.",
-          "alarm_entity": "📱 Sensor der die nächste Wecker-Zeit enthält (z.B. `sensor.next_alarm`). Wird bei Modus 'Wecker' und 'Hybrid' verwendet.",
-          "weekend_offset_hours": "😴 Um wie viele Stunden die Aufwachzeit am **Wochenende/Feiertag** verschoben wird.\n\nNutzt `binary_sensor.workday` zur Erkennung.",
-          "sleep_temp": "🌙 Temperatur beim **Einschlafen**. Leer = saisonal automatisch.\n\nSommer: ~27°C | Winter: ~29°C",
-          "deep_sleep_temp": "💤 Kühlster Punkt im **Tiefschlaf** für optimale Regeneration. Leer = saisonal automatisch.\n\nSommer: ~26°C | Winter: ~27.5°C",
-          "wake_temp": "☀️ Temperatur beim **Aufwachen** – sanftes Erwärmen unterstützt das natürliche Aufwachen. Leer = saisonal automatisch.\n\nSommer: ~28°C | Winter: ~30°C",
-          "sleep_stage_entity": "⌚ Schlafphasen von einem Wearable (Fitbit, Withings, Apple Watch etc.).\n\nÜberschreibt die Biorhythmus-Kurve basierend auf echten Schlafphasen!"
+          "warm_from": "Ab wann soll diese Seite warm sein? Das Vorheizen startet automatisch früher.",
+          "warm_until": "Bis wann warm bleiben? Gilt gleichzeitig als Aufwachzeit für die Biorhythmus-Kurve.",
+          "chronotype": "Bestimmt den Tiefpunkt der Temperaturkurve. Lerchen erreichen ihn früher, Eulen später.",
+          "alarm_entity": "Sensor mit der nächsten Wecker-Zeit, z.B. sensor.next_alarm.",
+          "weekend_offset_hours": "Um wie viele Stunden die Aufwachzeit am Wochenende verschoben wird.",
+          "sleep_temp": "Temperatur beim Einschlafen. Leer = saisonal automatisch (Sommer ~27°C, Winter ~29°C).",
+          "deep_sleep_temp": "Kühlster Punkt im Tiefschlaf. Leer = saisonal automatisch (Sommer ~26°C, Winter ~27.5°C).",
+          "wake_temp": "Temperatur beim Aufwachen. Leer = saisonal automatisch (Sommer ~28°C, Winter ~30°C).",
+          "sleep_stage_entity": "Schlafphasen von Fitbit, Withings oder Apple Watch. Überschreibt die Biorhythmus-Kurve."
         }
       },
       "mode_settings": {
-        "title": "🎛️ Modus-Einstellungen",
-        "description": "Konfiguriere die Temperatur-Einstellungen für jeden Sonder-Modus.",
+        "title": "🎛️ Sondermodi",
+        "description": "Temperatur-Einstellungen für Krank, Boost, Urlaub und Ausschlafen.",
         "data": {
           "sick_mode_temp": "Krank-Modus Temperatur",
           "sick_mode_days": "Krank-Modus Dauer",
-          "boost_offset": "Boost Temperatur-Offset",
+          "boost_offset": "Boost-Offset",
           "away_temp": "Urlaub-Temperatur",
           "comfort_offset": "Ausschlafen-Offset"
         },
         "data_description": {
-          "sick_mode_temp": "🤒 Konstante Temperatur bei aktivem Krank-Modus.\n\nEmpfohlen: **30-32°C** für Muskelentspannung und Genesung.",
-          "sick_mode_days": "📅 Wie viele Tage der Krank-Modus automatisch aktiv bleibt bevor er sich deaktiviert.",
-          "boost_offset": "🔥 Temperaturerhöhung über der aktuellen Kurve während Schnellheizen.\n\nEmpfohlen: **+2-3°C**\n\n💡 **Tipp**: Lege einen Zigbee-Button auf den Nachttisch, der den Boost per Automation aktiviert!",
-          "away_temp": "🏖️ Minimale Haltetemperatur im Urlaub-Modus.\n\n⚠️ **Wasserbett**: Nie unter 24°C (Kondensation, Schimmel, Vinyl-Schäden)!\n\nEmpfohlen: **24-25°C** (spart Energie, schützt Material)",
-          "comfort_offset": "😴 Extra Wärme zum Ausschlafen am Wochenende. Die Aufwach-Kurve wird entsprechend verzögert."
+          "sick_mode_temp": "Konstante Temperatur bei aktivem Krank-Modus. Empfohlen: 30–32°C für Muskelentspannung und Genesung.",
+          "sick_mode_days": "Wie viele Tage der Krank-Modus aktiv bleibt, bevor er sich automatisch deaktiviert.",
+          "boost_offset": "Temperaturerhöhung über der aktuellen Zieltemperatur während Schnellheizen. Empfohlen: +2–3°C.",
+          "away_temp": "Haltetemperatur im Urlaub-Modus. Bei Wasserbetten nie unter 24°C wegen Kondensation und Vinyl-Schutz. Empfohlen: 24–25°C.",
+          "comfort_offset": "Extra Wärme zum Ausschlafen am Wochenende. Die Aufwach-Phase der Kurve wird entsprechend verzögert."
+        }
+      },
+      "global_times": {
+        "title": "🌡️ Temperatur & Bett",
+        "description": "System-weite Temperatur-Grenzen und Bett-Eigenschaften.",
+        "data": {
+          "summer_threshold": "Sommer-Schwelle",
+          "temperature_offset": "Temperatur-Offset",
+          "bed_volume_liters": "Bett-Volumen"
+        },
+        "data_description": {
+          "summer_threshold": "Ab dieser Außentemperatur schaltet das System in den Sommer-Modus und heizt nicht mehr. Empfohlen: 25°C.",
+          "temperature_offset": "Feinjustierung für alle Temperaturen. +1.0 = alles 1°C wärmer, -1.0 = alles kühler.",
+          "bed_volume_liters": "Wassermenge in Litern. Richtwerte: 250 L Einzelbett, 400 L Doppelbett, 700 L King-Size. Wird für die thermische Batterie und Aufheizzeit benötigt."
+        }
+      },
+      "global_sensors": {
+        "title": "📊 Sensoren & Strompreis",
+        "description": "Strompreis und optionale Sensoren für Energieoptimierung und Schlafqualität.\n\n**Strompreis** — Dein aktueller Tarif in ct/kWh. Wird für die Ersparnis-Berechnung und als Fallback verwendet, wenn kein dynamischer Preis-Sensor vorhanden ist.\n\n**Preis-Sensor** — Dynamischer Strompreis von Tibber, aWATTar oder ENTSO-E. Überschreibt den festen Tarif und schaltet den Eco-Modus bei hohem Preis.\n\n**Solar-Sensor** — PV-Leistung in Watt (z.B. Fronius, SMA, Huawei). Bei Überschuss über der eingestellten Schwelle nutzt Solar-Boost den Gratis-Strom.\n\n**Solar-Schwelle** — Ab wie viel Watt Überschuss der Boost startet. Richtwert: mindestens so hoch wie die Heizleistung des Betts (z.B. 300 W für Einzelbett, 600 W für Doppelbett).\n\n**CO₂-Sensor** — CO₂ im Schlafzimmer (z.B. Netatmo, SCD40, SCD41). Fließt mit 25% in den Schlaf-Score ein.",
+        "data": {
+          "electricity_price": "Strompreis (Festtarif)",
+          "price_sensor": "Dynamischer Preis-Sensor",
+          "solar_sensor": "Solar-Sensor",
+          "co2_sensor": "CO₂-Sensor",
+          "solar_boost_threshold": "Solar-Schwelle"
+        },
+        "data_description": {
+          "electricity_price": "Dein aktueller Stromtarif. Wird für die Ersparnis-Berechnung und als Fallback ohne Preis-Sensor verwendet.",
+          "price_sensor": "Überschreibt den Festpreis mit Echtzeit-Daten und schaltet den Eco-Modus.",
+          "solar_sensor": "PV-Leistung in Watt. Solar-Boost aktiviert ab 500 W Überschuss.",
+          "co2_sensor": "CO₂ im Schlafzimmer für den Schlaf-Score.",
+          "solar_boost_threshold": "Ab wie viel Watt PV-Überschuss der Solar-Boost aktiviert wird. Bei einem Doppelbett mit 600 W Heizleistung auf 600 W oder höher einstellen."
         }
       }
     },
     "abort": {
-      "no_zones": "Keine Zonen konfiguriert. Bitte zuerst die Integration neu einrichten.",
-      "invalid_zone": "Ungültige Zone ausgewählt."
+      "no_zones": "Keine Zonen konfiguriert. Bitte die Integration zuerst einrichten.",
+      "invalid_zone": "Ungültige Zone."
     }
   }
 }
