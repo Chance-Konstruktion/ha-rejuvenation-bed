@@ -8,7 +8,7 @@
 
 🇬🇧 [English Version](README_EN.md)
 
-Verwandelt jede Bett-Heizung in eine selbstlernende Schlaf-KI. Biorhythmus-basierte Temperaturkurve, Einschlafzeit-Vorhersage, Solar-Nutzung als thermische Batterie, Präsenz-Erkennung und Auto-Kalibrierung. Funktioniert mit Wasserbetten, Heizmatten und beheizbaren Matratzenauflagen.
+Verwandelt jede Bett-Heizung in eine selbstlernende "Schlaf-KI". Biorhythmus-basierte Temperaturkurve, Solar-Nutzung als thermische Batterie, Präsenz-Erkennung und Auto-Kalibrierung. Funktioniert mit Wasserbetten, Heizmatten und beheizbaren Matratzenauflagen.
 
 ---
 
@@ -31,7 +31,7 @@ Das System lernt automatisch deine Einschlafzeit und die optimalen Schwellwerte 
 
 **Energie-Management** – Solar-Boost nutzt PV-Überschuss als thermische Batterie. Dynamische Strompreise (Tibber, aWATTar, ENTSO-E). Energie-Tracking mit kWh, Heizstunden und Ersparnis-Berechnung. Thermische Batterie als Prozent-Sensor.
 
-**Intelligenz** – Präsenz-Erkennung durch Wassertemperatur-Varianz (kein extra Sensor nötig). Auto-Kalibrierung in 3–5 Tagen. Isolations-Erkennung (Bett zugedeckt?). Schwitz-Erkennung 2.0 per Kreuzkorrelation. Schlaf-Score 0–100. Lernbasiertes Vorheizen.
+**Intelligenz** – Präsenz-Erkennung durch Wassertemperatur-Varianz (kein extra Sensor nötig). Auto-Kalibrierung in 3–5 Tagen. Isolations-Erkennung (Bett zugedeckt?). Schwitz-Erkennung per Kreuzkorrelation. Schlaf-Score 0–100. Lernbasiertes Vorheizen.
 
 **Sicherheit** – Überhitzungsschutz (max 36°C), Fail-Safe bei Sensor-Ausfall, Startup-Grace-Period, Anti-Short-Cycle, Ausreißer-Filter, Leckage-Alarm. Optionale Sensoren können jederzeit ausfallen ohne die Kernfunktion zu beeinträchtigen.
 
@@ -44,7 +44,7 @@ Das System lernt automatisch deine Einschlafzeit und die optimalen Schwellwerte 
 | **A** | Smart-Plug | Zeitschaltuhr, Boost, Urlaub |
 | **B** | + Temperatursensor | + Biorhythmus, Präsenz, Schlaf-Score |
 | **C** | + Leistungssensor | + Energie-Tracking, bessere Präsenz |
-| **D** | + SHT41 (Luft/Feuchte) | + Isolations-Check, Schwitz 2.0, Leckage |
+| **D** | + SHT41 (Luft/Feuchte) | + Isolations-Check, Schwitzerkennung, Leckage |
 
 Minimum: Ein Smart-Plug der die Heizung schaltet.
 
