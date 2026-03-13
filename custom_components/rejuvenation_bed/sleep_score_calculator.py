@@ -12,13 +12,12 @@ Das ist DAS Feature, das User lieben werden!
 """
 
 import logging
-from datetime import datetime, timedelta, time
+from datetime import datetime, time
 from typing import Dict, List, Optional, Tuple
 from dataclasses import dataclass, field
 from collections import deque
 from homeassistant.core import HomeAssistant
 from .const import local_now
-from homeassistant.util import dt as dt_util
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -134,7 +133,10 @@ class SleepScoreCalculator:
         self._current_night: Dict[int, NightData] = {}
         
         # CO2 Sensor (optional)
-        self.co2_sensor = config_entry.data.get("global", {}).get("co2_sensor")
+        self.co2_sensor = (
+            config_entry.options.get("co2_sensor")
+            or config_entry.data.get("global", {}).get("co2_sensor")
+        )
     
     def start_night_tracking(self, zone_index: int, planned_bedtime: datetime, planned_wake: datetime):
         """
