@@ -1,0 +1,139 @@
+title: Rejuvenation Bed Cockpit
+views:
+  - title: Nacht-Cockpit
+    path: rejuvenation-bed-night
+    icon: mdi:bed-outline
+    type: sections
+    max_columns: 2
+    cards:
+      - type: heading
+        heading: Rejuvenation Bed · Nachtmodus
+        heading_style: title
+        icon: mdi:bed-outline
+
+      - type: tile
+        entity: climate.rejuvenation_bed_links
+        name: Bett Links Thermostat
+        features_position: bottom
+        vertical: false
+        state_content:
+          - state
+          - current_temperature
+        tap_action:
+          action: more-info
+
+      - type: tile
+        entity: climate.rejuvenation_bed_rechts
+        name: Bett Rechts Thermostat
+        features_position: bottom
+        vertical: false
+        state_content:
+          - state
+          - current_temperature
+        tap_action:
+          action: more-info
+
+      - type: thermostat
+        entity: climate.rejuvenation_bed_links
+        name: Bettseite Links
+
+      - type: thermostat
+        entity: climate.rejuvenation_bed_rechts
+        name: Bettseite Rechts
+
+      - type: heading
+        heading: Nachttisch
+        icon: mdi:alarm
+
+      - type: clock
+        clock_size: medium
+
+      - type: entities
+        title: Wecker & Nacht-Licht
+        show_header_toggle: false
+        entities:
+          - entity: sensor.next_alarm
+            name: Nächster Wecker
+          - entity: input_datetime.bedroom_alarm
+            name: Wecker-Zeit
+          - entity: light.nachttisch
+            name: Nachttischlicht
+          - entity: light.schlafzimmer_ambient
+            name: Ambientelicht
+
+      - type: heading
+        heading: Modi & Komfort
+        icon: mdi:weather-night
+
+      - type: entities
+        title: Bett-Modi
+        show_header_toggle: false
+        entities:
+          - entity: switch.bett_links_schnellheizen
+            name: Boost Links
+          - entity: switch.bett_rechts_schnellheizen
+            name: Boost Rechts
+          - entity: switch.bett_links_krank_modus
+            name: Krank-Modus Links
+          - entity: switch.bett_rechts_krank_modus
+            name: Krank-Modus Rechts
+          - entity: switch.bett_urlaub_modus
+            name: Urlaub-Modus
+          - entity: switch.bett_thermische_batterie
+            name: Thermische Batterie
+          - entity: switch.bett_tarifmodus
+            name: Tarifmodus
+
+      - type: heading
+        heading: Optionale Sensoren
+        icon: mdi:chart-line
+
+      - type: conditional
+        conditions:
+          - entity: sensor.bett_energiepreis_status
+            state_not: unavailable
+        card:
+          type: tile
+          entity: sensor.bett_energiepreis_status
+          name: Energiepreis-Status
+          color: amber
+
+      - type: conditional
+        conditions:
+          - entity: sensor.bett_solar_anteil_heute
+            state_not: unavailable
+        card:
+          type: tile
+          entity: sensor.bett_solar_anteil_heute
+          name: Solaranteil heute
+          color: amber
+
+      - type: conditional
+        conditions:
+          - entity: sensor.bett_heutiger_verbrauch
+            state_not: unavailable
+        card:
+          type: tile
+          entity: sensor.bett_heutiger_verbrauch
+          name: Verbrauch heute
+          color: amber
+
+      - type: conditional
+        conditions:
+          - entity: sensor.bett_schlafscore_links
+            state_not: unavailable
+        card:
+          type: tile
+          entity: sensor.bett_schlafscore_links
+          name: Schlafscore Links
+          color: amber
+
+      - type: conditional
+        conditions:
+          - entity: sensor.bett_schlafscore_rechts
+            state_not: unavailable
+        card:
+          type: tile
+          entity: sensor.bett_schlafscore_rechts
+          name: Schlafscore Rechts
+          color: amber
