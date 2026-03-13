@@ -179,3 +179,18 @@ MIT License – siehe [LICENSE](LICENSE)
 ---
 
 *Gebaut mit echten Sensordaten aus einem 2×2m Dual-Kern Wasserbett. Kalibriert auf 126.771 Datenpunkte.*
+
+---
+
+## Dashboard-Vorlage (Nightstand Cockpit)
+
+Eine mobile/tablet-freundliche Lovelace-Vorlage findest du hier:
+
+- `dashboards/rejuvenation_bed_nightstand_cockpit.yaml`
+
+Design-Ziel:
+- Nachtfreundlich, „Bernstein“-Look
+- Nachttisch-Cockpit mit Uhr, Wecker, Licht und Bett-Thermostaten
+- Optionale Bereiche über `conditional` Cards (nur sichtbar wenn Entity verfügbar)
+
+> Hinweis: Passe die Entity-IDs in der YAML an deine Installation an.
