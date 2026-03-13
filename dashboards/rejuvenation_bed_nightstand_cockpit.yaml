@@ -11,35 +11,61 @@ views:
         heading_style: title
         icon: mdi:bed-outline
 
-      - type: tile
-        entity: climate.rejuvenation_bed_links
-        name: Bett Links Thermostat
-        features_position: bottom
-        vertical: false
-        state_content:
-          - state
-          - current_temperature
-        tap_action:
-          action: more-info
+      - type: markdown
+        content: >-
+          ⚙️ Diese Vorlage ist absichtlich **optional aufgebaut**.
+          Passe die Entity-IDs an deine Installation an.
+          Nicht verfügbare Karten bleiben über `conditional` verborgen.
 
-      - type: tile
-        entity: climate.rejuvenation_bed_rechts
-        name: Bett Rechts Thermostat
-        features_position: bottom
-        vertical: false
-        state_content:
-          - state
-          - current_temperature
-        tap_action:
-          action: more-info
+      # === Bett-Thermostat Links ===
+      - type: conditional
+        conditions:
+          - entity: climate.rejuvenation_bed_links
+            state_not: unavailable
+        card:
+          type: tile
+          entity: climate.rejuvenation_bed_links
+          name: Bett Links Thermostat
+          features_position: bottom
+          state_content:
+            - state
+            - current_temperature
+          tap_action:
+            action: more-info
 
-      - type: thermostat
-        entity: climate.rejuvenation_bed_links
-        name: Bettseite Links
+      - type: conditional
+        conditions:
+          - entity: climate.rejuvenation_bed_links
+            state_not: unavailable
+        card:
+          type: thermostat
+          entity: climate.rejuvenation_bed_links
+          name: Bettseite Links
 
-      - type: thermostat
-        entity: climate.rejuvenation_bed_rechts
-        name: Bettseite Rechts
+      # === Bett-Thermostat Rechts ===
+      - type: conditional
+        conditions:
+          - entity: climate.rejuvenation_bed_rechts
+            state_not: unavailable
+        card:
+          type: tile
+          entity: climate.rejuvenation_bed_rechts
+          name: Bett Rechts Thermostat
+          features_position: bottom
+          state_content:
+            - state
+            - current_temperature
+          tap_action:
+            action: more-info
+
+      - type: conditional
+        conditions:
+          - entity: climate.rejuvenation_bed_rechts
+            state_not: unavailable
+        card:
+          type: thermostat
+          entity: climate.rejuvenation_bed_rechts
+          name: Bettseite Rechts
 
       - type: heading
         heading: Nachttisch
@@ -48,41 +74,120 @@ views:
       - type: clock
         clock_size: medium
 
-      - type: entities
-        title: Wecker & Nacht-Licht
-        show_header_toggle: false
-        entities:
+      # === Wecker / Licht (komplett optional) ===
+      - type: conditional
+        conditions:
           - entity: sensor.next_alarm
-            name: Nächster Wecker
+            state_not: unavailable
+        card:
+          type: tile
+          entity: sensor.next_alarm
+          name: Nächster Wecker
+          color: amber
+
+      - type: conditional
+        conditions:
           - entity: input_datetime.bedroom_alarm
-            name: Wecker-Zeit
+            state_not: unavailable
+        card:
+          type: tile
+          entity: input_datetime.bedroom_alarm
+          name: Wecker-Zeit
+          color: amber
+
+      - type: conditional
+        conditions:
           - entity: light.nachttisch
-            name: Nachttischlicht
+            state_not: unavailable
+        card:
+          type: tile
+          entity: light.nachttisch
+          name: Nachttischlicht
+          color: amber
+
+      - type: conditional
+        conditions:
           - entity: light.schlafzimmer_ambient
-            name: Ambientelicht
+            state_not: unavailable
+        card:
+          type: tile
+          entity: light.schlafzimmer_ambient
+          name: Ambientelicht
+          color: amber
 
       - type: heading
-        heading: Modi & Komfort
+        heading: Bett-Modi (optional)
         icon: mdi:weather-night
 
-      - type: entities
-        title: Bett-Modi
-        show_header_toggle: false
-        entities:
+      - type: conditional
+        conditions:
           - entity: switch.bett_links_schnellheizen
-            name: Boost Links
+            state_not: unavailable
+        card:
+          type: tile
+          entity: switch.bett_links_schnellheizen
+          name: Boost Links
+          color: amber
+
+      - type: conditional
+        conditions:
           - entity: switch.bett_rechts_schnellheizen
-            name: Boost Rechts
+            state_not: unavailable
+        card:
+          type: tile
+          entity: switch.bett_rechts_schnellheizen
+          name: Boost Rechts
+          color: amber
+
+      - type: conditional
+        conditions:
           - entity: switch.bett_links_krank_modus
-            name: Krank-Modus Links
+            state_not: unavailable
+        card:
+          type: tile
+          entity: switch.bett_links_krank_modus
+          name: Krank-Modus Links
+          color: amber
+
+      - type: conditional
+        conditions:
           - entity: switch.bett_rechts_krank_modus
-            name: Krank-Modus Rechts
+            state_not: unavailable
+        card:
+          type: tile
+          entity: switch.bett_rechts_krank_modus
+          name: Krank-Modus Rechts
+          color: amber
+
+      - type: conditional
+        conditions:
           - entity: switch.bett_urlaub_modus
-            name: Urlaub-Modus
+            state_not: unavailable
+        card:
+          type: tile
+          entity: switch.bett_urlaub_modus
+          name: Urlaub-Modus
+          color: amber
+
+      - type: conditional
+        conditions:
           - entity: switch.bett_thermische_batterie
-            name: Thermische Batterie
+            state_not: unavailable
+        card:
+          type: tile
+          entity: switch.bett_thermische_batterie
+          name: Thermische Batterie
+          color: amber
+
+      - type: conditional
+        conditions:
           - entity: switch.bett_tarifmodus
-            name: Tarifmodus
+            state_not: unavailable
+        card:
+          type: tile
+          entity: switch.bett_tarifmodus
+          name: Tarifmodus
+          color: amber
 
       - type: heading
         heading: Optionale Sensoren
