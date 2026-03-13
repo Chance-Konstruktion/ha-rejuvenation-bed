@@ -3,7 +3,7 @@
 **Intelligente Bett-Heizungssteuerung für Home Assistant**
 
 [![HACS Badge](https://img.shields.io/badge/HACS-Custom-orange.svg)](https://github.com/hacs/integration)
-[![Version](https://img.shields.io/badge/version-0.5.0-blue.svg)](https://github.com/Chance-Konstruktion/ha-rejuvenation-bed/releases)
+[![Version](https://img.shields.io/badge/version-0.5.5-blue.svg)](https://github.com/Chance-Konstruktion/ha-rejuvenation-bed/releases)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
 🇬🇧 [English Version](README_EN.md)
@@ -31,7 +31,7 @@ Das System lernt automatisch deine Einschlafzeit und die optimalen Schwellwerte 
 
 **Energie-Management** – Solar-Boost nutzt PV-Überschuss als thermische Batterie. Dynamische Strompreise (Tibber, aWATTar, ENTSO-E). Energie-Tracking mit kWh, Heizstunden und Ersparnis-Berechnung. Thermische Batterie als Prozent-Sensor.
 
-**Intelligenz** – Präsenz-Erkennung durch Wassertemperatur-Varianz (kein extra Sensor nötig). Auto-Kalibrierung in 3–5 Tagen. Isolations-Erkennung (Bett zugedeckt?). Schwitz-Erkennung per Kreuzkorrelation. Schlaf-Score 0–100. Einschlafzeit-Vorhersage mit lernbasiertem Vorheizen.
+**Intelligenz** – Präsenz-Erkennung durch Wassertemperatur-Varianz (kein extra Sensor nötig). Auto-Kalibrierung in 3–5 Tagen. Isolations-Erkennung (Bett zugedeckt?). Schwitz-Erkennung per Kreuzkorrelation. Schlaf-Score 0–100. Lernbasiertes Vorheizen.
 
 **Sicherheit** – Überhitzungsschutz (max 36°C), Fail-Safe bei Sensor-Ausfall, Startup-Grace-Period, Anti-Short-Cycle, Ausreißer-Filter, Leckage-Alarm. Optionale Sensoren können jederzeit ausfallen ohne die Kernfunktion zu beeinträchtigen.
 
@@ -98,7 +98,7 @@ Die Integration erstellt drei Geräte in Home Assistant:
 | `switch.bett_boost` | Schnellheizen |
 | `switch.bett_krank_modus` | Krank-Modus |
 | `switch.bett_solar_batterie` | Thermische Batterie |
-| `switch.bett_eco_modus` | Tarifmodus |
+| `switch.bett_tarifmodus` | Tarifmodus (bei teuerem Strom Temperatur senken) |
 
 ### ⚡ Bett Energie
 
@@ -130,7 +130,7 @@ Die Integration erstellt drei Geräte in Home Assistant:
 | **Krank** | `switch.bett_krank_modus` | Konstante Temperatur für konfigurierbare Tage |
 | **Urlaub** | HVAC-Modus "away" | Minimale 24°C Haltetemperatur |
 | **Solar** | `switch.bett_solar_batterie` | PV-Überschuss als Wärme speichern |
-| **Eco** | `switch.bett_eco_modus` | Bei teuerem Strom Temperatur senken |
+| **Tarif** | `switch.bett_tarifmodus` | Bei teuerem Strom Temperatur senken |
 
 ---
 

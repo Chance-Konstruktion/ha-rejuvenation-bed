@@ -3,7 +3,7 @@
 **Intelligent bed heating controller for Home Assistant**
 
 [![HACS Badge](https://img.shields.io/badge/HACS-Custom-orange.svg)](https://github.com/hacs/integration)
-[![Version](https://img.shields.io/badge/version-0.5.0-blue.svg)](https://github.com/Chance-Konstruktion/ha-rejuvenation-bed/releases)
+[![Version](https://img.shields.io/badge/version-0.5.5-blue.svg)](https://github.com/Chance-Konstruktion/ha-rejuvenation-bed/releases)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
 🇩🇪 [Deutsche Version](README.md)
@@ -31,7 +31,7 @@ The system automatically learns your bedtime and the optimal thresholds for your
 
 **Energy management** – Solar boost uses PV surplus as thermal battery. Dynamic electricity prices (Tibber, Octopus, ENTSO-E). Energy tracking with kWh, heating hours and savings calculation. Thermal battery as percentage sensor.
 
-**Intelligence** – Presence detection through water temperature variance (no extra sensor needed). Auto-calibration in 3–5 days. Insulation detection (blanket on/off). Sweat detection 2.0 via cross-correlation. Sleep score 0–100. Bedtime prediction with learning-based preheating.
+**Intelligence** – Presence detection through water temperature variance (no extra sensor needed). Auto-calibration in 3–5 days. Insulation detection (blanket on/off). Sweat detection 2.0 via cross-correlation. Sleep score 0–100. Learning-based preheating.
 
 **Safety** – Overheat protection (max 36°C), fail-safe on sensor failure, startup grace period, anti-short-cycle, outlier filter, leak alarm. Optional sensors can fail at any time without affecting core functionality.
 
@@ -91,11 +91,14 @@ The integration creates three devices in Home Assistant:
 | `sensor.bett_zieltemperatur` | Calculated target temperature |
 | `sensor.bett_status` | Current mode and decision reason |
 | `sensor.bett_thermal_summary` | Temperature calculation breakdown |
+| `sensor.bett_rampe` | Heat-up ramp status |
 | `binary_sensor.bett_prasenz` | Person in bed |
+| `binary_sensor.bett_isolation` | Bed covered (requires SHT41) |
+| `binary_sensor.bett_schwitzen` | Sweat/moisture alarm |
 | `switch.bett_boost` | Quick heat |
 | `switch.bett_krank_modus` | Sick mode |
 | `switch.bett_solar_batterie` | Thermal battery |
-| `switch.bett_eco_modus` | Tariff mode |
+| `switch.bett_tarifmodus` | Tariff mode (reduce temperature during expensive rates) |
 
 ### ⚡ Bed Energy
 
@@ -103,16 +106,18 @@ The integration creates three devices in Home Assistant:
 |--------|------------|
 | `sensor.bett_thermische_batterie` | Thermal storage charge level (%) |
 | `sensor.bett_energie_heute` | Consumption today (kWh) |
+| `sensor.bett_gesamtleistung` | Current power consumption (W) |
 | `sensor.bett_heizstunden` | Heating hours today |
 | `sensor.bett_ersparnis` | Estimated savings (€) |
 | `sensor.bett_solar_prozent` | Solar share of consumption |
+| `sensor.bett_strompreis_status` | Current tariff mode |
 
 ### 😴 Bed Sleep
 
 | Entity | Description |
 |--------|------------|
 | `sensor.bett_schlaf_score` | Last night (0–100) |
-| `sensor.bett_einschlafzeit_vorhersage` | Learned bedtime prediction |
+| `sensor.bett_schlaf_score_woche` | Weekly average |
 | `sensor.bett_intelligence` | Calibration and learning status |
 
 ---
