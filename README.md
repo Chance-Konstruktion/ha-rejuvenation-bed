@@ -167,6 +167,9 @@ Empfohlen. Ohne Sensor läuft das System als intelligente Zeitschaltuhr (Level A
 **Was passiert wenn ein Sensor ausfällt?**
 Die Integration degradiert automatisch. Der SHT41 kann ausfallen ohne Auswirkung auf die Heizung. Selbst der Wasser-Temperatursensor hat einen Fail-Safe (30% Duty-Cycle).
 
+**Wie funktioniert die Präsenz-Erkennung bei Heizmatten?**
+Anders als beim Wasserbett (Varianz-Analyse im Wasserkörper) nutzt die Heizmatten-Erkennung den **Temperatur-Trend**: Wenn die Heizung aus ist und die Temperatur trotzdem steigt, liegt jemand drauf (Körperwärme). Voraussetzung ist ein Temperatursensor an der Matte. Ohne Sensor ist keine Präsenz-Erkennung möglich — das System läuft dann als Zeitschaltuhr (Level A). Die Erkennung ist weniger präzise als beim Wasserbett, funktioniert aber zuverlässig nach einer kurzen Einliegezeit (~3 Min).
+
 **Welchen Temperatursensor?**
 DS18B20 wasserdicht (IM Wasser) + optional SHT41 (OBEN auf dem Kern).
 
