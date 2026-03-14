@@ -148,12 +148,18 @@ class RejuvenationBedClimate(CoordinatorEntity, ClimateEntity):
 
     def _detect_hardware_level(self, zone_conf) -> str:
         """
-        Erkennt Hardware-Level: A/B/C
+        Erkennt Hardware-Level: A/B/C/D/E
         """
         has_temp = zone_conf.get("temp_sensor") is not None
         has_power = zone_conf.get("power_sensor") is not None
-        
-        if has_temp:
+        has_air = zone_conf.get("air_temp_sensor") is not None
+        has_moisture = zone_conf.get("moisture_sensor") is not None
+
+        if has_temp and has_power and has_air and has_moisture:
+            return "E"  # Premium
+        elif has_temp and has_power and (has_air or has_moisture):
+            return "D"  # Erweitert
+        elif has_temp and has_power:
             return "C"  # Vollausstattung
         elif has_power:
             return "B"  # Smart
@@ -165,7 +171,7 @@ class RejuvenationBedClimate(CoordinatorEntity, ClimateEntity):
         if self._hardware_level == "A":
             self._attr_hvac_modes = [HVACMode.OFF, HVACMode.HEAT]
             self._attr_preset_modes = [PRESET_NONE, PRESET_BOOST]
-        elif self._hardware_level == "B":
+        elif self._hardware_level in ["B", "C", "D", "E"]:
             self._attr_hvac_modes = [HVACMode.OFF, HVACMode.AUTO, HVACMode.HEAT]
             self._attr_preset_modes = [PRESET_NONE, PRESET_AWAY, PRESET_BOOST]
 
