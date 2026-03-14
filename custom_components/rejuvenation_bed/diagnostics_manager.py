@@ -282,11 +282,13 @@ class DiagnosticsManager:
         last_reset = budget.get("last_reset")
         if isinstance(last_reset, str):
             try:
-                last_reset_dt = datetime.fromisoformat(last_reset)
+                last_reset_dt = datetime.fromisoformat(last_reset).replace(tzinfo=None)
             except:
                 last_reset_dt = local_now()
+        elif hasattr(last_reset, 'replace'):
+            last_reset_dt = last_reset.replace(tzinfo=None) if last_reset else local_now()
         else:
-            last_reset_dt = last_reset or local_now()
+            last_reset_dt = local_now()
         
         elapsed = local_now() - last_reset_dt
         days_since_reset = elapsed.total_seconds() / 86400
