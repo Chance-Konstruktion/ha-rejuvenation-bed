@@ -152,6 +152,9 @@ No. Any electric bed heater works: waterbed, heating pad, heated mattress topper
 **Do I need a temperature sensor?**
 Recommended. Without a sensor, the system runs as an intelligent timer (Level A). With a sensor: full biorhythm curve and presence detection.
 
+**How does presence detection work with heating pads?**
+Unlike waterbeds (variance analysis in the water body), heating pad detection uses the **temperature trend**: if the heater is off and the temperature still rises, someone is lying on it (body heat). This requires a temperature sensor on the pad. Without a sensor, presence detection is not available — the system runs as a timer (Level A). Detection is less precise than with waterbeds but works reliably after a short settling time (~3 min).
+
 **What happens if a sensor fails?**
 The integration degrades automatically. The SHT41 can fail without affecting heating. Even the water temperature sensor has a fail-safe (30% duty cycle).
 
