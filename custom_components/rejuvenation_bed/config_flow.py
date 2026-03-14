@@ -196,7 +196,18 @@ class RejuvenationBedConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             level = zone.get("hardware_level", "A")
             zone_name = f"Zone {idx + 1}"
             
-            if level == "C":
+            if level == "E":
+                features_available.append(f"✅ {zone_name}: PREMIUM")
+                features_available.append("   • Alle Features von VERJÜNGUNGSBRUNNEN")
+                features_available.append("   • Schwitz-Erkennung 2.0 (Feuchte-Sensor)")
+                features_available.append("   • Isolations-Überwachung (Luft-Sensor)")
+                features_available.append("   • Leckage-Erkennung")
+            elif level == "D":
+                features_available.append(f"✅ {zone_name}: ERWEITERT")
+                features_available.append("   • Alle Features von VERJÜNGUNGSBRUNNEN")
+                features_available.append("   • Erweiterte Umgebungs-Sensorik")
+                features_available.append("   • Verbesserte Präsenz-Erkennung")
+            elif level == "C":
                 features_available.append(f"✅ {zone_name}: VERJÜNGUNGSBRUNNEN")
                 features_available.append("   • Biorhythmus-Kurve mit Schlafphasen")
                 features_available.append("   • Präsenz-Erkennung (Sensor-Fusion)")
@@ -262,8 +273,8 @@ class RejuvenationBedConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 
                 vol.Required("compare_to_legacy", default=True): selector.BooleanSelector(),
                 
-                vol.Optional("electricity_price", default=0.30): vol.All(
-                    vol.Coerce(float), vol.Range(min=0.05, max=1.0)
+                vol.Optional("electricity_price", default=30.0): vol.All(
+                    vol.Coerce(float), vol.Range(min=5.0, max=80.0)
                 ),
             }),
             description_placeholders={

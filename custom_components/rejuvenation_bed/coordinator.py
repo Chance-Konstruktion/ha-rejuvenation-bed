@@ -773,6 +773,7 @@ class RejuvenationBedCoordinator(DataUpdateCoordinator):
                     self._heater_states[heater_entity] = should_heat
                     
                     # Schwitz-Erkennung & Leckage-Detection (über PresenceDetector)
+                    is_leaking = False  # Default falls Leak-Check crasht
                     try:
                         is_leaking = self.presence_detector.is_potential_leak(zone_index)
                         if is_leaking:
@@ -788,6 +789,8 @@ class RejuvenationBedCoordinator(DataUpdateCoordinator):
                     # NICHT-KRITISCH: Crash hier darf Heizung NIE lahmlegen!
                     # ═══════════════════════════════════════════════════
                     is_sweating = False  # Default falls Intelligence crasht
+                    sweat_status = None  # Default falls Intelligence crasht
+                    isolation = None  # Default falls Intelligence crasht
                     try:
                         water_std = self.presence_detector._last_water_std.get(zone_index, 0.0)
                         
@@ -845,10 +848,10 @@ class RejuvenationBedCoordinator(DataUpdateCoordinator):
                         "presence_reason": presence_reason,
                         "is_sweating": is_sweating,
                         "is_leaking": is_leaking,
-                        "humidity_level": sweat_status.humidity_level,
-                        "sweat_cause": sweat_status.cause,
-                        "isolation_level": isolation.level,
-                        "isolation_delta": isolation.delta_water_air,
+                        "humidity_level": sweat_status.humidity_level if sweat_status else None,
+                        "sweat_cause": sweat_status.cause if sweat_status else None,
+                        "isolation_level": isolation.level if isolation else None,
+                        "isolation_delta": isolation.delta_water_air if isolation else None,
                         "active_mode": active_mode,
                     }
                     
@@ -1117,7 +1120,7 @@ class RejuvenationBedCoordinator(DataUpdateCoordinator):
         if self.eco_mode_enabled:
             return HVACMode.AUTO, PRESET_NONE  # Eco wird über Status-Sensor angezeigt
         
-        if hardware_level in ["C", "B"]:
+        if hardware_level in ["E", "D", "C", "B"]:
             return (HVACMode.HEAT, PRESET_NONE) if is_present else (HVACMode.AUTO, PRESET_NONE)
         
         return HVACMode.HEAT, PRESET_NONE
