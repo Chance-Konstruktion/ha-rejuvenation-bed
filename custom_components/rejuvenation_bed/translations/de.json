@@ -23,7 +23,7 @@
       },
       "safety_info": {
         "title": "⚠️ Sicherheitshinweis",
-        "description": "**WICHTIG:** Stelle sicher, dass die physischen Regler deiner Wasserbettheizung auf die **maximale Temperatur (38°C)** gestellt sind.\n\nNur so kann Home Assistant die Temperatur präzise innerhalb der sicheren Grenzen regeln.\n\nDie Software begrenzt intern auf max. 32°C - der Hardware-Regler ist nur eine Sicherheitsebene."
+        "description": "**WICHTIG:** Stelle sicher, dass die physischen Regler deiner Wasserbettheizung auf die **maximale Temperatur (38°C)** gestellt sind.\n\nNur so kann Home Assistant die Temperatur präzise innerhalb der sicheren Grenzen regeln.\n\nDie Software begrenzt intern auf max. 34°C (Boost) bzw. 36°C (Hardware-Limit) - der Hardware-Regler ist eine zusätzliche Sicherheitsebene."
       },
       "zone_config": {
         "title": "Zoneneinstellungen",
