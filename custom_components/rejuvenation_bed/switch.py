@@ -64,6 +64,21 @@ def get_zone_device_info(coordinator, zone_index: int) -> DeviceInfo:
     )
 
 
+
+
+def get_energy_device_info(coordinator) -> DeviceInfo:
+    """Energie-Gerät: Verbrauch, Solar, Ersparnis, Batterie."""
+    return DeviceInfo(
+        identifiers={(DOMAIN, f"{coordinator.config_entry.entry_id}_energy")},
+        manufacturer=MANUFACTURER,
+        model="Energie & Ersparnis",
+        name="Bett Energie",
+        sw_version=SW_VERSION,
+        via_device=(DOMAIN, coordinator.config_entry.entry_id),
+    )
+
+
+
 async def async_setup_entry(hass, entry, async_add_entities):
     """Richtet die Schalter für das Rejuvenation Bed ein."""
     coordinator = hass.data[DOMAIN][entry.entry_id]
@@ -291,7 +306,7 @@ class BedThermalBatterySwitch(CoordinatorEntity, SwitchEntity):
         self.coordinator = coordinator
         self._attr_name = "Bett Solar-Batterie"
         self._attr_unique_id = f"{coordinator.config_entry.entry_id}_thermal_battery"
-        self._attr_device_info = get_device_info(coordinator)
+        self._attr_device_info = get_energy_device_info(coordinator)
 
     @property
     def is_on(self) -> bool:
@@ -415,7 +430,7 @@ class BedVacationModeSwitch(CoordinatorEntity, SwitchEntity):
         self._is_waterbed = is_waterbed
         self._attr_name = "Bett Urlaub-Modus"
         self._attr_unique_id = f"{coordinator.config_entry.entry_id}_vacation_mode"
-        self._attr_device_info = get_device_info(coordinator)
+        self._attr_device_info = get_energy_device_info(coordinator)
 
     @property
     def is_on(self) -> bool:

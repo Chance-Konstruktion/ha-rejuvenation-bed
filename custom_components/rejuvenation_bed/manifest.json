@@ -1,7 +1,7 @@
 {
   "domain": "rejuvenation_bed",
   "name": "Rejuvenation Bed",
-  "version": "0.5.4",
+  "version": "0.6.0",
   "documentation": "https://github.com/Chance-Konstruktion/ha-rejuvenation-bed",
   "issue_tracker": "https://github.com/Chance-Konstruktion/ha-rejuvenation-bed/issues",
   "codeowners": ["@Chance-Konstruktion"],
