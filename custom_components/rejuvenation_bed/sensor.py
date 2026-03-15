@@ -60,12 +60,12 @@ def get_energy_device_info(coordinator) -> DeviceInfo:
 
 
 def get_sleep_device_info(coordinator) -> DeviceInfo:
-    """Schlaf-Gerät: Score, Vorhersage, Intelligenz."""
+    """Schlaf-Gerät: Score, Analyse, Diagnose, Intelligenz."""
     return DeviceInfo(
         identifiers={(DOMAIN, f"{coordinator.config_entry.entry_id}_sleep")},
         manufacturer=MANUFACTURER,
         model="Schlaf, Analyse & Intelligenz",
-        name="Bett Schlaf",
+        name="Bett Schlaf/Analyse",
         sw_version=SW_VERSION,
         via_device=(DOMAIN, coordinator.config_entry.entry_id),
     )
@@ -278,6 +278,7 @@ class BedZonePowerSensor(RejuvenationBedZoneSensor):
 
     def __init__(self, coordinator, zone_idx, display_name):
         super().__init__(coordinator, zone_idx)
+        self._attr_device_info = get_energy_device_info(coordinator)
         self.internal_zone_name = f"Zone {zone_idx + 1}"
         self._attr_name = f"Bett{display_name} Leistung"
         self._attr_unique_id = f"{coordinator.config_entry.entry_id}_zone_{zone_idx}_power"
@@ -378,14 +379,15 @@ class BedThermalSummarySensor(RejuvenationBedZoneSensor):
 class BedRampStatusSensor(RejuvenationBedZoneSensor):
     """
     Zeigt den Status der Temperatur-Rampe (Materialschutz).
-    
+
     Das Vinyl wird durch sanfte Änderungen (max. 1°C/h) geschont.
     Dieser Sensor zeigt ob gerade eine Rampe aktiv ist.
     """
     _attr_icon = "mdi:chart-timeline-variant"
-    
+
     def __init__(self, coordinator, zone_idx, display_name):
         super().__init__(coordinator, zone_idx)
+        self._attr_device_info = get_sleep_device_info(coordinator)
         self.zone_idx = zone_idx
         self._attr_name = f"Bett{display_name} Rampen-Status"
         self._attr_unique_id = f"{coordinator.config_entry.entry_id}_zone_{zone_idx}_ramp"
@@ -588,9 +590,10 @@ class BedSleepScoreSensor(RejuvenationBedZoneSensor):
     _attr_icon = "mdi:sleep"
     _attr_state_class = SensorStateClass.MEASUREMENT
     _attr_native_unit_of_measurement = "Punkte"
-    
+
     def __init__(self, coordinator, zone_idx, display_name):
         super().__init__(coordinator, zone_idx)
+        self._attr_device_info = get_sleep_device_info(coordinator)
         self.zone_idx = zone_idx
         self._attr_name = f"Bett{display_name} Schlaf-Score"
         self._attr_unique_id = f"{coordinator.config_entry.entry_id}_zone_{zone_idx}_sleep_score"
@@ -628,9 +631,10 @@ class BedSleepScoreWeeklySensor(RejuvenationBedZoneSensor):
     _attr_icon = "mdi:calendar-week"
     _attr_state_class = SensorStateClass.MEASUREMENT
     _attr_native_unit_of_measurement = "Punkte"
-    
+
     def __init__(self, coordinator, zone_idx, display_name):
         super().__init__(coordinator, zone_idx)
+        self._attr_device_info = get_sleep_device_info(coordinator)
         self.zone_idx = zone_idx
         self._attr_name = f"Bett{display_name} Schlaf-Score Woche"
         self._attr_unique_id = f"{coordinator.config_entry.entry_id}_zone_{zone_idx}_sleep_score_weekly"

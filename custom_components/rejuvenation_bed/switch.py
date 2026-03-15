@@ -65,16 +65,16 @@ def get_zone_device_info(coordinator, zone_index: int) -> DeviceInfo:
     )
 
 
-    
-    model = "Smart Wasserbett Controller" if bed_type == "wasserbett" else "Smart Heizmatte Controller"
-    zone_suffix = "Dual-Zone" if zones_count > 1 else "Mono"
-    
+
+def get_energy_device_info(coordinator) -> DeviceInfo:
+    """Energie-Gerät: Verbrauch, Solar, Ersparnis, Batterie."""
     return DeviceInfo(
-        identifiers={(DOMAIN, coordinator.config_entry.entry_id)},
+        identifiers={(DOMAIN, f"{coordinator.config_entry.entry_id}_energy")},
         manufacturer=MANUFACTURER,
-        model=f"{model} ({zone_suffix})",
-        name="Rejuvenation Bed",
+        model="Energie & Ersparnis",
+        name="Bett Energie",
         sw_version=SW_VERSION,
+        via_device=(DOMAIN, coordinator.config_entry.entry_id),
     )
 
 
@@ -305,7 +305,7 @@ class BedThermalBatterySwitch(CoordinatorEntity, SwitchEntity):
         self.coordinator = coordinator
         self._attr_name = "Bett Solar-Batterie"
         self._attr_unique_id = f"{coordinator.config_entry.entry_id}_thermal_battery"
-        self._attr_device_info = get_device_info(coordinator)
+        self._attr_device_info = get_energy_device_info(coordinator)
 
     @property
     def is_on(self) -> bool:
@@ -429,7 +429,7 @@ class BedVacationModeSwitch(CoordinatorEntity, SwitchEntity):
         self._is_waterbed = is_waterbed
         self._attr_name = "Bett Urlaub-Modus"
         self._attr_unique_id = f"{coordinator.config_entry.entry_id}_vacation_mode"
-        self._attr_device_info = get_device_info(coordinator)
+        self._attr_device_info = get_energy_device_info(coordinator)
 
     @property
     def is_on(self) -> bool:

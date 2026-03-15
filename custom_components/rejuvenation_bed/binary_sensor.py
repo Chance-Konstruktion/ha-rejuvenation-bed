@@ -44,16 +44,16 @@ def get_zone_device_info(coordinator, zone_index: int) -> DeviceInfo:
     )
 
 
-    
-    model = "Smart Wasserbett Controller" if bed_type == "wasserbett" else "Smart Heizmatte Controller"
-    zone_suffix = "Dual-Zone" if zones_count > 1 else "Mono"
-    
+
+def get_sleep_device_info(coordinator) -> DeviceInfo:
+    """Schlaf-Gerät: Score, Analyse, Diagnose, Intelligenz."""
     return DeviceInfo(
-        identifiers={(DOMAIN, coordinator.config_entry.entry_id)},
+        identifiers={(DOMAIN, f"{coordinator.config_entry.entry_id}_sleep")},
         manufacturer=MANUFACTURER,
-        model=f"{model} ({zone_suffix})",
-        name="Rejuvenation Bed",
+        model="Schlaf, Analyse & Intelligenz",
+        name="Bett Schlaf/Analyse",
         sw_version=SW_VERSION,
+        via_device=(DOMAIN, coordinator.config_entry.entry_id),
     )
 
 async def async_setup_entry(hass, config_entry, async_add_entities):
@@ -126,7 +126,7 @@ class BedMoistureSensor(CoordinatorEntity, BinarySensorEntity):
         self._attr_name = f"Bett{suffix} {name_type}"
         self._attr_device_class = device_class
         self._attr_unique_id = f"{coordinator.config_entry.entry_id}_z{zone_idx}_{data_key}"
-        self._attr_device_info = get_zone_device_info(coordinator, zone_idx)
+        self._attr_device_info = get_sleep_device_info(coordinator)
         
         # Icon-Anpassung für Schwitzen
         if data_key == "is_sweating":
@@ -148,7 +148,7 @@ class BedWatchdogSensor(CoordinatorEntity, BinarySensorEntity):
         super().__init__(coordinator)
         self._attr_name = "Bett System-Status"
         self._attr_unique_id = f"{coordinator.config_entry.entry_id}_watchdog"
-        self._attr_device_info = get_device_info(coordinator)
+        self._attr_device_info = get_sleep_device_info(coordinator)
 
     @property
     def is_on(self) -> bool:
@@ -193,7 +193,7 @@ class BedDegradedModeSensor(CoordinatorEntity, BinarySensorEntity):
         super().__init__(coordinator)
         self._attr_name = "Bett Degraded Mode"
         self._attr_unique_id = f"{coordinator.config_entry.entry_id}_degraded_mode"
-        self._attr_device_info = get_device_info(coordinator)
+        self._attr_device_info = get_sleep_device_info(coordinator)
 
     @property
     def is_on(self) -> bool:
@@ -283,7 +283,7 @@ class BedCondensationRiskSensor(CoordinatorEntity, BinarySensorEntity):
         super().__init__(coordinator)
         self._attr_name = "Bett Kondensationsrisiko"
         self._attr_unique_id = f"{coordinator.config_entry.entry_id}_condensation_risk"
-        self._attr_device_info = get_device_info(coordinator)
+        self._attr_device_info = get_sleep_device_info(coordinator)
 
     @property
     def is_on(self) -> bool:
