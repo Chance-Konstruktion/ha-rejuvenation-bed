@@ -220,5 +220,73 @@
       "no_zones": "No zones configured. Please set up the integration first.",
       "invalid_zone": "Invalid zone."
     }
+  },
+  "services": {
+    "set_boost": {
+      "name": "Activate Boost",
+      "description": "Activates quick heating mode",
+      "fields": {
+        "duration_minutes": {
+          "name": "Duration (minutes)",
+          "description": "How long the boost should stay active"
+        }
+      }
+    },
+    "set_sick_mode": {
+      "name": "Activate Sick Mode",
+      "description": "Activates constant warmth for recovery",
+      "fields": {
+        "temperature": {
+          "name": "Temperature (°C)",
+          "description": "Constant target temperature"
+        },
+        "days": {
+          "name": "Duration (days)",
+          "description": "How many days the mode stays active"
+        }
+      }
+    },
+    "set_vacation_mode": {
+      "name": "Activate Vacation Mode",
+      "description": "Activates frost protection mode for absence",
+      "fields": {
+        "temperature": {
+          "name": "Temperature (°C)",
+          "description": "Minimum holding temperature"
+        },
+        "end_date": {
+          "name": "Return date",
+          "description": "When the vacation ends (optional)"
+        }
+      }
+    },
+    "cancel_special_mode": {
+      "name": "Cancel Special Mode",
+      "description": "Cancels boost, sick or vacation mode"
+    },
+    "reset_energy_budget": {
+      "name": "Reset Energy Budget",
+      "description": "Resets energy statistics to zero",
+      "fields": {
+        "confirm": {
+          "name": "Confirmation",
+          "description": "Confirm the reset"
+        }
+      }
+    },
+    "preheat_bed": {
+      "name": "Preheat Bed",
+      "description": "Preheats the bed to comfort temperature",
+      "fields": {
+        "target_temperature": {
+          "name": "Target temperature (°C)",
+          "description": "Desired preheat temperature"
+        },
+        "duration_minutes": {
+          "name": "Duration (minutes)",
+          "description": "How long to preheat"
+        }
+      }
+    }
   }
 }
