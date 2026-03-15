@@ -3,7 +3,7 @@
 **Intelligente Bett-Heizungssteuerung für Home Assistant**
 
 [![HACS Badge](https://img.shields.io/badge/HACS-Custom-orange.svg)](https://github.com/hacs/integration)
-[![Version](https://img.shields.io/badge/version-0.5.5-blue.svg)](https://github.com/Chance-Konstruktion/ha-rejuvenation-bed/releases)
+[![Version](https://img.shields.io/badge/version-0.6.0-blue.svg)](https://github.com/Chance-Konstruktion/ha-rejuvenation-bed/releases)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
 🇬🇧 [English Version](README_EN.md)
@@ -91,34 +91,40 @@ Die Integration erstellt drei Geräte in Home Assistant:
 | `sensor.bett_zieltemperatur` | Berechnete Zieltemperatur |
 | `sensor.bett_status` | Aktueller Modus und Entscheidungsgrund |
 | `sensor.bett_thermal_summary` | Temperatur-Berechnung aufgeschlüsselt |
-| `sensor.bett_rampe` | Aufheiz-Rampe Status |
 | `binary_sensor.bett_prasenz` | Person im Bett |
 | `binary_sensor.bett_isolation` | Bett zugedeckt (braucht SHT41) |
-| `binary_sensor.bett_schwitzen` | Schwitz-/Nässe-Alarm |
 | `switch.bett_boost` | Schnellheizen |
 | `switch.bett_krank_modus` | Krank-Modus |
-| `switch.bett_solar_batterie` | Thermische Batterie |
 | `switch.bett_tarifmodus` | Tarifmodus (bei teuerem Strom Temperatur senken) |
 
 ### ⚡ Bett Energie
 
 | Entity | Beschreibung |
 |--------|-------------|
+| `sensor.bett_leistung` | Aktuelle Leistung pro Zone (W) |
+| `sensor.bett_gesamtleistung` | Gesamtleistung aller Zonen (W) |
 | `sensor.bett_thermische_batterie` | Ladezustand des Wärmespeichers (%) |
 | `sensor.bett_energie_heute` | Verbrauch heute (kWh) |
-| `sensor.bett_gesamtleistung` | Aktuelle Leistung (W) |
 | `sensor.bett_heizstunden` | Heizstunden heute |
 | `sensor.bett_ersparnis` | Geschätzte Ersparnis (€) |
 | `sensor.bett_solar_prozent` | Solar-Anteil am Verbrauch |
 | `sensor.bett_strompreis_status` | Aktueller Tarif-Modus |
+| `switch.bett_solar_batterie` | Thermische Batterie |
+| `switch.bett_urlaub_modus` | Urlaub-Modus |
 
-### 😴 Bett Schlaf
+### 😴 Bett Schlaf/Analyse
 
 | Entity | Beschreibung |
 |--------|-------------|
 | `sensor.bett_schlaf_score` | Letzte Nacht (0–100) |
 | `sensor.bett_schlaf_score_woche` | Wochendurchschnitt |
+| `sensor.bett_rampe` | Aufheiz-Rampe Status |
 | `sensor.bett_intelligence` | Kalibrierung und Lernstatus |
+| `binary_sensor.bett_degraded_mode` | Degraded Mode (Sensor-Ausfall) |
+| `binary_sensor.bett_kondensationsrisiko` | Kondensationsrisiko (< 24°C) |
+| `binary_sensor.bett_leckage_verdacht` | Leckage-Verdacht |
+| `binary_sensor.bett_schwitzen` | Schwitz-/Nässe-Alarm |
+| `binary_sensor.bett_system_status` | System-Gesundheit |
 
 ---
 
