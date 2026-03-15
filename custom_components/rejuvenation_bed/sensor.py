@@ -4,7 +4,7 @@ from homeassistant.components.sensor import (
     SensorDeviceClass,
     SensorStateClass,
 )
-from homeassistant.const import UnitOfTemperature, UnitOfEnergy, UnitOfPower
+from homeassistant.const import UnitOfTemperature, UnitOfEnergy
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from homeassistant.helpers.entity import DeviceInfo
 from .const import DOMAIN, MANUFACTURER, SW_VERSION
@@ -155,7 +155,7 @@ async def async_setup_entry(hass, config_entry, async_add_entities):
     # ═══════════════════════════════════════════════════════════
     
     # Strompreis-Status nur wenn price_sensor konfiguriert
-    if global_config.get("price_sensor"):
+    if config_entry.options.get("price_sensor") or global_config.get("price_sensor"):
         entities.append(BedEnergyPriceStatusSensor(coordinator))
     
     # Gesamtleistung nur wenn mindestens eine Zone Power hat
@@ -329,8 +329,10 @@ class BedEnergyPriceStatusSensor(RejuvenationBedEnergySensor):
     @property
     def icon(self):
         val = self.native_value
-        if val == "Günstig": return "mdi:currency-eur-off"
-        if val == "Teuer": return "mdi:alert-circle-outline"
+        if val == "Günstig":
+            return "mdi:currency-eur-off"
+        if val == "Teuer":
+            return "mdi:alert-circle-outline"
         return "mdi:currency-eur"
 
 
@@ -838,9 +840,9 @@ class BedLegacyComparisonSensor(RejuvenationBedEnergySensor):
             "strompreis_eur_kwh": round(price_per_kwh, 3),
             "tracking_tage": days,
             "berechnung": (
-                f"Legacy: 26% Duty-Cycle (gemessen). "
-                f"Smart: Tatsächlicher Verbrauch. "
-                f"Solar-Anteil wird als kostenlos bewertet."
+                "Legacy: 26% Duty-Cycle (gemessen). "
+                "Smart: Tatsächlicher Verbrauch. "
+                "Solar-Anteil wird als kostenlos bewertet."
             ),
         }
 

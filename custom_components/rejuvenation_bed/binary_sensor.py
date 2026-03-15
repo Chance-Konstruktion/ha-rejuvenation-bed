@@ -56,6 +56,7 @@ def get_sleep_device_info(coordinator) -> DeviceInfo:
         via_device=(DOMAIN, coordinator.config_entry.entry_id),
     )
 
+
 async def async_setup_entry(hass, config_entry, async_add_entities):
     """Setze die binären Sensoren basierend auf der Zonen-Konfiguration auf."""
     coordinator = hass.data[DOMAIN][config_entry.entry_id]

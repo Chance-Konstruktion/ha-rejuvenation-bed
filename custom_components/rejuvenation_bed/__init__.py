@@ -6,7 +6,6 @@ from homeassistant.helpers import config_validation as cv, device_registry as dr
 import voluptuous as vol
 from .const import DOMAIN, SW_VERSION, local_now
 from .coordinator import RejuvenationBedCoordinator
-from homeassistant.util import dt as dt_util
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -182,10 +181,12 @@ async def _async_setup_services(hass: HomeAssistant, entry: ConfigEntry):
         """Handle set_vacation_mode service."""
         coordinator = hass.data[DOMAIN][entry.entry_id]
         end_date = call.data.get("end_date")
+        temperature = call.data.get("temperature")
         
         from homeassistant.components.climate.const import PRESET_AWAY
         
         coordinator.vacation_mode_enabled = True
+        coordinator.vacation_temp_override = temperature
         if end_date:
             coordinator.vacation_until = datetime.combine(end_date, datetime.min.time())
         else:
@@ -216,6 +217,7 @@ async def _async_setup_services(hass: HomeAssistant, entry: ConfigEntry):
         # Vacation zurücksetzen
         coordinator.vacation_mode_enabled = False
         coordinator.vacation_until = None
+        coordinator.vacation_temp_override = None
         
         _LOGGER.info("Alle Sonder-Modi beendet")
         await coordinator.async_request_refresh()

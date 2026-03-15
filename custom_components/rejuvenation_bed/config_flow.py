@@ -287,6 +287,10 @@ class RejuvenationBedConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         """Schritt 7: Globale Parameter (Warmhalte-Zeitfenster, Chronotyp, etc.)."""
         if user_input is not None:
             # Merge mit bereits gesetztem bed_type
+            if "energy" in self._data and "electricity_price" in self._data["energy"]:
+                self._data["global"].setdefault(
+                    "electricity_price", self._data["energy"]["electricity_price"]
+                )
             self._data["global"].update(user_input)
             return self.async_create_entry(title="Rejuvenation Bed", data=self._data)
 
