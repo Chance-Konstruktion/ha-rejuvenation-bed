@@ -14,7 +14,6 @@ Wichtig: Energie-Logik wirkt ADDITIV, nie destruktiv!
 """
 
 import logging
-from typing import Optional
 from homeassistant.core import HomeAssistant
 from enum import Enum
 
@@ -362,6 +361,6 @@ if __name__ == "__main__":
     print("\nTemperatur-Offsets:")
     print(f"  - Solar-Boost: +{EnergyStateResolver.SOLAR_BOOST_OFFSET}°C")
     print(f"  - Eco-Mode: {EnergyStateResolver.ECO_OFFSET}°C")
-    print(f"  - Normal: ±0.0°C")
+    print("  - Normal: ±0.0°C")
     print(f"\n⚠️ Anti-Kalt-Garantie: Niemals unter {EnergyStateResolver.ABSOLUTE_MIN_TEMP}°C!")
     print("\n" + "=" * 60)

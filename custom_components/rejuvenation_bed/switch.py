@@ -66,6 +66,7 @@ def get_zone_device_info(coordinator, zone_index: int) -> DeviceInfo:
 
 
 
+
 def get_energy_device_info(coordinator) -> DeviceInfo:
     """Energie-Gerät: Verbrauch, Solar, Ersparnis, Batterie."""
     return DeviceInfo(
@@ -463,6 +464,7 @@ class BedVacationModeSwitch(CoordinatorEntity, SwitchEntity):
         """Deaktiviert den Urlaub-Modus."""
         self.coordinator.vacation_mode_enabled = False
         self.coordinator.vacation_until = None
+        self.coordinator.vacation_temp_override = None
         _LOGGER.info("Urlaub-Modus deaktiviert - willkommen zurück!")
         await self.coordinator.async_request_refresh()
         self.async_write_ha_state()
