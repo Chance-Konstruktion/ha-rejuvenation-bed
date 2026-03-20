@@ -45,6 +45,7 @@ def get_zone_device_info(coordinator, zone_index: int) -> DeviceInfo:
 
 
 
+
 def get_sleep_device_info(coordinator) -> DeviceInfo:
     """Schlaf-Gerät: Score, Analyse, Diagnose, Intelligenz."""
     return DeviceInfo(
@@ -55,6 +56,7 @@ def get_sleep_device_info(coordinator) -> DeviceInfo:
         sw_version=SW_VERSION,
         via_device=(DOMAIN, coordinator.config_entry.entry_id),
     )
+
 
 
 async def async_setup_entry(hass, config_entry, async_add_entities):

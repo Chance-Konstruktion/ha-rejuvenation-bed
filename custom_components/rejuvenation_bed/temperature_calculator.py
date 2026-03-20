@@ -15,10 +15,9 @@ Die Zieltemperatur wird berechnet als:
 """
 
 import logging
-from datetime import datetime, time, timedelta
+from datetime import datetime, time
 from typing import Optional
 from homeassistant.core import HomeAssistant
-from homeassistant.util import dt as dt_util
 
 from .biorhythmus_curve import BiorhythmusCurve
 from .wake_time_resolver import WakeTimeResolver

@@ -196,6 +196,7 @@ MIT License – siehe [LICENSE](LICENSE)
 Eine mobile/tablet-freundliche Lovelace-Vorlage findest du hier:
 
 - `dashboards/rejuvenation_bed_nightstand_cockpit.yaml`
+- `dashboards/premium_nightstand_dashboard.html` (Standalone React/HTML, inkl. Mini-Ansicht < 800px)
 
 Design-Ziel:
 - Nachtfreundlich, „Bernstein“-Look
@@ -203,3 +204,33 @@ Design-Ziel:
 - Konsequente Optionalität über `conditional` Cards (Karten bleiben verborgen, wenn Entitäten nicht existieren)
 
 > Hinweis: Passe die Entity-IDs in der YAML an deine Installation an.
+
+
+### Einbindung in Home Assistant (Standalone HTML)
+
+Damit `dashboards/premium_nightstand_dashboard.html` in Home Assistant angezeigt werden kann, muss die Datei unter `/config/www/` liegen (oder über einen Webserver erreichbar sein).
+
+1. Datei kopieren, z.B. nach:
+   - `/config/www/rejuvenation_bed/premium_nightstand_dashboard.html`
+
+2. Dann kannst du sie auf zwei Arten einbinden:
+
+**A) Als eigenes Panel (`panel_iframe`)**
+
+```yaml
+panel_iframe:
+  waterbed_cockpit:
+    title: Wasserbett Cockpit
+    icon: mdi:bed-outline
+    url: /local/rejuvenation_bed/premium_nightstand_dashboard.html
+```
+
+**B) In einem Lovelace-Dashboard als `iframe`-Card**
+
+```yaml
+type: iframe
+url: /local/rejuvenation_bed/premium_nightstand_dashboard.html
+aspect_ratio: 100%
+```
+
+> Hinweis: Die Mini-Ansicht aktiviert sich automatisch unter 800px Breite per CSS Media Query (z.B. auf kleinen Außendisplays).
