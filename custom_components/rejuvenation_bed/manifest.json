@@ -1,19 +1,13 @@
 {
   "domain": "rejuvenation_bed",
   "name": "Rejuvenation Bed",
-  "version": "0.6.0",
-  "documentation": "https://github.com/Chance-Konstruktion/ha-rejuvenation-bed",
-  "issue_tracker": "https://github.com/Chance-Konstruktion/ha-rejuvenation-bed/issues",
   "codeowners": ["@Chance-Konstruktion"],
   "config_flow": true,
-  "iot_class": "local_polling",
-  "requirements": [],
   "dependencies": [],
-  "after_dependencies": [],
-  "platforms": [
-    "climate",
-    "sensor",
-    "binary_sensor",
-    "switch"
-  ]
+  "documentation": "https://github.com/Chance-Konstruktion/ha-rejuvenation-bed",
+  "integration_type": "device",
+  "iot_class": "local_polling",
+  "issue_tracker": "https://github.com/Chance-Konstruktion/ha-rejuvenation-bed/issues",
+  "requirements": [],
+  "version": "0.6.1"
 }

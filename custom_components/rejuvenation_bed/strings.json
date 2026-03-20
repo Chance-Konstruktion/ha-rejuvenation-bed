@@ -23,9 +23,9 @@
         "title": "Zoneneinstellungen",
         "description": "Konfiguration für: {zone_info}",
         "sections": {
-          "main_zone": "Hauptmatratze",
-          "left_side": "Linke Seite",
-          "right_side": "Rechte Seite"
+          "main_zone": {"name": "Hauptmatratze"},
+          "left_side": {"name": "Linke Seite"},
+          "right_side": {"name": "Rechte Seite"}
         },
         "data": {
           "heater": "Heizungsschalter / Relais",

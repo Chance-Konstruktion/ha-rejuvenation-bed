@@ -3,7 +3,7 @@
 **Intelligente Bett-Heizungssteuerung für Home Assistant**
 
 [![HACS Badge](https://img.shields.io/badge/HACS-Custom-orange.svg)](https://github.com/hacs/integration)
-[![Version](https://img.shields.io/badge/version-0.6.0-blue.svg)](https://github.com/Chance-Konstruktion/ha-rejuvenation-bed/releases)
+[![Version](https://img.shields.io/badge/version-0.6.1-blue.svg)](https://github.com/Chance-Konstruktion/ha-rejuvenation-bed/releases)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
 🇬🇧 [English Version](README_EN.md)
@@ -181,6 +181,31 @@ DS18B20 wasserdicht (IM Wasser) + optional SHT41 (OBEN auf dem Kern).
 
 ---
 
+## Changelog
+
+### v0.6.1
+
+**Bugfixes:**
+- Stale `vacation_temp_override` — Beim Deaktivieren des Urlaub-Modus (Switch oder Auto-Expire) wird die temporäre Temperatur jetzt korrekt zurückgesetzt. Zuvor wurde beim erneuten Aktivieren die alte Temperatur wiederverwendet.
+- Fitbit Sleep-Stage Mappings — `"deep"` und `"rem"` Mappings für Fitbit wiederhergestellt, die fälschlich als Duplikate entfernt wurden.
+
+**Verbesserungen (aus Codex-Review):**
+- Toten/unerreichbaren Code entfernt (duplizierte `DeviceInfo`-Blöcke in binary_sensor, climate, switch)
+- Bare `except:` durch spezifische `except (TypeError, ValueError):` ersetzt
+- Unused Imports aufgeräumt (`dt_util`, `List`, `Any`, `Optional`, `DOMAIN`, `asdict`, `UnitOfPower`, `State`)
+- Optionale Entities (`price_sensor`, `co2_sensor`) werden jetzt auch aus `config_entry.options` gelesen (nicht nur aus der initialen Config)
+- Urlaub-Service `set_vacation` unterstützt jetzt optionalen `temperature`-Parameter
+- F-String Linting (Strings ohne Variablen korrigiert)
+- Dashboard-Vorlagen: Premium Nightstand Dashboard (Standalone HTML/React) hinzugefügt
+
+### v0.6.0
+
+- Entity-Reorganisation: Geräte aufgeräumt, Schlaf/Analyse-Bereich eingeführt
+- Service-Übersetzungen (DE/EN) ergänzt
+- Toten Code entfernt
+
+---
+
 ## Lizenz
 
 MIT License – siehe [LICENSE](LICENSE)
@@ -196,6 +221,7 @@ MIT License – siehe [LICENSE](LICENSE)
 Eine mobile/tablet-freundliche Lovelace-Vorlage findest du hier:
 
 - `dashboards/rejuvenation_bed_nightstand_cockpit.yaml`
+- `dashboards/premium_nightstand_dashboard.html` (Standalone React/HTML, inkl. Mini-Ansicht < 800px)
 
 Design-Ziel:
 - Nachtfreundlich, „Bernstein“-Look
@@ -203,3 +229,33 @@ Design-Ziel:
 - Konsequente Optionalität über `conditional` Cards (Karten bleiben verborgen, wenn Entitäten nicht existieren)
 
 > Hinweis: Passe die Entity-IDs in der YAML an deine Installation an.
+
+
+### Einbindung in Home Assistant (Standalone HTML)
+
+Damit `dashboards/premium_nightstand_dashboard.html` in Home Assistant angezeigt werden kann, muss die Datei unter `/config/www/` liegen (oder über einen Webserver erreichbar sein).
+
+1. Datei kopieren, z.B. nach:
+   - `/config/www/rejuvenation_bed/premium_nightstand_dashboard.html`
+
+2. Dann kannst du sie auf zwei Arten einbinden:
+
+**A) Als eigenes Panel (`panel_iframe`)**
+
+```yaml
+panel_iframe:
+  waterbed_cockpit:
+    title: Wasserbett Cockpit
+    icon: mdi:bed-outline
+    url: /local/rejuvenation_bed/premium_nightstand_dashboard.html
+```
+
+**B) In einem Lovelace-Dashboard als `iframe`-Card**
+
+```yaml
+type: iframe
+url: /local/rejuvenation_bed/premium_nightstand_dashboard.html
+aspect_ratio: 100%
+```
+
+> Hinweis: Die Mini-Ansicht aktiviert sich automatisch unter 800px Breite per CSS Media Query (z.B. auf kleinen Außendisplays).

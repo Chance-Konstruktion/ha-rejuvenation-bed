@@ -30,7 +30,6 @@ import logging
 from homeassistant import config_entries
 from homeassistant.helpers import selector
 from .const import (
-    DOMAIN,
     DEFAULT_SICK_MODE_TEMP,
     DEFAULT_SICK_MODE_DAYS,
     DEFAULT_SUMMER_TEMP,

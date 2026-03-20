@@ -17,7 +17,7 @@ Physikalische Grundlagen:
 import logging
 from datetime import datetime, timedelta
 from typing import Optional, Tuple, Dict, Any
-from dataclasses import dataclass, asdict
+from dataclasses import dataclass
 
 from .const import (
     MAX_TEMP_CHANGE_PER_HOUR,

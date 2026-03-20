@@ -12,7 +12,7 @@ Wenn ein Wearable echte Schlafphasen-Daten liefert, können wir:
 
 import logging
 from typing import Optional, Tuple
-from homeassistant.core import HomeAssistant, State
+from homeassistant.core import HomeAssistant
 from enum import Enum
 
 _LOGGER = logging.getLogger(__name__)

@@ -137,7 +137,7 @@ BOOST_MAX_TEMP = 34.0               # Absolute Obergrenze Boost (Hardware-Thermo
 
 # Device Info
 MANUFACTURER = "Rejuvenation Bed"
-SW_VERSION = "0.6.0"
+SW_VERSION = "0.6.1"
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # ZEIT-HELPER

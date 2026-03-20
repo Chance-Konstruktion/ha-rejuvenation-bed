@@ -213,6 +213,7 @@ class RejuvenationBedCoordinator(DataUpdateCoordinator):
             # Prüfe ob Urlaub abgelaufen
             if vacation_until and local_now() > vacation_until:
                 self.vacation_mode_enabled = False
+                self.vacation_temp_override = None
                 _LOGGER.info("Urlaub-Modus automatisch beendet.")
             else:
                 # Wasserbett: Konfigurierte Urlaub-Temp, Heizmatte: kann aus

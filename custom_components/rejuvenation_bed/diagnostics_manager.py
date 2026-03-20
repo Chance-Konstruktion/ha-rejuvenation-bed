@@ -13,10 +13,9 @@ TRANSPARENZ ist Kernprinzip!
 
 import logging
 from datetime import datetime, timedelta
-from typing import Dict, List, Optional
+from typing import List, Optional
 from homeassistant.helpers.storage import Store
 from .const import local_now
-from homeassistant.util import dt as dt_util
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -283,7 +282,7 @@ class DiagnosticsManager:
         if isinstance(last_reset, str):
             try:
                 last_reset_dt = datetime.fromisoformat(last_reset).replace(tzinfo=None)
-            except:
+            except (TypeError, ValueError):
                 last_reset_dt = local_now()
         elif hasattr(last_reset, 'replace'):
             last_reset_dt = last_reset.replace(tzinfo=None) if last_reset else local_now()

@@ -20,10 +20,9 @@ HIERARCHIE DER SICHERHEIT:
 """
 
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime
 from typing import Dict, Optional, Tuple
 from homeassistant.core import HomeAssistant
-from homeassistant.util import dt as dt_util
 
 from .const import ABSOLUTE_MAX_TEMP, WATERBED_CONFIG, local_now
 
@@ -229,7 +228,7 @@ class SafetyManager:
                         )
                         self._heating_start_time[zone_index] = now
                         self._heating_start_temp[zone_index] = current_temp
-                        return False, f"SENSOR_DEFECT_SUSPECTED", notification
+                        return False, "SENSOR_DEFECT_SUSPECTED", notification
         else:
             self._heating_start_time.pop(zone_index, None)
             self._heating_start_temp.pop(zone_index, None)
