@@ -66,6 +66,7 @@ def get_zone_device_info(coordinator, zone_index: int) -> DeviceInfo:
 
 
 
+
 def get_energy_device_info(coordinator) -> DeviceInfo:
     """Energie-Gerät: Verbrauch, Solar, Ersparnis, Batterie."""
     return DeviceInfo(

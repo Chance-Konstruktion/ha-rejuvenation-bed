@@ -35,7 +35,6 @@ from typing import Optional, Dict
 
 from homeassistant.helpers.storage import Store
 from .const import local_now
-from homeassistant.util import dt as dt_util
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -803,8 +802,6 @@ class BedIntelligence:
         """Umfassende Diagnostics für Debug und Dashboard."""
         iso = self.get_isolation_status(zone_index)
         sweat = self.get_sweat_status(zone_index)
-        bedtime_pred = self.predict_bedtime(zone_index)
-
         return {
             "calibration": self.get_calibration_progress(),
             "features": {
