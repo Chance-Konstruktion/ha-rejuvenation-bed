@@ -1,0 +1,496 @@
+<!doctype html>
+<html lang="de">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <title>Premium Wasserbett Nachttisch-Cockpit</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700;800&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet" />
+    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <style>
+      :root {
+        --bg: #0a0a0a;
+        --bg-2: #000000;
+        --amber: #ffb347;
+        --amber-2: #f59e0b;
+        --amber-3: #d97706;
+        --text: #ffd8a6;
+        --muted: #a47a40;
+        --line: rgba(255, 179, 71, 0.22);
+        --shadow: 0 0 24px rgba(245, 158, 11, 0.28);
+      }
+
+      * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+      html, body {
+        margin: 0;
+        width: 100%;
+        height: 100%;
+        background: radial-gradient(circle at 50% 10%, #111 0%, var(--bg) 50%, var(--bg-2) 100%);
+        color: var(--text);
+        font-family: Inter, "Segoe UI", system-ui, sans-serif;
+        overflow: hidden;
+      }
+
+      #root {
+        width: 100%;
+        height: 100%;
+      }
+
+      .app {
+        width: 100%;
+        height: 100%;
+        padding: 20px;
+        display: grid;
+        grid-template-rows: auto 1fr;
+        gap: 14px;
+      }
+
+      .chrome {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        padding: 10px 14px;
+        background: rgba(255, 179, 71, 0.03);
+      }
+
+      .brand { font-weight: 700; letter-spacing: .05em; color: var(--amber); }
+      .status-icons { display: flex; gap: 12px; color: var(--amber-2); opacity: .95; }
+
+      .main {
+        display: grid;
+        grid-template-columns: 1.15fr 0.95fr;
+        gap: 16px;
+        min-height: 0;
+      }
+
+      .panel {
+        border: 1px solid var(--line);
+        border-radius: 20px;
+        padding: 16px;
+        background: linear-gradient(180deg, rgba(255,179,71,0.06), rgba(255,179,71,0.015));
+        box-shadow: inset 0 0 40px rgba(255, 179, 71, 0.03);
+        min-height: 0;
+      }
+
+      .left {
+        display: grid;
+        grid-template-rows: auto auto 1fr auto;
+        gap: 14px;
+      }
+
+      .right {
+        display: grid;
+        grid-template-rows: auto auto auto 1fr;
+        gap: 12px;
+      }
+
+      .clock {
+        font-family: "JetBrains Mono", monospace;
+        font-size: clamp(36px, 6vw, 72px);
+        font-weight: 700;
+        letter-spacing: .03em;
+        color: var(--amber);
+        text-shadow: var(--shadow);
+      }
+
+      .sub { color: var(--muted); font-size: .9rem; }
+
+      .bed-stage { text-align: center; }
+
+      .bed-icon {
+        margin: 10px auto 8px;
+        width: min(92%, 560px);
+        height: 145px;
+        border: 1.5px solid var(--amber-3);
+        border-radius: 18px;
+        position: relative;
+        box-shadow: 0 0 28px rgba(217, 119, 6, 0.25);
+      }
+
+      .bed-icon::before, .bed-icon::after {
+        content: "";
+        position: absolute;
+        border: 1.5px solid var(--amber-2);
+      }
+
+      .bed-icon::before {
+        left: 8%; right: 8%; top: 24%; height: 46%;
+        border-radius: 10px;
+      }
+
+      .bed-icon::after {
+        left: 5%; width: 90%; bottom: -10px; height: 12px;
+        border-radius: 8px;
+        background: rgba(255, 179, 71, 0.08);
+      }
+
+      .temp {
+        font-family: "JetBrains Mono", monospace;
+        font-size: clamp(30px, 5vw, 58px);
+        font-weight: 800;
+        color: #ffd49b;
+      }
+
+      .phase {
+        color: var(--amber-2);
+        font-weight: 600;
+        margin-top: 6px;
+      }
+
+      .alarm-block {
+        display: grid;
+        grid-template-columns: 1fr auto;
+        gap: 10px;
+        align-items: center;
+      }
+
+      .alarm-time {
+        font-family: "JetBrains Mono", monospace;
+        font-size: clamp(32px, 5vw, 56px);
+        font-weight: 800;
+        letter-spacing: .03em;
+      }
+
+      .alarm-controls {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .btn {
+        min-width: 44px;
+        min-height: 44px;
+        border-radius: 12px;
+        border: 1px solid var(--line);
+        background: rgba(255, 179, 71, 0.06);
+        color: var(--amber);
+        font-size: 1.25rem;
+        font-weight: 700;
+        cursor: pointer;
+        transition: transform .15s ease, box-shadow .18s ease, background .18s ease;
+      }
+
+      .btn:hover, .btn:active {
+        transform: translateY(-1px);
+        box-shadow: var(--shadow);
+        background: rgba(255, 179, 71, 0.12);
+      }
+
+      .toggles {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0,1fr));
+        gap: 10px;
+      }
+
+      .toggle {
+        min-height: 60px;
+        border-radius: 14px;
+        border: 1px solid var(--line);
+        padding: 10px;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        background: rgba(255, 179, 71, 0.03);
+        transition: box-shadow .2s ease, border-color .2s ease, background .2s ease;
+      }
+
+      .toggle.active {
+        border-color: var(--amber);
+        box-shadow: var(--shadow);
+        background: rgba(255, 179, 71, 0.12);
+      }
+
+      .toggle-label { display: flex; gap: 8px; align-items: center; font-weight: 700; }
+
+      .switch {
+        width: 52px;
+        height: 30px;
+        border-radius: 999px;
+        border: 1px solid var(--line);
+        position: relative;
+        background: rgba(255,255,255,0.08);
+      }
+
+      .switch::after {
+        content: "";
+        position: absolute;
+        top: 3px;
+        left: 3px;
+        width: 22px;
+        height: 22px;
+        border-radius: 50%;
+        background: #f7e5ca;
+        transition: transform .2s ease;
+      }
+
+      .toggle.active .switch {
+        background: rgba(245, 158, 11, 0.35);
+      }
+
+      .toggle.active .switch::after { transform: translateX(22px); }
+
+      .feedback {
+        min-height: 22px;
+        color: var(--amber-2);
+        opacity: 0;
+        transform: translateY(4px);
+        transition: opacity .25s ease, transform .25s ease;
+        font-size: .92rem;
+      }
+
+      .feedback.show {
+        opacity: 1;
+        transform: translateY(0);
+      }
+
+      /* MINI ANSICHT (z.B. Z Flip Außendisplay) */
+      @media (max-width: 799px) {
+        .app {
+          padding: 10px;
+          gap: 8px;
+          grid-template-rows: auto 1fr;
+        }
+
+        .chrome { padding: 8px 10px; border-radius: 10px; }
+        .brand { font-size: .78rem; }
+
+        .main {
+          display: block;
+          height: 100%;
+        }
+
+        .left, .right {
+          grid-template-rows: none;
+          display: flex;
+          flex-direction: column;
+          gap: 8px;
+          height: 100%;
+        }
+
+        .panel {
+          padding: 10px;
+          border-radius: 12px;
+        }
+
+        .bed-stage,
+        .alarm-controls .btn,
+        .sub-phase,
+        .bed-icon,
+        .main .left .phase,
+        .main .left .bed-graphic,
+        .desktop-only {
+          display: none !important;
+        }
+
+        .clock {
+          font-size: clamp(54px, 17vw, 88px);
+          line-height: 1;
+          text-align: center;
+        }
+
+        .alarm-time {
+          font-size: clamp(28px, 9vw, 40px);
+          text-align: center;
+        }
+
+        .mini-alarm-state {
+          display: block;
+          text-align: center;
+          color: var(--amber-2);
+          font-weight: 700;
+          margin-top: 2px;
+        }
+
+        .temp {
+          font-size: clamp(30px, 10vw, 42px);
+          text-align: center;
+        }
+
+        .toggles {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+          gap: 8px;
+        }
+
+        .toggle {
+          min-height: 72px;
+          padding: 8px;
+          border-radius: 12px;
+        }
+
+        .toggle-label {
+          flex-direction: column;
+          align-items: flex-start;
+          gap: 4px;
+          font-size: .92rem;
+        }
+
+        .switch {
+          width: 60px;
+          height: 34px;
+        }
+
+        .switch::after {
+          width: 26px;
+          height: 26px;
+          top: 3px;
+          left: 3px;
+        }
+
+        .toggle.active .switch::after { transform: translateX(26px); }
+
+        .full-width { grid-column: 1 / -1; }
+
+        .feedback {
+          min-height: 18px;
+          text-align: center;
+          font-size: .8rem;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+      const { useEffect, useMemo, useState } = React;
+
+      function pad(n) { return String(n).padStart(2, '0'); }
+
+      function ClockText({ now }) {
+        return <div className="clock">{pad(now.getHours())}:{pad(now.getMinutes())}</div>;
+      }
+
+      function ToggleCard({ icon, label, active, onToggle, className = "" }) {
+        return (
+          <button className={`toggle ${active ? 'active' : ''} ${className}`} onClick={onToggle}>
+            <span className="toggle-label"><span>{icon}</span><span>{label}</span></span>
+            <span className="switch" />
+          </button>
+        );
+      }
+
+      function App() {
+        const [now, setNow] = useState(new Date());
+        const [temp, setTemp] = useState(28.5);
+        const [alarmHour, setAlarmHour] = useState(6);
+        const [alarmMinute, setAlarmMinute] = useState(30);
+        const [alarmEnabled, setAlarmEnabled] = useState(true);
+        const [lightOn, setLightOn] = useState(false);
+        const [boostOn, setBoostOn] = useState(false);
+        const [sickOn, setSickOn] = useState(false);
+        const [feedback, setFeedback] = useState("");
+
+        useEffect(() => {
+          const t = setInterval(() => setNow(new Date()), 1000);
+          return () => clearInterval(t);
+        }, []);
+
+        useEffect(() => {
+          const id = setInterval(() => {
+            setTemp((v) => {
+              const next = v + (Math.random() - 0.5) * 0.08;
+              return Math.max(26.8, Math.min(31.2, Number(next.toFixed(1))));
+            });
+          }, 5000);
+          return () => clearInterval(id);
+        }, []);
+
+        useEffect(() => {
+          if (!feedback) return;
+          const id = setTimeout(() => setFeedback(""), 1300);
+          return () => clearTimeout(id);
+        }, [feedback]);
+
+        const alarmText = `${pad(alarmHour)}:${pad(alarmMinute)}`;
+
+        const phase = useMemo(() => {
+          const h = now.getHours();
+          if (h >= 23 || h < 3) return "Tiefschlaf";
+          if (h >= 3 && h < 6) return "REM-Phase";
+          if (h >= 6 && h < 9) return "Aufwachphase";
+          return "Standby";
+        }, [now]);
+
+        const adjustAlarm = (delta) => {
+          const total = (alarmHour * 60 + alarmMinute + delta + 24 * 60) % (24 * 60);
+          setAlarmHour(Math.floor(total / 60));
+          setAlarmMinute(total % 60);
+          setFeedback(`Wecker: ${pad(Math.floor(total / 60))}:${pad(total % 60)}`);
+        };
+
+        const toggle = (setter, label, activeLabel = "aktiv", offLabel = "aus") => {
+          setter((prev) => {
+            const next = !prev;
+            setFeedback(`${label} ${next ? activeLabel : offLabel}`);
+            return next;
+          });
+        };
+
+        return (
+          <div className="app">
+            <div className="chrome">
+              <div className="brand">WASSERBETT · PREMIUM COCKPIT</div>
+              <div className="status-icons" aria-label="Statussymbole">
+                <span title="WLAN">📶</span>
+                <span title="Batterie">🔋 86%</span>
+              </div>
+            </div>
+
+            <div className="main">
+              <section className="panel left">
+                <ClockText now={now} />
+                <div className="sub desktop-only">Live-Uhr · lokale Zeit</div>
+
+                <div className="bed-stage desktop-only">
+                  <div className="bed-icon bed-graphic" />
+                  <div className="temp">{temp.toFixed(1)}°C</div>
+                  <div className="phase">Biorhythmus: {phase}</div>
+                </div>
+
+                <div className="mini-alarm-state" style={{ display: 'none' }}>
+                  {alarmEnabled ? "⏰ Wecker aktiv" : "🔕 Wecker aus"}
+                </div>
+
+                <div className={`feedback ${feedback ? 'show' : ''}`}>{feedback || ' '}</div>
+              </section>
+
+              <section className="panel right">
+                <div className="alarm-block">
+                  <div>
+                    <div className="sub">Weckzeit</div>
+                    <div className="alarm-time">{alarmText}</div>
+                    <div className="mini-alarm-state">{alarmEnabled ? '⏰ Aktiv' : '🔕 Aus'}</div>
+                  </div>
+
+                  <div className="alarm-controls desktop-only">
+                    <button className="btn" onClick={() => adjustAlarm(-5)} aria-label="Minus 5 Minuten">−</button>
+                    <button className="btn" onClick={() => adjustAlarm(+5)} aria-label="Plus 5 Minuten">+</button>
+                  </div>
+                </div>
+
+                <div className="temp">{temp.toFixed(1)}°C</div>
+
+                <div className="toggles">
+                  <ToggleCard icon="⏰" label="Wecker" active={alarmEnabled} onToggle={() => toggle(setAlarmEnabled, 'Wecker', 'an', 'aus')} />
+                  <ToggleCard icon="⚡" label="Boost" active={boostOn} onToggle={() => toggle(setBoostOn, 'Boost', 'aktiv', 'aus')} />
+                  <ToggleCard icon="🤒" label="Krankmodus" active={sickOn} onToggle={() => toggle(setSickOn, 'Krankmodus', 'aktiv', 'aus')} />
+                  <ToggleCard icon="💡" label="Licht" active={lightOn} onToggle={() => toggle(setLightOn, 'Licht', 'an', 'aus')} className="full-width" />
+                </div>
+
+                <div className="sub desktop-only">Touch-optimiert · Hauptansicht ≥ 800px · Miniansicht &lt; 800px</div>
+              </section>
+            </div>
+          </div>
+        );
+      }
+
+      ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+    </script>
+  </body>
+</html>

@@ -13,11 +13,10 @@ von der Temperatur-Berechnung ausgewertet werden müssen!
 """
 
 import logging
-from datetime import datetime, timedelta
+from datetime import timedelta
 from homeassistant.components.switch import SwitchEntity, SwitchDeviceClass
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from homeassistant.helpers.entity import DeviceInfo
-from homeassistant.util import dt as dt_util
 from .const import (
     DOMAIN, 
     DEFAULT_SICK_MODE_TEMP, 
@@ -62,19 +61,6 @@ def get_zone_device_info(coordinator, zone_index: int) -> DeviceInfo:
         name=f'Bett {zone_name}',
         sw_version=SW_VERSION,
         via_device=(DOMAIN, coordinator.config_entry.entry_id),
-    )
-
-
-    
-    model = "Smart Wasserbett Controller" if bed_type == "wasserbett" else "Smart Heizmatte Controller"
-    zone_suffix = "Dual-Zone" if zones_count > 1 else "Mono"
-    
-    return DeviceInfo(
-        identifiers={(DOMAIN, coordinator.config_entry.entry_id)},
-        manufacturer=MANUFACTURER,
-        model=f"{model} ({zone_suffix})",
-        name="Rejuvenation Bed",
-        sw_version=SW_VERSION,
     )
 
 
@@ -129,7 +115,7 @@ async def async_setup_entry(hass, entry, async_add_entities):
         entities.append(BedThermalBatterySwitch(coordinator))
     
     # Tarifmodus NUR wenn Strompreis-Sensor konfiguriert ist
-    if global_conf.get("price_sensor"):
+    if entry.options.get("price_sensor") or global_conf.get("price_sensor"):
         entities.append(BedTariffModeSwitch(coordinator, is_waterbed))
     
     # Urlaub-Modus für alle Typen
