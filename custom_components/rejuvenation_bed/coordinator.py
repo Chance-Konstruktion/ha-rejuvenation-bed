@@ -11,13 +11,13 @@ Zentrale Steuerung mit allen Bug-Fixes:
 import logging
 from collections import deque
 from datetime import datetime, timedelta
-from typing import Dict, Optional, List, Any
+from typing import Dict, Optional
 
 from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 from homeassistant.components.persistent_notification import async_create as notify_create
 
-from .const import DOMAIN, UPDATE_INTERVAL, get_bed_config, BED_TYPE_WATERBED, BED_TYPE_HEATING_PAD, BOOST_MAX_TEMP, local_now
+from .const import UPDATE_INTERVAL, get_bed_config, BED_TYPE_WATERBED, BED_TYPE_HEATING_PAD, BOOST_MAX_TEMP, local_now
 from .safety_manager import SafetyManager
 from .temperature_calculator import TemperatureCalculator
 from .energy_state_resolver import EnergyStateResolver
@@ -27,7 +27,6 @@ from .presence_detector import PresenceDetector
 from .sleep_score_calculator import SleepScoreCalculator
 from .ramp_controller import RampController
 from .bed_intelligence import BedIntelligence
-from homeassistant.util import dt as dt_util
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -116,6 +115,7 @@ class RejuvenationBedCoordinator(DataUpdateCoordinator):
         self.eco_mode_enabled = False  # Tarifmodus Default AUS
         self.vacation_mode_enabled = False  # NEU: Urlaub-Modus Default AUS
         self.vacation_until = None  # NEU: Urlaub-Ende
+        self.vacation_temp_override = None  # Optional per Service gesetzt
         
         # Präsenz-Tracking für Biorhythmus-Aktivierung
         self._presence_detected_at = {}   # Wann Präsenz erstmals erkannt
@@ -218,7 +218,9 @@ class RejuvenationBedCoordinator(DataUpdateCoordinator):
                 # Wasserbett: Konfigurierte Urlaub-Temp, Heizmatte: kann aus
                 if self.bed_type == BED_TYPE_WATERBED:
                     away_temp = float(
-                        self.config_entry.options.get("away_temp")
+                        self.vacation_temp_override
+                        if self.vacation_temp_override is not None
+                        else self.config_entry.options.get("away_temp")
                         or self.bed_config.get("away_temp", 24.0)
                     )
                     return away_temp, "vacation", f"✈️ Urlaub-Modus ({away_temp}°C Frostschutz)"

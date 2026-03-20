@@ -154,8 +154,7 @@ class AntiShortCycleManager:
             return False, f"Hysterese (±{self.HYSTERESIS_DELTA_C}°C)"
         
         # Zeitbasierte Checks
-        time_since_last_change = (now - history["last_change"]).total_seconds()
-        
+
         # Fall 1: Heizung will EINSCHALTEN (current=OFF, desired=ON)
         if not current_state and desired_state:
             # Prüfe Minimum OFF-Zeit

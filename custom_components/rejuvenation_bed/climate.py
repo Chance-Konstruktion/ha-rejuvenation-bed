@@ -70,19 +70,6 @@ def get_zone_device_info(coordinator, zone_index: int) -> DeviceInfo:
     )
 
 
-    
-    model = "Smart Wasserbett Controller" if bed_type == "wasserbett" else "Smart Heizmatte Controller"
-    zone_suffix = "Dual-Zone" if zones_count > 1 else "Mono"
-    
-    return DeviceInfo(
-        identifiers={(DOMAIN, coordinator.config_entry.entry_id)},
-        manufacturer=MANUFACTURER,
-        model=f"{model} ({zone_suffix})",
-        name="Rejuvenation Bed",
-        sw_version=SW_VERSION,
-    )
-
-
 async def async_setup_entry(hass, entry, async_add_entities):
     """Richtet die Thermostate für das Rejuvenation Bed ein."""
     coordinator = hass.data[DOMAIN][entry.entry_id]
