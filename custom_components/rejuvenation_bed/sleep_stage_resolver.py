@@ -49,6 +49,8 @@ class SleepStageResolver:
         
         # Fitbit
         "light": SleepStage.LIGHT,
+        "deep": SleepStage.DEEP,
+        "rem": SleepStage.REM,
         "wake": SleepStage.AWAKE,
         
         # Withings
