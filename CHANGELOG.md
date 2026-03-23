@@ -2,6 +2,32 @@
 
 Alle Änderungen am Rejuvenation Bed Projekt.
 
+## [0.6.1] - 2026-03-23
+
+### Bugfixes
+- **Urlaub-Temperatur** – Vacation mode override temperature was ignored; now correctly applied.
+- **Fitbit-Mappings** – Restored Fitbit sleep stage mappings that were accidentally removed.
+- **Hassfest-Validierung** – Manifest keys sorted alphabetically, invalid `platforms` key removed, `integration_type` added.
+
+### Dokumentation
+- **Dashboard-Vorlagen** – Premium Nightstand Dashboard (React/HTML) und Lovelace YAML Cockpit dokumentiert.
+- **Services** – Alle 6 Services (`set_boost`, `set_sick_mode`, `set_vacation_mode`, `cancel_special_mode`, `preheat_bed`, `reset_energy_budget`) in README dokumentiert.
+- **README überarbeitet** – Sondermodi-Tabelle, Dashboard-Sektion, Architektur auf 60s-Loop aktualisiert. HACS-Badge auf "Default" gesetzt.
+- **README_EN.md** – Englische Version vollständig synchronisiert (Services, Dashboards, Special Modes, Architecture).
+
+## [0.6.0] - 2026-03-15
+
+### Neue Features
+- **Entity-Reorganisation** – Geräte aufgeräumt und neu gruppiert in drei Devices (Hauptgerät, Energie, Schlaf/Analyse).
+- **Premium Dashboard** – Eigenständiges React/HTML Nightstand Dashboard mit Mini-Ansicht (< 800px) und Home Assistant Embedding Guide.
+- **Lovelace Dashboard** – YAML-Vorlage für Mobile/Tablet-freundliches Nightstand Cockpit.
+- **Service-Übersetzungen** – Fehlende Übersetzungen für alle Services ergänzt.
+
+### Bugfixes
+- **Toten Code entfernt** – Unbenutzte Code-Pfade bereinigt.
+- **Merge-Konflikte** – Konflikte mit main-Branch sauber aufgelöst.
+- **.gitignore** – `__pycache__` Ordner ausgeschlossen.
+
 ## [0.4.2] - 2026-03-06
 
 ### Neue Features
