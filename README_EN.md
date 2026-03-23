@@ -2,8 +2,8 @@
 
 **Intelligent bed heating controller for Home Assistant**
 
-[![HACS Badge](https://img.shields.io/badge/HACS-Custom-orange.svg)](https://github.com/hacs/integration)
-[![Version](https://img.shields.io/badge/version-0.6.0-blue.svg)](https://github.com/Chance-Konstruktion/ha-rejuvenation-bed/releases)
+[![HACS Badge](https://img.shields.io/badge/HACS-Default-orange.svg)](https://github.com/hacs/integration)
+[![Version](https://img.shields.io/badge/version-0.6.1-blue.svg)](https://github.com/Chance-Konstruktion/ha-rejuvenation-bed/releases)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
 🇩🇪 [Deutsche Version](README.md)
@@ -31,7 +31,7 @@ The system automatically learns your bedtime and the optimal thresholds for your
 
 **Energy management** – Solar boost uses PV surplus as thermal battery. Dynamic electricity prices (Tibber, Octopus, ENTSO-E). Energy tracking with kWh, heating hours and savings calculation. Thermal battery as percentage sensor.
 
-**Intelligence** – Presence detection through water temperature variance (no extra sensor needed). Auto-calibration in 3–5 days. Insulation detection (blanket on/off). Sweat detection 2.0 via cross-correlation. Sleep score 0–100. Learning-based preheating.
+**Intelligence** – Presence detection through water temperature variance (no extra sensor needed). Auto-calibration in 3–5 days. Insulation detection (blanket on/off). Sweat detection via cross-correlation. Sleep score 0–100. Learning-based preheating.
 
 **Safety** – Overheat protection (max 36°C), fail-safe on sensor failure, startup grace period, anti-short-cycle, outlier filter, leak alarm. Optional sensors can fail at any time without affecting core functionality.
 
@@ -44,7 +44,7 @@ The system automatically learns your bedtime and the optimal thresholds for your
 | **A** | Smart plug | Timer, boost, vacation |
 | **B** | + Temperature sensor | + Biorhythm, presence, sleep score |
 | **C** | + Power sensor | + Energy tracking, better presence |
-| **D** | + SHT41 (air/humidity) | + Insulation check, sweat 2.0, leak alarm |
+| **D** | + SHT41 (air/humidity) | + Insulation check, sweat detection, leak alarm |
 
 Minimum: A smart plug that switches the heater.
 
@@ -128,10 +128,69 @@ The integration creates three devices in Home Assistant:
 
 ---
 
+## Services
+
+| Service | Description |
+|---------|------------|
+| `rejuvenation_bed.set_boost` | Activate quick heat (duration configurable) |
+| `rejuvenation_bed.set_sick_mode` | Sick mode (temperature + days) |
+| `rejuvenation_bed.set_vacation_mode` | Vacation mode with optional temperature and end date |
+| `rejuvenation_bed.cancel_special_mode` | Cancel all special modes |
+| `rejuvenation_bed.preheat_bed` | Preheat bed (temperature + duration) |
+| `rejuvenation_bed.reset_energy_budget` | Reset energy statistics |
+
+---
+
+## Special Modes
+
+| Mode | Activation | Effect |
+|------|-----------|--------|
+| **Boost** | `switch.bett_boost` | Quick heat: target temperature + offset for 60 min |
+| **Sick** | `switch.bett_krank_modus` | Constant temperature for configurable days |
+| **Vacation** | `switch.bett_urlaub_modus` or service | Minimal 24°C holding temperature (with optional temperature) |
+| **Solar** | `switch.bett_solar_batterie` | Store PV surplus as heat |
+| **Tariff** | `switch.bett_tarifmodus` | Reduce temperature during expensive rates |
+
+---
+
+## Dashboard Templates
+
+Two ready-made dashboard templates in the `dashboards/` folder:
+
+### Lovelace YAML (Nightstand Cockpit)
+
+`dashboards/rejuvenation_bed_nightstand_cockpit.yaml` — Mobile/tablet-friendly Lovelace template. Adjust entity IDs to your installation.
+
+### Standalone HTML (Premium Dashboard)
+
+`dashboards/premium_nightstand_dashboard.html` — Standalone React/HTML dashboard with mini view (< 800px).
+
+**Embed as panel:**
+
+```yaml
+panel_iframe:
+  waterbed_cockpit:
+    title: Waterbed Cockpit
+    icon: mdi:bed-outline
+    url: /local/rejuvenation_bed/premium_nightstand_dashboard.html
+```
+
+**Or as iframe card:**
+
+```yaml
+type: iframe
+url: /local/rejuvenation_bed/premium_nightstand_dashboard.html
+aspect_ratio: 100%
+```
+
+Copy file to `/config/www/rejuvenation_bed/`.
+
+---
+
 ## Architecture
 
 ```
-coordinator.py ─── Central 30s loop
+coordinator.py ─── Central 60s loop
  ├── safety_manager.py ──────── Overheat protection, fail-safe
  ├── temperature_calculator.py ─ Biorhythm curve, target temperature
  │   ├── biorhythmus_curve.py ── Sleep phase curve (chronotype)
@@ -158,11 +217,14 @@ No. Any electric bed heater works: waterbed, heating pad, heated mattress topper
 **Do I need a temperature sensor?**
 Recommended. Without a sensor, the system runs as an intelligent timer (Level A). With a sensor: full biorhythm curve and presence detection.
 
+**What happens if a sensor fails?**
+The integration degrades automatically. The SHT41 can fail without affecting heating. Even the water temperature sensor has a fail-safe (30% duty cycle).
+
 **How does presence detection work with heating pads?**
 Unlike waterbeds (variance analysis in the water body), heating pad detection uses the **temperature trend**: if the heater is off and the temperature still rises, someone is lying on it (body heat). This requires a temperature sensor on the pad. Without a sensor, presence detection is not available — the system runs as a timer (Level A). Detection is less precise than with waterbeds but works reliably after a short settling time (~3 min).
 
-**What happens if a sensor fails?**
-The integration degrades automatically. The SHT41 can fail without affecting heating. Even the water temperature sensor has a fail-safe (30% duty cycle).
+**Which temperature sensor?**
+DS18B20 waterproof (IN the water) + optional SHT41 (ON TOP of the core).
 
 ---
 
