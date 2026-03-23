@@ -2,7 +2,7 @@
 
 **Intelligente Bett-Heizungssteuerung für Home Assistant**
 
-[![HACS Badge](https://img.shields.io/badge/HACS-Custom-orange.svg)](https://github.com/hacs/integration)
+[![HACS Badge](https://img.shields.io/badge/HACS-Default-orange.svg)](https://github.com/hacs/integration)
 [![Version](https://img.shields.io/badge/version-0.6.1-blue.svg)](https://github.com/Chance-Konstruktion/ha-rejuvenation-bed/releases)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
@@ -128,22 +128,69 @@ Die Integration erstellt drei Geräte in Home Assistant:
 
 ---
 
+## Services
+
+| Service | Beschreibung |
+|---------|-------------|
+| `rejuvenation_bed.set_boost` | Schnellheizen aktivieren (Dauer konfigurierbar) |
+| `rejuvenation_bed.set_sick_mode` | Krank-Modus (Temperatur + Tage) |
+| `rejuvenation_bed.set_vacation_mode` | Urlaub-Modus mit optionaler Temperatur und Enddatum |
+| `rejuvenation_bed.cancel_special_mode` | Alle Sondermodi beenden |
+| `rejuvenation_bed.preheat_bed` | Bett vorheizen (Temperatur + Dauer) |
+| `rejuvenation_bed.reset_energy_budget` | Energiestatistiken zurücksetzen |
+
+---
+
 ## Sondermodi
 
 | Modus | Aktivierung | Wirkung |
 |-------|------------|---------|
 | **Boost** | `switch.bett_boost` | Schnellheizen: Zieltemperatur + Offset für 60 Min |
 | **Krank** | `switch.bett_krank_modus` | Konstante Temperatur für konfigurierbare Tage |
-| **Urlaub** | HVAC-Modus "away" | Minimale 24°C Haltetemperatur |
+| **Urlaub** | `switch.bett_urlaub_modus` oder Service | Minimale 24°C Haltetemperatur (mit optionaler Temperatur) |
 | **Solar** | `switch.bett_solar_batterie` | PV-Überschuss als Wärme speichern |
 | **Tarif** | `switch.bett_tarifmodus` | Bei teuerem Strom Temperatur senken |
+
+---
+
+## Dashboard-Vorlagen
+
+Zwei fertige Dashboard-Vorlagen im `dashboards/`-Ordner:
+
+### Lovelace YAML (Nightstand Cockpit)
+
+`dashboards/rejuvenation_bed_nightstand_cockpit.yaml` — Mobile/Tablet-freundliche Lovelace-Vorlage. Entity-IDs an deine Installation anpassen.
+
+### Standalone HTML (Premium Dashboard)
+
+`dashboards/premium_nightstand_dashboard.html` — Eigenständiges React/HTML-Dashboard mit Mini-Ansicht (< 800px).
+
+**Einbindung als Panel:**
+
+```yaml
+panel_iframe:
+  waterbed_cockpit:
+    title: Wasserbett Cockpit
+    icon: mdi:bed-outline
+    url: /local/rejuvenation_bed/premium_nightstand_dashboard.html
+```
+
+**Oder als iframe-Card:**
+
+```yaml
+type: iframe
+url: /local/rejuvenation_bed/premium_nightstand_dashboard.html
+aspect_ratio: 100%
+```
+
+Datei nach `/config/www/rejuvenation_bed/` kopieren.
 
 ---
 
 ## Architektur
 
 ```
-coordinator.py ─── Zentraler 30s-Loop
+coordinator.py ─── Zentraler 60s-Loop
  ├── safety_manager.py ──────── Überhitzungsschutz, Fail-Safe
  ├── temperature_calculator.py ─ Biorhythmus-Kurve, Zieltemperatur
  │   ├── biorhythmus_curve.py ── Schlafphasen-Kurve (Chronotyp)
@@ -181,31 +228,6 @@ DS18B20 wasserdicht (IM Wasser) + optional SHT41 (OBEN auf dem Kern).
 
 ---
 
-## Changelog
-
-### v0.6.1
-
-**Bugfixes:**
-- Stale `vacation_temp_override` — Beim Deaktivieren des Urlaub-Modus (Switch oder Auto-Expire) wird die temporäre Temperatur jetzt korrekt zurückgesetzt. Zuvor wurde beim erneuten Aktivieren die alte Temperatur wiederverwendet.
-- Fitbit Sleep-Stage Mappings — `"deep"` und `"rem"` Mappings für Fitbit wiederhergestellt, die fälschlich als Duplikate entfernt wurden.
-
-**Verbesserungen (aus Codex-Review):**
-- Toten/unerreichbaren Code entfernt (duplizierte `DeviceInfo`-Blöcke in binary_sensor, climate, switch)
-- Bare `except:` durch spezifische `except (TypeError, ValueError):` ersetzt
-- Unused Imports aufgeräumt (`dt_util`, `List`, `Any`, `Optional`, `DOMAIN`, `asdict`, `UnitOfPower`, `State`)
-- Optionale Entities (`price_sensor`, `co2_sensor`) werden jetzt auch aus `config_entry.options` gelesen (nicht nur aus der initialen Config)
-- Urlaub-Service `set_vacation` unterstützt jetzt optionalen `temperature`-Parameter
-- F-String Linting (Strings ohne Variablen korrigiert)
-- Dashboard-Vorlagen: Premium Nightstand Dashboard (Standalone HTML/React) hinzugefügt
-
-### v0.6.0
-
-- Entity-Reorganisation: Geräte aufgeräumt, Schlaf/Analyse-Bereich eingeführt
-- Service-Übersetzungen (DE/EN) ergänzt
-- Toten Code entfernt
-
----
-
 ## Lizenz
 
 MIT License – siehe [LICENSE](LICENSE)
@@ -213,49 +235,3 @@ MIT License – siehe [LICENSE](LICENSE)
 ---
 
 *Gebaut mit echten Sensordaten aus einem 2×2m Dual-Kern Wasserbett. Kalibriert auf 126.771 Datenpunkte.*
-
----
-
-## Dashboard-Vorlage (Nightstand Cockpit)
-
-Eine mobile/tablet-freundliche Lovelace-Vorlage findest du hier:
-
-- `dashboards/rejuvenation_bed_nightstand_cockpit.yaml`
-- `dashboards/premium_nightstand_dashboard.html` (Standalone React/HTML, inkl. Mini-Ansicht < 800px)
-
-Design-Ziel:
-- Nachtfreundlich, „Bernstein“-Look
-- Nachttisch-Cockpit mit Uhr, Wecker, Licht und Bett-Thermostaten
-- Konsequente Optionalität über `conditional` Cards (Karten bleiben verborgen, wenn Entitäten nicht existieren)
-
-> Hinweis: Passe die Entity-IDs in der YAML an deine Installation an.
-
-
-### Einbindung in Home Assistant (Standalone HTML)
-
-Damit `dashboards/premium_nightstand_dashboard.html` in Home Assistant angezeigt werden kann, muss die Datei unter `/config/www/` liegen (oder über einen Webserver erreichbar sein).
-
-1. Datei kopieren, z.B. nach:
-   - `/config/www/rejuvenation_bed/premium_nightstand_dashboard.html`
-
-2. Dann kannst du sie auf zwei Arten einbinden:
-
-**A) Als eigenes Panel (`panel_iframe`)**
-
-```yaml
-panel_iframe:
-  waterbed_cockpit:
-    title: Wasserbett Cockpit
-    icon: mdi:bed-outline
-    url: /local/rejuvenation_bed/premium_nightstand_dashboard.html
-```
-
-**B) In einem Lovelace-Dashboard als `iframe`-Card**
-
-```yaml
-type: iframe
-url: /local/rejuvenation_bed/premium_nightstand_dashboard.html
-aspect_ratio: 100%
-```
-
-> Hinweis: Die Mini-Ansicht aktiviert sich automatisch unter 800px Breite per CSS Media Query (z.B. auf kleinen Außendisplays).
