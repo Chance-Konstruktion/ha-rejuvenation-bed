@@ -502,10 +502,12 @@ class PresenceDetector:
         old = self._is_present.get(zone_index)
         if old != is_present:
             self._state_since[zone_index] = now
-            if is_present:
-                _LOGGER.info(f"🛏️ Zone {zone_index}: Präsenz erkannt ({reason})")
-            else:
-                _LOGGER.info(f"Zone {zone_index}: Bett leer ({reason})")
+            _LOGGER.info(
+                "Zone %d: %s (%s)",
+                zone_index,
+                "Präsenz erkannt" if is_present else "Bett leer",
+                reason,
+            )
 
         self._is_present[zone_index] = is_present
         self._last_confidence[zone_index] = confidence

@@ -1,0 +1,55 @@
+name: Lint & Type Check
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  ruff:
+    name: Ruff Linter
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install ruff
+      - run: ruff check custom_components/rejuvenation_bed/ --select E,F,W --ignore E501
+
+  black:
+    name: Black Formatter Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install black
+      - run: black --check --diff custom_components/rejuvenation_bed/
+
+  mypy:
+    name: MyPy Type Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: |
+          pip install mypy homeassistant-stubs
+          pip install homeassistant
+      - run: mypy custom_components/rejuvenation_bed/ --ignore-missing-imports --no-strict-optional --allow-untyped-defs
+
+  pytest:
+    name: Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: |
+          pip install pytest pytest-cov pytest-asyncio
+          pip install homeassistant
+      - run: pytest tests/ -v --cov=custom_components/rejuvenation_bed --cov-report=term-missing

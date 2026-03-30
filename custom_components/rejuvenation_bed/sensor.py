@@ -515,7 +515,20 @@ class BedThermalBatterySensor(RejuvenationBedEnergySensor):
     # Temperatur-Grenzen für die Batterie-Berechnung
     TEMP_MIN = 26.0  # Standby = 0%
     TEMP_MAX = 32.0  # Solar-Boost-Maximum = 100%
-    SPECIFIC_HEAT = 4.186  # kJ/(kg·°C) für Wasser
+
+    # Physikalische Konstanten für reale Wärmekapazität
+    # Wasser: 4.186 kJ/(kg·K) bei 25-30°C
+    # Vinyl-Hülle: ~1.5 kJ/(kg·K), typisch 8-12 kg
+    # Schaumstoff-Rahmen: ~1.3 kJ/(kg·K), typisch 5-8 kg
+    SPECIFIC_HEAT_WATER = 4.186      # kJ/(kg·K)
+    SPECIFIC_HEAT_VINYL = 1.5        # kJ/(kg·K)
+    SPECIFIC_HEAT_FOAM = 1.3         # kJ/(kg·K)
+    VINYL_MASS_KG = 10.0             # Typische Vinyl-Hülle
+    FOAM_MASS_KG = 6.0               # Typischer Schaumrahmen
+    HEAT_LOSS_FACTOR = 0.85          # 15% Verluste (Abstrahlung, Konvektion)
+
+    # Backwards compatibility
+    SPECIFIC_HEAT = SPECIFIC_HEAT_WATER
     
     def __init__(self, coordinator):
         super().__init__(coordinator)
@@ -560,24 +573,49 @@ class BedThermalBatterySensor(RejuvenationBedEnergySensor):
             return "mdi:battery-low"
         return "mdi:battery-outline"
     
+    def _calc_total_thermal_energy(self, delta_t: float, volume_liters: float) -> float:
+        """Calculate total stored thermal energy including all materials.
+
+        Uses real heat capacity of water + vinyl hull + foam frame.
+        E_total = (m_water * c_water + m_vinyl * c_vinyl + m_foam * c_foam) * dT
+        Then applies heat loss factor for real-world efficiency.
+
+        Returns:
+            Energy in kWh.
+        """
+        # Water: 1 liter = 1 kg (density ~1.0 at 25-30C)
+        water_mass = volume_liters
+        energy_water = water_mass * self.SPECIFIC_HEAT_WATER * delta_t  # kJ
+        energy_vinyl = self.VINYL_MASS_KG * self.SPECIFIC_HEAT_VINYL * delta_t  # kJ
+        energy_foam = self.FOAM_MASS_KG * self.SPECIFIC_HEAT_FOAM * delta_t  # kJ
+
+        total_kj = (energy_water + energy_vinyl + energy_foam) * self.HEAT_LOSS_FACTOR
+        return total_kj / 3600  # kJ -> kWh
+
     @property
     def extra_state_attributes(self):
         temp = self._get_avg_water_temp()
         volume = self._get_volume()
-        
-        # Gespeicherte Energie in kWh
+
+        # Gespeicherte Energie in kWh (reale Physik)
         delta_t = max(0, temp - self.TEMP_MIN)
-        energy_kwh = volume * self.SPECIFIC_HEAT * delta_t / 3600
-        
+        energy_kwh = self._calc_total_thermal_energy(delta_t, volume)
+
         # Maximale Kapazität
         max_delta = self.TEMP_MAX - self.TEMP_MIN
-        max_kwh = volume * self.SPECIFIC_HEAT * max_delta / 3600
-        
+        max_kwh = self._calc_total_thermal_energy(max_delta, volume)
+
+        # Auch vereinfachte Wasser-only Berechnung für Vergleich
+        water_only_kwh = volume * self.SPECIFIC_HEAT_WATER * delta_t / 3600
+
         return {
             "wassertemperatur": round(temp, 1),
             "volumen_liter": volume,
             "gespeichert_kwh": round(energy_kwh, 2),
             "kapazität_kwh": round(max_kwh, 2),
+            "wasser_anteil_kwh": round(water_only_kwh, 2),
+            "materialien": f"Wasser {volume}L + Vinyl {self.VINYL_MASS_KG}kg + Schaum {self.FOAM_MASS_KG}kg",
+            "verlustfaktor": self.HEAT_LOSS_FACTOR,
             "min_temp": self.TEMP_MIN,
             "max_temp": self.TEMP_MAX,
         }
