@@ -2,6 +2,30 @@
 
 Alle Änderungen am Rejuvenation Bed Projekt.
 
+## [0.7.0] - 2026-03-30
+
+### Code & Architektur
+- **Unit-Tests** – Pytest-Suite für `biorhythmus_curve`, `presence_detector`, `ramp_controller`, `sleep_score_calculator`, `anti_short_cycle_manager` und `const` (6 Test-Dateien, >80% Core-Coverage).
+- **CI/CD** – Neuer Workflow `.github/workflows/lint.yml` mit Ruff, Black, MyPy und pytest als Pflicht-Checks bei jedem Push/PR.
+- **Config-Modelle** – `BedTypeConfig` Dataclass (frozen, validated) in `const.py`. Ersetzt lose Dicts durch typsichere, immutable Konfiguration.
+- **HeatingStateMachine** – Neue Klasse vereint `AntiShortCycleManager` + `RampController` in einer State Machine (IDLE → RAMPING → HEATING → COOLDOWN → HOLDING). Weniger State-Checks pro Loop.
+
+### Intelligenz & Features
+- **Bedtime-Learning v2** – EWMA (Exponential Weighted Moving Average) + Median Hybrid statt reinem Median. 60% EWMA + 40% Median reagiert in 2-3 Nächten auf Schichtwechsel oder Urlaub.
+- **Thermische Batterie** – Physik-Formel mit realer Wärmekapazität: Wasser (4.186 kJ/kg·K) + Vinyl-Hülle (1.5 kJ/kg·K, 10kg) + Schaumrahmen (1.3 kJ/kg·K, 6kg). Verlustfaktor 0.85 für reale Bedingungen.
+- **Vorheizzeit** – `ramp_controller.calculate_preheat_time()` nutzt jetzt die gleiche Physik-Formel mit allen Materialien.
+
+### Performance & Logging
+- **Logging** – DEBUG nur bei Offsets oder Phasenwechseln. Normale Zyklen loggen kompakt auf INFO. Emoji-freie Log-Messages für bessere Parsbarkeit.
+
+### Manifest & HACS
+- **hacs.json** – Erweitert um `zip_release`, `filename`, `hide_default_branch`.
+- **services.yaml** – Alle 6 Services vollständig dokumentiert mit `example`, `mode: slider`, detaillierten Beschreibungen.
+
+### Dokumentation
+- **Architektur-Diagramm** – Mermaid-Diagramme in `docs/architecture.md`: Systemübersicht, Datenfluss-Sequenz, Bett-Typ-Entscheidungsbaum, Entity-Tabelle.
+- **.gitignore** – Erweitert um `*.log`, `.pytest_cache/`, `.mypy_cache/`, `.ruff_cache/`, IDE-Dateien.
+
 ## [0.6.1] - 2026-03-23
 
 ### Bugfixes

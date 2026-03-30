@@ -199,13 +199,20 @@ class RampController:
         if temp_diff <= 0:
             return timedelta(0)
         
-        # Physikalische Berechnung
-        # 1 kWh erwärmt ~1000L um ~0.86°C
-        # Also: 1 kWh erwärmt water_liters um (0.86 * 1000 / water_liters) °C
-        kwh_per_degree = water_liters / (0.86 * 1000)  # kWh pro °C
-        total_kwh_needed = temp_diff * kwh_per_degree
-        
-        # Zeit = Energie / Leistung (mit Verlustfaktor 0.85)
+        # Physikalische Berechnung mit realer Wärmekapazität
+        # Wasser: c = 4.186 kJ/(kg·K), 1 Liter ~ 1 kg
+        # Vinyl-Hülle: c = 1.5 kJ/(kg·K), ~10 kg
+        # Schaumrahmen: c = 1.3 kJ/(kg·K), ~6 kg
+        SPECIFIC_HEAT_WATER = 4.186  # kJ/(kg·K)
+        VINYL_MASS = 10.0  # kg
+        FOAM_MASS = 6.0  # kg
+
+        energy_water_kj = water_liters * SPECIFIC_HEAT_WATER * temp_diff
+        energy_vinyl_kj = VINYL_MASS * 1.5 * temp_diff
+        energy_foam_kj = FOAM_MASS * 1.3 * temp_diff
+        total_kwh_needed = (energy_water_kj + energy_vinyl_kj + energy_foam_kj) / 3600
+
+        # Zeit = Energie / Leistung (mit Verlustfaktor 0.85 für Abstrahlung)
         efficiency = 0.85
         hours_needed = total_kwh_needed / (power_watts / 1000) / efficiency
         
