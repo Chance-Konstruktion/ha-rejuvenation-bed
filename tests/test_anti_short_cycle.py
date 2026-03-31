@@ -20,9 +20,7 @@ class TestGracePeriod:
     def test_grace_period_allows_switching(self):
         """During grace period, switching should be allowed."""
         m = AntiShortCycleManager()  # Fresh, in grace period
-        allowed, reason = m.can_switch(
-            "switch.heater", False, True, 26.0, 28.0
-        )
+        allowed, reason = m.can_switch("switch.heater", False, True, 26.0, 28.0)
         # Grace period should allow the switch
         assert "Grace" in reason
 
@@ -34,9 +32,7 @@ class TestGracePeriod:
 
 class TestFirstDecision:
     def test_first_switch_always_allowed(self, manager):
-        allowed, reason = manager.can_switch(
-            "switch.heater", False, True, 26.0, 28.0
-        )
+        allowed, reason = manager.can_switch("switch.heater", False, True, 26.0, 28.0)
         assert allowed
         assert "Erste" in reason
 
@@ -44,13 +40,13 @@ class TestFirstDecision:
 class TestMinRunTime:
     def test_cannot_turn_off_too_quickly(self, manager):
         """After turning ON, must stay on for MIN_RUN_TIME."""
-        # Turn on
+        # First decision initializes history
         manager.can_switch("switch.heater", False, True, 26.0, 28.0)
+        # Set last_on_time to "just now" to simulate a recent turn-on
+        manager._state_history["switch.heater"]["last_on_time"] = datetime.now()
 
-        # Try to turn off immediately
-        allowed, reason = manager.can_switch(
-            "switch.heater", True, False, 28.1, 28.0
-        )
+        # Try to turn off immediately - blocked by min run time
+        allowed, reason = manager.can_switch("switch.heater", True, False, 29.0, 28.0)
         assert not allowed
         assert "ON-Zeit" in reason
 
@@ -60,13 +56,9 @@ class TestMinRunTime:
         manager.can_switch("switch.heater", False, True, 26.0, 28.0)
 
         # Fast-forward past min run time
-        manager._state_history["switch.heater"]["last_on_time"] = (
-            datetime.now() - timedelta(seconds=700)
-        )
+        manager._state_history["switch.heater"]["last_on_time"] = datetime.now() - timedelta(seconds=700)
 
-        allowed, reason = manager.can_switch(
-            "switch.heater", True, False, 28.5, 28.0
-        )
+        allowed, reason = manager.can_switch("switch.heater", True, False, 28.5, 28.0)
         assert allowed
 
 
@@ -75,15 +67,11 @@ class TestMinOffTime:
         """After turning OFF, must stay off for MIN_OFF_TIME."""
         # First turn on then off
         manager.can_switch("switch.heater", False, True, 26.0, 28.0)
-        manager._state_history["switch.heater"]["last_on_time"] = (
-            datetime.now() - timedelta(seconds=700)
-        )
+        manager._state_history["switch.heater"]["last_on_time"] = datetime.now() - timedelta(seconds=700)
         manager.can_switch("switch.heater", True, False, 28.5, 28.0)
 
         # Try to turn on again immediately
-        allowed, reason = manager.can_switch(
-            "switch.heater", False, True, 27.5, 28.0
-        )
+        allowed, reason = manager.can_switch("switch.heater", False, True, 27.5, 28.0)
         assert not allowed
         assert "OFF-Zeit" in reason
 
@@ -93,36 +81,24 @@ class TestHysteresis:
         """Don't turn on if only slightly below target."""
         # First register the heater
         manager.can_switch("switch.heater", False, True, 26.0, 28.0)
-        manager._state_history["switch.heater"]["last_on_time"] = (
-            datetime.now() - timedelta(seconds=700)
-        )
+        manager._state_history["switch.heater"]["last_on_time"] = datetime.now() - timedelta(seconds=700)
         manager.can_switch("switch.heater", True, False, 28.5, 28.0)
-        manager._state_history["switch.heater"]["last_off_time"] = (
-            datetime.now() - timedelta(seconds=400)
-        )
+        manager._state_history["switch.heater"]["last_off_time"] = datetime.now() - timedelta(seconds=400)
 
         # Try to turn on at 27.9 (only 0.1 below target of 28.0)
-        allowed, reason = manager.can_switch(
-            "switch.heater", False, True, 27.9, 28.0
-        )
+        allowed, reason = manager.can_switch("switch.heater", False, True, 27.9, 28.0)
         assert not allowed
         assert "Hysterese" in reason
 
     def test_turn_on_well_below_threshold(self, manager):
         """Turn on if significantly below target."""
         manager.can_switch("switch.heater", False, True, 26.0, 28.0)
-        manager._state_history["switch.heater"]["last_on_time"] = (
-            datetime.now() - timedelta(seconds=700)
-        )
+        manager._state_history["switch.heater"]["last_on_time"] = datetime.now() - timedelta(seconds=700)
         manager.can_switch("switch.heater", True, False, 28.5, 28.0)
-        manager._state_history["switch.heater"]["last_off_time"] = (
-            datetime.now() - timedelta(seconds=400)
-        )
+        manager._state_history["switch.heater"]["last_off_time"] = datetime.now() - timedelta(seconds=400)
 
         # Turn on at 27.5 (0.5 below target, exceeds 0.3 hysteresis)
-        allowed, reason = manager.can_switch(
-            "switch.heater", False, True, 27.5, 28.0
-        )
+        allowed, reason = manager.can_switch("switch.heater", False, True, 27.5, 28.0)
         assert allowed
 
 
@@ -130,9 +106,7 @@ class TestNoChange:
     def test_same_state_always_ok(self, manager):
         """No change needed = always allowed."""
         manager.can_switch("switch.heater", False, True, 26.0, 28.0)
-        allowed, reason = manager.can_switch(
-            "switch.heater", True, True, 27.0, 28.0
-        )
+        allowed, reason = manager.can_switch("switch.heater", True, True, 27.0, 28.0)
         assert allowed
         assert "Keine Änderung" in reason
 
@@ -146,9 +120,7 @@ class TestHardwareSync:
         """After sync, should allow switching (fake 'long ago')."""
         manager.sync_with_hardware("switch.heater", True)
         # Should be able to turn off immediately (last_on_time was set to 30min ago)
-        allowed, reason = manager.can_switch(
-            "switch.heater", True, False, 28.5, 28.0
-        )
+        allowed, reason = manager.can_switch("switch.heater", True, False, 28.5, 28.0)
         assert allowed
 
 
@@ -159,9 +131,7 @@ class TestForceOverride:
         # Force override
         manager.force_allow_switch("switch.heater")
         # Should now be able to turn off immediately
-        allowed, reason = manager.can_switch(
-            "switch.heater", True, False, 28.5, 28.0
-        )
+        allowed, reason = manager.can_switch("switch.heater", True, False, 28.5, 28.0)
         assert allowed
 
 
@@ -176,10 +146,11 @@ class TestDiagnostics:
         assert "heater_states" in diag
 
     def test_blocked_count(self, manager):
-        # Turn on
+        # Turn on and set last_on_time to now (simulating recent turn-on)
         manager.can_switch("switch.heater", False, True, 26.0, 28.0)
-        # Try turning off too quick (blocked)
-        manager.can_switch("switch.heater", True, False, 28.1, 28.0)
+        manager._state_history["switch.heater"]["last_on_time"] = datetime.now()
+        # Try turning off too quick (blocked by min run time)
+        manager.can_switch("switch.heater", True, False, 29.0, 28.0)
 
         diag = manager.get_diagnostics()
         assert diag["blocked_switches"] >= 1

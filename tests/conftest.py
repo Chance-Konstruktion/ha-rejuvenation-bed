@@ -1,7 +1,60 @@
-"""Shared fixtures for Rejuvenation Bed tests."""
+"""Shared fixtures for Rejuvenation Bed tests.
+
+Mocks homeassistant before any component imports to allow
+testing without a full HA installation.
+"""
+
+import sys
+from unittest.mock import MagicMock
+from datetime import time
 
 import pytest
-from datetime import time
+
+# ── Mock homeassistant and all submodules before any component imports ──
+# We need to register ALL possible submodules so Python's import system
+# treats them as packages (i.e., can import sub-sub-modules from them).
+
+# Gather all homeassistant submodules referenced by the codebase
+_HA_SUBMODULES = [
+    "homeassistant",
+    "homeassistant.config_entries",
+    "homeassistant.core",
+    "homeassistant.const",
+    "homeassistant.exceptions",
+    "homeassistant.data_entry_flow",
+    "homeassistant.util",
+    "homeassistant.util.dt",
+    "homeassistant.helpers",
+    "homeassistant.helpers.storage",
+    "homeassistant.helpers.entity_platform",
+    "homeassistant.helpers.update_coordinator",
+    "homeassistant.helpers.entity",
+    "homeassistant.helpers.config_validation",
+    "homeassistant.helpers.selector",
+    "homeassistant.helpers.device_registry",
+    "homeassistant.helpers.event",
+    "homeassistant.helpers.restore_state",
+    "homeassistant.components",
+    "homeassistant.components.climate",
+    "homeassistant.components.climate.const",
+    "homeassistant.components.sensor",
+    "homeassistant.components.binary_sensor",
+    "homeassistant.components.switch",
+    "homeassistant.components.persistent_notification",
+    "voluptuous",
+    "voluptuous.humanize",
+]
+
+# Create a single root mock - all sub-attributes auto-create as MagicMock
+_ha_root = MagicMock()
+
+for mod_name in _HA_SUBMODULES:
+    if mod_name not in sys.modules:
+        # Each module gets its own MagicMock so import X from Y works
+        sys.modules[mod_name] = MagicMock()
+
+
+# ── Fixtures ──
 
 
 @pytest.fixture

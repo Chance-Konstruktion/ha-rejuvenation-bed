@@ -18,13 +18,13 @@ for backwards compatibility. This class wraps and coordinates them.
 """
 
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime
 from enum import Enum
-from typing import Optional, Tuple
+from typing import Optional
 from dataclasses import dataclass
 
 from .anti_short_cycle_manager import AntiShortCycleManager
-from .ramp_controller import RampController, RampState
+from .ramp_controller import RampController
 
 _LOGGER = logging.getLogger(__name__)
 

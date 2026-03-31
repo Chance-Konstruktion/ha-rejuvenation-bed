@@ -1,13 +1,12 @@
 """Tests for SleepScoreCalculator - sleep quality metrics."""
 
 import pytest
-from datetime import datetime, time
+from datetime import datetime
 from unittest.mock import MagicMock, patch
 
 from custom_components.rejuvenation_bed.sleep_score_calculator import (
     SleepScoreCalculator,
     NightData,
-    SleepScore,
 )
 
 
@@ -31,9 +30,7 @@ def calculator(mock_hass, mock_config_entry):
 
 class TestNightData:
     def test_default_values(self):
-        night = NightData(
-            date=datetime(2026, 3, 15), zone_index=0
-        )
+        night = NightData(date=datetime(2026, 3, 15), zone_index=0)
         assert night.heating_cycles == 0
         assert night.interruptions == 0
         assert night.co2_readings == []
@@ -69,8 +66,9 @@ class TestTemperatureStability:
     def test_moderate_stability(self, calculator):
         night = NightData(date=datetime(2026, 3, 15), zone_index=0)
         import math
-        # Moderate: +/- 0.4C
-        night.temp_readings = [28.0 + 0.4 * math.sin(i * 0.1) for i in range(100)]
+
+        # Moderate: +/- 0.6C → std ~0.42, between EXCELLENT (0.3) and GOOD (0.5)
+        night.temp_readings = [28.0 + 0.6 * math.sin(i * 0.1) for i in range(100)]
         score = calculator._calc_temperature_stability(night)
         assert 50 < score < 100
 
