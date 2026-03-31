@@ -891,23 +891,25 @@ class BedIntelligence:
     def predict_bedtime(self, zone_index: int) -> Optional[dict]:
         """
         Sagt die wahrscheinliche Einschlafzeit vorher.
-        
+
         Unterscheidet Wochentage (Mo-Do) und Wochenende (Fr-So).
-        Nutzt Median statt Durchschnitt (robust gegen Ausreißer).
-        
+        Nutzt Hybrid: Median (robust gegen Ausreißer) + EWMA (reagiert schnell
+        auf Schichtwechsel/Urlaub). Das Ergebnis ist der gewichtete Mittelwert
+        aus beidem: 60% EWMA + 40% Median.
+
         Returns:
             Dict mit predicted_time, confidence, basis oder None
         """
         if not hasattr(self, '_bedtime_history'):
             return None
-            
+
         history = self._bedtime_history.get(zone_index, [])
         if len(history) < self._MIN_SAMPLES_FOR_PREDICTION:
             return None
-        
+
         now = local_now()
         is_weekend = now.weekday() >= 4  # Fr, Sa, So
-        
+
         # Einträge filtern: Wochentag vs. Wochenende
         if is_weekend:
             relevant = [h for h in history if h["weekday"] >= 4]
@@ -915,30 +917,46 @@ class BedIntelligence:
         else:
             relevant = [h for h in history if h["weekday"] < 4]
             day_type = "Wochentag"
-        
+
         # Fallback: Wenn für diesen Typ zu wenig Daten, alle nehmen
         if len(relevant) < self._MIN_SAMPLES_FOR_PREDICTION:
             relevant = history
             day_type = "Alle Tage"
-        
-        # Median berechnen (robust gegen "eine Nacht bis 3 Uhr wach")
-        minutes_list = sorted([h["minutes"] for h in relevant])
-        n = len(minutes_list)
+
+        # Chronologisch sortieren (nach Datum) für EWMA
+        relevant_sorted = sorted(relevant, key=lambda h: h["date"])
+        minutes_list = [h["minutes"] for h in relevant_sorted]
+
+        # ── MEDIAN (robust gegen Ausreißer) ──
+        sorted_mins = sorted(minutes_list)
+        n = len(sorted_mins)
         if n % 2 == 0:
-            median_min = (minutes_list[n // 2 - 1] + minutes_list[n // 2]) / 2
+            median_min = (sorted_mins[n // 2 - 1] + sorted_mins[n // 2]) / 2
         else:
-            median_min = minutes_list[n // 2]
-        
+            median_min = sorted_mins[n // 2]
+
+        # ── EWMA (reagiert schnell auf Veränderungen) ──
+        # Alpha = 0.3 → letzte Nacht hat 30% Gewicht, ältere nimmt exponentiell ab
+        # Bei Schichtwechsel oder Urlaub reagiert EWMA in 2-3 Nächten
+        alpha = 0.3
+        ewma = minutes_list[0]
+        for m in minutes_list[1:]:
+            ewma = alpha * m + (1 - alpha) * ewma
+
+        # ── HYBRID: 60% EWMA + 40% Median ──
+        # EWMA reagiert schneller, Median ist stabiler
+        predicted_min = 0.6 * ewma + 0.4 * median_min
+
         # Zurück in Uhrzeit (Überlauf beachten: >1440 = nächster Tag)
-        pred_min = int(median_min) % 1440
+        pred_min = int(predicted_min) % 1440
         pred_hour = pred_min // 60
         pred_minute = pred_min % 60
-        
+
         # Streuung (IQR) für Konfidenz
-        q1 = minutes_list[n // 4] if n >= 4 else minutes_list[0]
-        q3 = minutes_list[3 * n // 4] if n >= 4 else minutes_list[-1]
+        q1 = sorted_mins[n // 4] if n >= 4 else sorted_mins[0]
+        q3 = sorted_mins[3 * n // 4] if n >= 4 else sorted_mins[-1]
         spread_min = q3 - q1  # Interquartilsabstand
-        
+
         # Konfidenz: Je enger die Streuung, desto sicherer
         if spread_min < 30:
             confidence = "hoch"
@@ -946,7 +964,7 @@ class BedIntelligence:
             confidence = "mittel"
         else:
             confidence = "niedrig"
-        
+
         from datetime import time as dt_time
         return {
             "predicted_time": dt_time(pred_hour, pred_minute),
@@ -955,6 +973,9 @@ class BedIntelligence:
             "spread_minutes": round(spread_min),
             "basis": day_type,
             "sample_count": len(relevant),
+            "method": "EWMA+Median",
+            "ewma_minutes": round(ewma),
+            "median_minutes": round(median_min),
         }
 
     def get_predicted_preheat_start(
