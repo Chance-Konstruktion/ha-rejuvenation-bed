@@ -47,10 +47,8 @@ class SleepStageResolver:
         "rem": SleepStage.REM,
         "awake": SleepStage.AWAKE,
         
-        # Fitbit
+        # Fitbit (deep, rem already mapped via Apple Watch above)
         "light": SleepStage.LIGHT,
-        "deep": SleepStage.DEEP,
-        "rem": SleepStage.REM,
         "wake": SleepStage.AWAKE,
         
         # Withings

@@ -64,11 +64,10 @@ class TemperatureCalculator:
         self.thermal_battery_enabled = self.bed_config.get("thermal_battery", True)
         self.eco_can_turn_off = self.bed_config.get("eco_can_turn_off", False)
         
-        _LOGGER.debug(
-            f"TemperatureCalculator initialisiert: "
-            f"Min-Temp={self.min_temp}°C, "
-            f"Vorheizzeit={self.preheat_hours}h/{self.preheat_minutes}min, "
-            f"Batterie={self.thermal_battery_enabled}"
+        _LOGGER.info(
+            "TemperatureCalculator: Min=%.1f°C, Vorheiz=%.1fh/%dmin, Batterie=%s",
+            self.min_temp, self.preheat_hours, self.preheat_minutes,
+            self.thermal_battery_enabled,
         )
         
         # Sub-Resolver initialisieren
@@ -308,12 +307,13 @@ class TemperatureCalculator:
         final_temp = max(final_temp, self.min_temp)
         final_temp = min(final_temp, ABSOLUTE_MAX_TEMP)
         
-        _LOGGER.debug(
-            f"Zone {zone_index}: Curve={curve_temp:.1f}°C, "
-            f"Energy={energy_offset:+.1f}°C, "
-            f"SleepStage={sleep_stage_offset:+.1f}°C → "
-            f"Final={final_temp:.1f}°C"
-        )
+        if energy_offset != 0.0 or sleep_stage_offset != 0.0:
+            _LOGGER.debug(
+                "Zone %d: Curve=%.1f + Energy=%+.1f + Stage=%+.1f = %.1f°C",
+                zone_index, curve_temp, energy_offset, sleep_stage_offset, final_temp,
+            )
+        else:
+            _LOGGER.debug("Zone %d: %.1f°C", zone_index, final_temp)
         
         return round(final_temp, 2)
     

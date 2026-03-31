@@ -2,7 +2,10 @@
 
 set_boost:
   name: Boost aktivieren
-  description: Aktiviert den Schnellheizen-Modus für eine Zone
+  description: >-
+    Aktiviert den Schnellheizen-Modus für eine Zone.
+    Die Temperatur wird um den konfigurierten Boost-Offset über die aktuelle
+    Zieltemperatur angehoben. Safety-Cap bei 36°C.
   target:
     entity:
       integration: rejuvenation_bed
@@ -10,19 +13,26 @@ set_boost:
   fields:
     duration_minutes:
       name: Dauer (Minuten)
-      description: Wie lange der Boost aktiv bleiben soll
+      description: >-
+        Wie lange der Boost aktiv bleiben soll.
+        Nach Ablauf kehrt die Temperatur zur normalen Biorhythmus-Kurve zurück.
       required: false
       default: 30
+      example: 45
       selector:
         number:
           min: 5
           max: 120
           step: 5
           unit_of_measurement: min
+          mode: slider
 
 set_sick_mode:
   name: Krank-Modus aktivieren
-  description: Aktiviert konstante Wärme für die Genesungszeit
+  description: >-
+    Aktiviert konstante Wärme für die Genesungszeit.
+    Die Biorhythmus-Kurve wird pausiert und stattdessen eine
+    feste Temperatur gehalten. Ideal bei Erkältung oder Rückenschmerzen.
   target:
     entity:
       integration: rejuvenation_bed
@@ -30,20 +40,27 @@ set_sick_mode:
   fields:
     temperature:
       name: Temperatur (°C)
-      description: Konstante Zieltemperatur
+      description: >-
+        Konstante Zieltemperatur während der Genesungszeit.
+        Empfohlen: 30-32°C für Muskelentspannung.
       required: false
       default: 30
+      example: 31
       selector:
         number:
           min: 28
           max: 35
           step: 0.5
           unit_of_measurement: °C
+          mode: slider
     days:
       name: Dauer (Tage)
-      description: Wie viele Tage der Modus aktiv bleibt
+      description: >-
+        Wie viele Tage der Modus aktiv bleibt.
+        Nach Ablauf schaltet das System zurück auf Biorhythmus.
       required: false
       default: 3
+      example: 5
       selector:
         number:
           min: 1
@@ -53,7 +70,10 @@ set_sick_mode:
 
 set_vacation_mode:
   name: Urlaub-Modus aktivieren
-  description: Aktiviert Frostschutz-Modus für Abwesenheit
+  description: >-
+    Aktiviert Frostschutz-Modus für Abwesenheit.
+    Für Wasserbetten wird die Mindesttemperatur (24°C) zum
+    Kondensationsschutz eingehalten. Heizmatten können komplett abschalten.
   target:
     entity:
       integration: rejuvenation_bed
@@ -61,44 +81,46 @@ set_vacation_mode:
   fields:
     temperature:
       name: Frostschutz-Temperatur (°C)
-      description: Minimale Haltetemperatur
+      description: >-
+        Minimale Haltetemperatur während der Abwesenheit.
+        Wasserbetten: Nie unter 24°C (Kondensation!).
+        Heizmatten: Kann 0°C sein (komplett aus).
       required: false
       default: 20
+      example: 24
       selector:
         number:
-          min: 15
+          min: 0
           max: 25
           step: 1
           unit_of_measurement: °C
+          mode: slider
     end_date:
       name: Rückkehr-Datum
-      description: Wann der Urlaub endet (optional)
+      description: >-
+        Wann der Urlaub endet.
+        Das Bett beginnt rechtzeitig mit dem Vorheizen,
+        damit es bei Rückkehr warm ist.
       required: false
       selector:
         date:
 
 cancel_special_mode:
   name: Sonder-Modus beenden
-  description: Beendet Boost, Krank oder Urlaub-Modus
+  description: >-
+    Beendet jeden aktiven Sondermodus (Boost, Krank oder Urlaub).
+    Das Bett kehrt sofort zur normalen Biorhythmus-Steuerung zurück.
   target:
     entity:
       integration: rejuvenation_bed
       domain: climate
 
-reset_energy_budget:
-  name: Energie-Budget zurücksetzen
-  description: Setzt die Energiestatistiken auf Null
-  fields:
-    confirm:
-      name: Bestätigung
-      description: Bestätige das Zurücksetzen
-      required: true
-      selector:
-        boolean:
-
 preheat_bed:
   name: Bett vorheizen
-  description: Heizt das Bett auf Komfort-Temperatur vor
+  description: >-
+    Heizt das Bett auf Komfort-Temperatur vor.
+    Nützlich wenn Gäste kommen oder der Zeitplan unregelmäßig ist.
+    Respektiert die Rampen-Begrenzung bei Wasserbetten (max 1°C/h).
   target:
     entity:
       integration: rejuvenation_bed
@@ -106,23 +128,46 @@ preheat_bed:
   fields:
     target_temperature:
       name: Zieltemperatur (°C)
-      description: Gewünschte Vorheiz-Temperatur
+      description: >-
+        Gewünschte Vorheiz-Temperatur.
+        Standard: 29°C (optimale Einschlaf-Temperatur).
       required: false
       default: 29
+      example: 28.5
       selector:
         number:
           min: 26
           max: 34
           step: 0.5
           unit_of_measurement: °C
+          mode: slider
     duration_minutes:
       name: Dauer (Minuten)
-      description: Wie lange vorgeheizt werden soll
+      description: >-
+        Wie lange vorgeheizt werden soll.
+        Wasserbetten brauchen typisch 30-60 Min pro °C.
       required: false
       default: 30
+      example: 45
       selector:
         number:
           min: 15
           max: 60
           step: 5
           unit_of_measurement: min
+          mode: slider
+
+reset_energy_budget:
+  name: Energie-Budget zurücksetzen
+  description: >-
+    Setzt die Energiestatistiken (Solar-kWh, Grid-kWh, Ersparnis) auf Null.
+    Nützlich nach Hardware-Änderungen oder zum Monats-Reset.
+  fields:
+    confirm:
+      name: Bestätigung
+      description: >-
+        Bestätige das Zurücksetzen.
+        Diese Aktion kann nicht rückgängig gemacht werden.
+      required: true
+      selector:
+        boolean:
