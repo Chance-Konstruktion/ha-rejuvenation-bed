@@ -63,9 +63,7 @@ class TestPresenceSensorOverride:
 class TestWaterbedVariance:
     def test_initial_collecting_data(self, detector):
         """First few readings should return 'collecting data'."""
-        is_present, conf, reason = detector.detect_presence(
-            zone_index=0, water_temp=28.0
-        )
+        is_present, conf, reason = detector.detect_presence(zone_index=0, water_temp=28.0)
         assert conf == 0.0
         assert "Daten" in reason
 
@@ -78,25 +76,24 @@ class TestWaterbedVariance:
             temp = 28.0 + (0.01 if i % 2 == 0 else -0.01)
             fast_detector._store(0, temp, None, None, t)
 
-        is_present, conf, reason = fast_detector.detect_presence(
-            zone_index=0, water_temp=28.0
-        )
+        is_present, conf, reason = fast_detector.detect_presence(zone_index=0, water_temp=28.0)
         assert conf < 0.5  # Low confidence = likely empty
 
     def test_variable_temps_presence(self, fast_detector):
-        """Variable water temps = someone in bed."""
-        now = datetime(2026, 3, 15, 23, 0)
+        """Variable water temps = someone in bed.
+
+        We use recent timestamps so _calc_std window includes the data.
+        """
+        now = datetime.now()
         import math
 
         for i in range(20):
-            t = now + timedelta(seconds=i * 30)
+            t = now - timedelta(seconds=(20 - i) * 30)
             # Significant variance: simulates water movement
             temp = 28.0 + 0.15 * math.sin(i * 0.5)
             fast_detector._store(0, temp, None, None, t)
 
-        is_present, conf, reason = fast_detector.detect_presence(
-            zone_index=0, water_temp=28.0
-        )
+        is_present, conf, reason = fast_detector.detect_presence(zone_index=0, water_temp=28.0)
         assert conf > 0.5
 
     def test_heater_active_raises_threshold(self, fast_detector):
@@ -109,9 +106,7 @@ class TestWaterbedVariance:
             fast_detector._store(0, temp, None, None, t)
 
         # Without heater: might detect presence
-        result_no_heat = fast_detector.detect_presence(
-            zone_index=0, water_temp=28.0, heater_active=False
-        )
+        result_no_heat = fast_detector.detect_presence(zone_index=0, water_temp=28.0, heater_active=False)
 
         # Reset
         fast_detector2 = PresenceDetector(
@@ -128,9 +123,7 @@ class TestWaterbedVariance:
             fast_detector2._store(0, temp, None, None, t)
 
         # With heater: should have higher threshold
-        result_heat = fast_detector2.detect_presence(
-            zone_index=0, water_temp=28.0, heater_active=True
-        )
+        result_heat = fast_detector2.detect_presence(zone_index=0, water_temp=28.0, heater_active=True)
         # Heater active should result in lower confidence
         assert result_heat[1] <= result_no_heat[1]
 
@@ -138,9 +131,9 @@ class TestWaterbedVariance:
 class TestHeatingPadPresence:
     def test_body_heat_detected(self, fast_detector):
         """Rising temp without heater = body heat = presence."""
-        now = datetime(2026, 3, 15, 23, 0)
+        now = datetime.now()
         for i in range(20):
-            t = now + timedelta(seconds=i * 30)
+            t = now - timedelta(seconds=(20 - i) * 30)
             # Temperature rising: body heat
             temp = 25.0 + i * 0.05
             fast_detector._store(0, temp, None, None, t)
@@ -166,14 +159,14 @@ class TestSweatDetection:
 
     def test_sweat_high_humidity_with_rise(self, detector):
         """Very high humidity with significant rise = sweating."""
-        now = datetime(2026, 3, 15, 23, 0)
-        # First: establish low baseline
+        now = datetime.now()
+        # First: establish low baseline (~100 min ago)
         for i in range(200):
-            t = now + timedelta(seconds=i * 30)
+            t = now - timedelta(seconds=(240 - i) * 30)
             detector._store(0, 28.0, None, 50.0, t)
-        # Then: spike to 95%
+        # Then: spike to 95% (recent 20 min)
         for i in range(40):
-            t = now + timedelta(seconds=(200 + i) * 30)
+            t = now - timedelta(seconds=(40 - i) * 30)
             detector._store(0, 28.0, None, 95.0, t)
 
         assert detector.is_sweating(0) is True
@@ -193,9 +186,9 @@ class TestLeakDetection:
 
     def test_leak_sustained_high_humidity(self, detector):
         """3+ hours of >85% humidity = potential leak."""
-        now = datetime(2026, 3, 15, 23, 0)
+        now = datetime.now()
         for i in range(400):  # ~3.3 hours at 30s
-            t = now + timedelta(seconds=i * 30)
+            t = now - timedelta(seconds=(400 - i) * 30)
             detector._store(0, 28.0, None, 90.0, t)
 
         assert detector.is_potential_leak(0) is True

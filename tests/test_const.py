@@ -1,10 +1,7 @@
 """Tests for constants and configuration models."""
 
-import pytest
-
 from custom_components.rejuvenation_bed.const import (
     DOMAIN,
-    DEFAULT_POWER,
     ABSOLUTE_MAX_TEMP,
     BED_TYPE_WATERBED,
     BED_TYPE_HEATING_PAD,
@@ -94,10 +91,19 @@ class TestConfigConsistency:
         pad_keys = set(HEATING_PAD_CONFIG.keys())
         # Some keys may differ (preheat_hours vs preheat_minutes)
         common = {
-            "min_temp", "max_temp", "standby_temp", "away_temp",
-            "max_change_per_hour", "ramp_enabled", "thermal_battery",
-            "leak_detection", "condensation_risk", "solar_boost_max",
-            "solar_boost_enabled", "eco_reduction_max", "eco_can_turn_off",
+            "min_temp",
+            "max_temp",
+            "standby_temp",
+            "away_temp",
+            "max_change_per_hour",
+            "ramp_enabled",
+            "thermal_battery",
+            "leak_detection",
+            "condensation_risk",
+            "solar_boost_max",
+            "solar_boost_enabled",
+            "eco_reduction_max",
+            "eco_can_turn_off",
         }
         assert common.issubset(waterbed_keys)
         assert common.issubset(pad_keys)

@@ -1,6 +1,5 @@
 """Tests for BiorhythmusCurve - pure math, no HA dependency."""
 
-import math
 import pytest
 from datetime import datetime, time, timedelta
 
@@ -22,36 +21,28 @@ class TestBiorhythmusCurveInit:
 
     def test_summer_profile(self):
         """Outdoor >20C triggers summer temps."""
-        curve = BiorhythmusCurve(
-            bedtime=time(23, 0), wake_time=time(7, 0), outdoor_temp=25.0
-        )
+        curve = BiorhythmusCurve(bedtime=time(23, 0), wake_time=time(7, 0), outdoor_temp=25.0)
         assert curve.sleep_temp == 27.0
         assert curve.deep_sleep_temp == 26.0
         assert curve.wake_temp == 28.0
 
     def test_winter_profile(self):
         """Outdoor <15C triggers winter temps."""
-        curve = BiorhythmusCurve(
-            bedtime=time(23, 0), wake_time=time(7, 0), outdoor_temp=10.0
-        )
+        curve = BiorhythmusCurve(bedtime=time(23, 0), wake_time=time(7, 0), outdoor_temp=10.0)
         assert curve.sleep_temp == 29.0
         assert curve.deep_sleep_temp == 27.5
         assert curve.wake_temp == 30.0
 
     def test_transition_profile(self):
         """Between 15-20C linearly interpolates."""
-        curve = BiorhythmusCurve(
-            bedtime=time(23, 0), wake_time=time(7, 0), outdoor_temp=17.5
-        )
+        curve = BiorhythmusCurve(bedtime=time(23, 0), wake_time=time(7, 0), outdoor_temp=17.5)
         # 17.5 is midpoint: 50% summer + 50% winter
         assert 27.5 < curve.sleep_temp < 28.5
         assert 26.5 < curve.deep_sleep_temp < 27.5
 
     def test_user_offset_applied(self):
         """User offset shifts all temperatures."""
-        curve = BiorhythmusCurve(
-            bedtime=time(23, 0), wake_time=time(7, 0), user_offset=1.5
-        )
+        curve = BiorhythmusCurve(bedtime=time(23, 0), wake_time=time(7, 0), user_offset=1.5)
         assert curve.sleep_temp == 28.0 + 1.5
         assert curve.deep_sleep_temp == 27.0 + 1.5
         assert curve.wake_temp == 29.0 + 1.5
@@ -197,9 +188,7 @@ class TestBiorhythmusCurveCurveInfo:
     """Test curve info/diagnostics."""
 
     def test_phases_have_correct_names(self):
-        curve = BiorhythmusCurve(
-            bedtime=time(23, 0), wake_time=time(7, 0)
-        )
+        curve = BiorhythmusCurve(bedtime=time(23, 0), wake_time=time(7, 0))
         # At bedtime -> Landing
         info = curve.get_curve_info(datetime(2026, 3, 15, 23, 5))
         assert info["phase"] == "Landing"
@@ -213,9 +202,7 @@ class TestBiorhythmusCurveCurveInfo:
         assert info["phase"] == "Aufwachen"
 
     def test_curve_info_contains_expected_keys(self):
-        curve = BiorhythmusCurve(
-            bedtime=time(23, 0), wake_time=time(7, 0)
-        )
+        curve = BiorhythmusCurve(bedtime=time(23, 0), wake_time=time(7, 0))
         info = curve.get_curve_info(datetime(2026, 3, 16, 2, 0))
         assert "normalized_time" in info
         assert "target_temperature" in info
@@ -229,18 +216,14 @@ class TestBiorhythmusCurveSeasonalUpdate:
     """Test outdoor temperature updates."""
 
     def test_update_outdoor_temp(self):
-        curve = BiorhythmusCurve(
-            bedtime=time(23, 0), wake_time=time(7, 0), outdoor_temp=10.0
-        )
+        curve = BiorhythmusCurve(bedtime=time(23, 0), wake_time=time(7, 0), outdoor_temp=10.0)
         assert curve.deep_sleep_temp == 27.5  # Winter
 
         curve.update_outdoor_temp(25.0)
         assert curve.deep_sleep_temp == 26.0  # Summer
 
     def test_no_change_on_same_temp(self):
-        curve = BiorhythmusCurve(
-            bedtime=time(23, 0), wake_time=time(7, 0), outdoor_temp=10.0
-        )
+        curve = BiorhythmusCurve(bedtime=time(23, 0), wake_time=time(7, 0), outdoor_temp=10.0)
         old_deep = curve.deep_sleep_temp
         curve.update_outdoor_temp(10.0)
         assert curve.deep_sleep_temp == old_deep

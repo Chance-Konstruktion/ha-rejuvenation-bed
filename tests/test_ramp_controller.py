@@ -28,9 +28,7 @@ class TestRampControllerInit:
 class TestRampedSetpoint:
     def test_first_call_returns_current(self, controller):
         """First call initializes with current temp."""
-        setpoint, state = controller.calculate_ramped_setpoint(
-            zone_index=0, desired_temp=29.0, current_temp=26.0
-        )
+        setpoint, state = controller.calculate_ramped_setpoint(zone_index=0, desired_temp=29.0, current_temp=26.0)
         # First call: should be close to current temp (start of ramp)
         assert setpoint >= 26.0
 
@@ -117,9 +115,7 @@ class TestShouldStartPreheat:
     def test_before_optimal_start(self, controller):
         """Should not start if too early."""
         bedtime = datetime.now() + timedelta(hours=12)
-        should, reason = controller.should_start_preheat(
-            26.0, 28.0, bedtime, 300, 350
-        )
+        should, reason = controller.should_start_preheat(26.0, 28.0, bedtime, 300, 350)
         assert not should
 
     def test_at_optimal_start(self, controller):
@@ -128,17 +124,13 @@ class TestShouldStartPreheat:
         duration = controller.calculate_preheat_time(26.0, 28.0, 300, 350)
         # Set bedtime to exactly duration from now
         bedtime = datetime.now() + duration - timedelta(minutes=1)
-        should, reason = controller.should_start_preheat(
-            26.0, 28.0, bedtime, 300, 350
-        )
+        should, reason = controller.should_start_preheat(26.0, 28.0, bedtime, 300, 350)
         assert should
 
     def test_past_bedtime(self, controller):
         """Should not start if bedtime already passed."""
         bedtime = datetime.now() - timedelta(hours=1)
-        should, reason = controller.should_start_preheat(
-            26.0, 28.0, bedtime, 300, 350
-        )
+        should, reason = controller.should_start_preheat(26.0, 28.0, bedtime, 300, 350)
         assert not should
 
 
