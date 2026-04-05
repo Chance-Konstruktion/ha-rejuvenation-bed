@@ -148,7 +148,7 @@ class RejuvenationBedClimate(CoordinatorEntity, ClimateEntity):
 
     def _detect_hardware_level(self, zone_conf) -> str:
         """
-        Erkennt Hardware-Level: A/B/C/D/E
+        Erkennt Hardware-Level: A/B/B+/C/D/E
         """
         has_temp = zone_conf.get("temp_sensor") is not None
         has_power = zone_conf.get("power_sensor") is not None
@@ -161,8 +161,10 @@ class RejuvenationBedClimate(CoordinatorEntity, ClimateEntity):
             return "D"  # Erweitert
         elif has_temp and has_power:
             return "C"  # Vollausstattung
+        elif has_temp:
+            return "B+"  # Temperatur - Kurve ja, Energie nein
         elif has_power:
-            return "B"  # Smart
+            return "B"  # Smart - Energie ja, Kurve nein
         else:
             return "A"  # Basic
     
@@ -171,7 +173,7 @@ class RejuvenationBedClimate(CoordinatorEntity, ClimateEntity):
         if self._hardware_level == "A":
             self._attr_hvac_modes = [HVACMode.OFF, HVACMode.HEAT]
             self._attr_preset_modes = [PRESET_NONE, PRESET_BOOST]
-        elif self._hardware_level in ["B", "C", "D", "E"]:
+        elif self._hardware_level in ["B", "B+", "C", "D", "E"]:
             self._attr_hvac_modes = [HVACMode.OFF, HVACMode.AUTO, HVACMode.HEAT]
             self._attr_preset_modes = [PRESET_NONE, PRESET_AWAY, PRESET_BOOST]
 
@@ -295,7 +297,7 @@ class RejuvenationBedClimate(CoordinatorEntity, ClimateEntity):
             "reason": zone_data.get("reason", ""),
         }
         
-        if self._hardware_level == "C":
+        if self._hardware_level in ["C", "B+", "D", "E"]:
             attrs["presence_detected"] = zone_data.get("is_present", False)
             attrs["presence_confidence"] = zone_data.get("presence_confidence", 0.0)
         
