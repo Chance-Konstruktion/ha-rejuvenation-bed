@@ -5,10 +5,20 @@ Alle Änderungen am Rejuvenation Bed Projekt.
 ## [0.7.0] - 2026-03-30
 
 ### Code & Architektur
-- **Unit-Tests** – Pytest-Suite für `biorhythmus_curve`, `presence_detector`, `ramp_controller`, `sleep_score_calculator`, `anti_short_cycle_manager` und `const` (6 Test-Dateien, >80% Core-Coverage).
-- **CI/CD** – Neuer Workflow `.github/workflows/lint.yml` mit Ruff, Black, MyPy und pytest als Pflicht-Checks bei jedem Push/PR.
+- **Unit-Tests** – Pytest-Suite für `biorhythmus_curve`, `presence_detector`, `ramp_controller`, `sleep_score_calculator`, `anti_short_cycle_manager` und `const` (6 Test-Dateien, 116 Tests, >80% Core-Coverage).
+- **CI/CD** – Neuer Workflow `.github/workflows/lint.yml` mit Ruff, Black und pytest als Pflicht-Checks bei jedem Push/PR.
 - **Config-Modelle** – `BedTypeConfig` Dataclass (frozen, validated) in `const.py`. Ersetzt lose Dicts durch typsichere, immutable Konfiguration.
 - **HeatingStateMachine** – Neue Klasse vereint `AntiShortCycleManager` + `RampController` in einer State Machine (IDLE → RAMPING → HEATING → COOLDOWN → HOLDING). Weniger State-Checks pro Loop.
+
+### Bugfixes
+- **Hardware-Level Erkennung** – Setup-Flow zeigte "Vollausstattung" (Level C) auch ohne Power-Sensor. Neues Level B+ für Temp-Only-Setups (Schalter + Temp-Sensor). Erkennung in `config_flow.py`, `climate.py`, `options_flow.py` und `coordinator.py` synchronisiert.
+  - A = Nur Schalter (Basic/Zeitschaltuhr)
+  - B = + Power-Sensor (Smart/Energie)
+  - B+ = + Temp-Sensor ohne Power (Kurve ja, Energie nein)
+  - C = + Temp + Power (Vollausstattung)
+  - D = + Luft oder Feuchte (Erweitert)
+  - E = + Luft und Feuchte (Premium)
+- **Doppelte Dict-Keys** – Fitbit-Mappings in `sleep_stage_resolver.py` hatten duplizierte Keys (`deep`, `rem`), behoben.
 
 ### Intelligenz & Features
 - **Bedtime-Learning v2** – EWMA (Exponential Weighted Moving Average) + Median Hybrid statt reinem Median. 60% EWMA + 40% Median reagiert in 2-3 Nächten auf Schichtwechsel oder Urlaub.
