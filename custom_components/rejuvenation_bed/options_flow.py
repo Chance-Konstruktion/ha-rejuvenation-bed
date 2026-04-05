@@ -565,6 +565,8 @@ class RejuvenationBedOptionsFlow(config_entries.OptionsFlow):
         elif has_temp and has_power:
             return "C"
         elif has_temp:
+            return "B+"
+        elif has_power:
             return "B"
         return "A"
 
