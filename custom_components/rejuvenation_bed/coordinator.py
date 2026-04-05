@@ -1123,7 +1123,7 @@ class RejuvenationBedCoordinator(DataUpdateCoordinator):
         if self.eco_mode_enabled:
             return HVACMode.AUTO, PRESET_NONE  # Eco wird über Status-Sensor angezeigt
         
-        if hardware_level in ["E", "D", "C", "B"]:
+        if hardware_level in ["E", "D", "C", "B+", "B"]:
             return (HVACMode.HEAT, PRESET_NONE) if is_present else (HVACMode.AUTO, PRESET_NONE)
         
         return HVACMode.HEAT, PRESET_NONE
