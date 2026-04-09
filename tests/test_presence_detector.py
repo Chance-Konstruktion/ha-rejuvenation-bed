@@ -1,6 +1,7 @@
-"""Tests for PresenceDetector - variance-based presence detection."""
+"""Tests for PresenceDetector v4 - variance + trend consistency based presence detection."""
 
 import pytest
+import math
 from datetime import datetime, timedelta
 
 from custom_components.rejuvenation_bed.presence_detector import (
@@ -16,27 +17,46 @@ def detector():
 
 @pytest.fixture
 def fast_detector():
-    """Detector with short hysteresis for testing."""
+    """Detector with no debounce and low min_samples for testing."""
     thresholds = PresenceThresholds(
+        debounce_minutes=0,
+        history_window_minutes=10,
+        min_samples=5,
         presence_enter_minutes=0,
         presence_leave_minutes=0,
-        variance_window_minutes=5,
-        min_datapoints=3,
     )
     return PresenceDetector(thresholds=thresholds)
 
 
+# ═══════════════════════════════════════════════════════════════════════════════
+# GRUNDLEGENDE TESTS
+# ═══════════════════════════════════════════════════════════════════════════════
+
 class TestPresenceDetectorInit:
     def test_default_thresholds(self, detector):
-        assert detector.thresholds.water_variance_threshold == 0.040
-        assert detector.thresholds.presence_enter_minutes == 5
-        assert detector.thresholds.presence_leave_minutes == 20
+        assert detector.thresholds.variance_low == 0.02
+        assert detector.thresholds.variance_high == 0.08
+        assert detector.thresholds.trend_threshold == 0.85
+        assert detector.thresholds.trend_chaotic == 0.6
+        assert detector.thresholds.debounce_minutes == 15
+        assert detector.thresholds.history_window_minutes == 30
+        assert detector.thresholds.min_samples == 20
 
     def test_custom_thresholds(self):
-        custom = PresenceThresholds(water_variance_threshold=0.06)
+        custom = PresenceThresholds(variance_low=0.01, variance_high=0.05)
         det = PresenceDetector(thresholds=custom)
-        assert det.thresholds.water_variance_threshold == 0.06
+        assert det.thresholds.variance_low == 0.01
+        assert det.thresholds.variance_high == 0.05
 
+    def test_legacy_water_variance_threshold_exists(self, detector):
+        """BedIntelligence sets this for calibration compatibility."""
+        assert hasattr(detector.thresholds, 'water_variance_threshold')
+        assert detector.thresholds.water_variance_threshold == 0.040
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# DEDIZIERTER SENSOR OVERRIDE
+# ═══════════════════════════════════════════════════════════════════════════════
 
 class TestPresenceSensorOverride:
     def test_dedicated_sensor_overrides(self, detector):
@@ -60,73 +80,234 @@ class TestPresenceSensorOverride:
         assert conf == 1.0
 
 
-class TestWaterbedVariance:
-    def test_initial_collecting_data(self, detector):
-        """First few readings should return 'collecting data'."""
-        is_present, conf, reason = detector.detect_presence(zone_index=0, water_temp=28.0)
-        assert conf == 0.0
-        assert "Daten" in reason
+# ═══════════════════════════════════════════════════════════════════════════════
+# KERN-TEST: HEIZUNG vs. PERSON (DAS HAUPTPROBLEM!)
+# ═══════════════════════════════════════════════════════════════════════════════
 
-    def test_stable_temps_no_presence(self, fast_detector):
-        """Stable water temps = empty bed."""
-        now = datetime(2026, 3, 15, 23, 0)
-        for i in range(20):
-            t = now + timedelta(seconds=i * 30)
-            # Very stable: 28.00 +/- 0.01
-            temp = 28.0 + (0.01 if i % 2 == 0 else -0.01)
-            fast_detector._store(0, temp, None, None, t)
+class TestHeatingVsPresence:
+    """
+    DAS ist der zentrale Bug-Fix-Test!
 
-        is_present, conf, reason = fast_detector.detect_presence(zone_index=0, water_temp=28.0)
-        assert conf < 0.5  # Low confidence = likely empty
+    Bett heizt allein: +0.0625°C alle 6-10 Min → monoton, niedrige Varianz → OFF
+    Person drin: chaotische Schwankungen → hohe Varianz, niedrige Konsistenz → ON
+    """
 
-    def test_variable_temps_presence(self, fast_detector):
-        """Variable water temps = someone in bed.
-
-        We use recent timestamps so _calc_std window includes the data.
+    def test_monotonic_heating_no_presence(self, fast_detector):
+        """
+        Simuliert gleichmäßiges Heizen ohne Person.
+        Temperatur steigt monoton um +0.0625°C alle ~8 Minuten.
+        → MUSS OFF bleiben!
         """
         now = datetime.now()
-        import math
+        base_temp = 27.375
 
-        for i in range(20):
-            t = now - timedelta(seconds=(20 - i) * 30)
-            # Significant variance: simulates water movement
-            temp = 28.0 + 0.15 * math.sin(i * 0.5)
+        # 30 Messwerte über 10 Minuten, monoton steigend
+        for i in range(30):
+            t = now - timedelta(seconds=(30 - i) * 20)
+            # +0.0625°C alle ~8 Min = +0.0625 alle ~16 Samples (bei 30s)
+            step = i // 5  # Alle 5 Samples ein Schritt
+            temp = base_temp + step * 0.0625
             fast_detector._store(0, temp, None, None, t)
 
-        is_present, conf, reason = fast_detector.detect_presence(zone_index=0, water_temp=28.0)
+        is_present, conf, reason = fast_detector.detect_presence(
+            zone_index=0, water_temp=base_temp + 0.375
+        )
+        assert is_present is False, f"Heizung allein darf NICHT als Präsenz erkannt werden! reason={reason}"
+        assert conf < 0.3
+
+    def test_chaotic_person_presence(self, fast_detector):
+        """
+        Simuliert chaotische Temperatur wenn Person im Bett liegt.
+        Schwankungen hoch und runter, keine klare Richtung.
+        → MUSS ON werden!
+        """
+        now = datetime.now()
+        base_temp = 28.0
+
+        for i in range(30):
+            t = now - timedelta(seconds=(30 - i) * 20)
+            # Chaotische Schwankungen: sin + random-artig
+            temp = base_temp + 0.3 * math.sin(i * 0.8) + 0.1 * math.cos(i * 2.1)
+            fast_detector._store(0, temp, None, None, t)
+
+        is_present, conf, reason = fast_detector.detect_presence(
+            zone_index=0, water_temp=28.1
+        )
+        assert is_present is True, f"Chaotische Schwankungen MÜSSEN als Präsenz erkannt werden! reason={reason}"
         assert conf > 0.5
 
-    def test_heater_active_raises_threshold(self, fast_detector):
-        """When heater is active, threshold is raised to ignore heating noise."""
-        now = datetime(2026, 3, 15, 23, 0)
-        for i in range(20):
-            t = now + timedelta(seconds=i * 30)
-            # Moderate variance (could be heating noise)
-            temp = 28.0 + 0.05 * (1 if i % 3 == 0 else -1)
+    def test_real_data_heating_pattern(self, fast_detector):
+        """
+        Echte Daten aus dem Bug-Report: Bett heizt von 01:00-05:00.
+        Konstant +0.0625°C Schritte. MUSS OFF bleiben.
+        """
+        now = datetime.now()
+        # Echte Heizungsdaten (vereinfacht): 27.375 → 29.5 über Stunden
+        # Hier 10 Minuten-Fenster mit typischem Muster
+        heating_temps = [
+            27.375, 27.375, 27.375, 27.4375, 27.4375, 27.4375,
+            27.5, 27.5, 27.5, 27.5625, 27.5625, 27.5625,
+            27.625, 27.625, 27.625, 27.6875, 27.6875, 27.6875,
+            27.75, 27.75, 27.75, 27.8125, 27.8125, 27.8125,
+            27.875, 27.875, 27.875, 27.9375, 27.9375, 27.9375,
+        ]
+        for i, temp in enumerate(heating_temps):
+            t = now - timedelta(seconds=(len(heating_temps) - i) * 20)
             fast_detector._store(0, temp, None, None, t)
 
-        # Without heater: might detect presence
-        result_no_heat = fast_detector.detect_presence(zone_index=0, water_temp=28.0, heater_active=False)
-
-        # Reset
-        fast_detector2 = PresenceDetector(
-            PresenceThresholds(
-                presence_enter_minutes=0,
-                presence_leave_minutes=0,
-                variance_window_minutes=5,
-                min_datapoints=3,
-            )
+        is_present, conf, reason = fast_detector.detect_presence(
+            zone_index=0, water_temp=27.9375
         )
+        assert is_present is False, f"Echtes Heizungsmuster darf NICHT als Präsenz erkannt werden! reason={reason}"
+
+    def test_sudden_person_entry(self, fast_detector):
+        """
+        Simuliert den Moment wo Person ins Bett steigt.
+        Erst monoton (Heizung), dann plötzlich chaotisch.
+        """
+        now = datetime.now()
+        base_temp = 29.0
+
+        # Erst 5 stabile Heiz-Werte
+        for i in range(5):
+            t = now - timedelta(seconds=(30 - i) * 20)
+            temp = base_temp + i * 0.01
+            fast_detector._store(0, temp, None, None, t)
+
+        # Dann 25 stark chaotische Werte (Person steigt ein, Bewegung, Decke)
+        for i in range(25):
+            t = now - timedelta(seconds=(25 - i) * 20)
+            temp = base_temp + 0.5 * math.sin(i * 1.5) + 0.2 * math.cos(i * 3.7)
+            fast_detector._store(0, temp, None, None, t)
+
+        is_present, conf, reason = fast_detector.detect_presence(
+            zone_index=0, water_temp=29.2
+        )
+        assert is_present is True, f"Person-Einstieg muss erkannt werden! reason={reason}"
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# VARIANZ-BERECHNUNG
+# ═══════════════════════════════════════════════════════════════════════════════
+
+class TestVarianceCalculation:
+    def test_zero_variance_constant_temp(self, fast_detector):
+        """Konstante Temperatur → Varianz = 0."""
+        now = datetime.now()
         for i in range(20):
-            t = now + timedelta(seconds=i * 30)
-            temp = 28.0 + 0.05 * (1 if i % 3 == 0 else -1)
-            fast_detector2._store(0, temp, None, None, t)
+            t = now - timedelta(seconds=(20 - i) * 20)
+            fast_detector._store(0, 28.0, None, None, t)
 
-        # With heater: should have higher threshold
-        result_heat = fast_detector2.detect_presence(zone_index=0, water_temp=28.0, heater_active=True)
-        # Heater active should result in lower confidence
-        assert result_heat[1] <= result_no_heat[1]
+        variance = fast_detector._calculate_variance(0)
+        assert variance == 0.0
 
+    def test_low_variance_heating(self, fast_detector):
+        """Monoton steigende Temp → niedrige Varianz (< VARIANCE_LOW)."""
+        now = datetime.now()
+        for i in range(20):
+            t = now - timedelta(seconds=(20 - i) * 20)
+            temp = 27.5 + i * 0.0125  # Langsamer Anstieg
+            fast_detector._store(0, temp, None, None, t)
+
+        variance = fast_detector._calculate_variance(0)
+        assert variance < 0.02, f"Heizungs-Varianz sollte < 0.02 sein, ist {variance}"
+
+    def test_high_variance_person(self, fast_detector):
+        """Chaotische Temp → hohe Varianz (> VARIANCE_HIGH)."""
+        now = datetime.now()
+        for i in range(20):
+            t = now - timedelta(seconds=(20 - i) * 20)
+            temp = 28.0 + 0.5 * math.sin(i * 0.7)
+            fast_detector._store(0, temp, None, None, t)
+
+        variance = fast_detector._calculate_variance(0)
+        assert variance > 0.08, f"Personen-Varianz sollte > 0.08 sein, ist {variance}"
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# TREND-KONSISTENZ
+# ═══════════════════════════════════════════════════════════════════════════════
+
+class TestTrendConsistency:
+    def test_monotonic_rise_high_consistency(self, fast_detector):
+        """Monoton steigend → Konsistenz nahe 1.0."""
+        now = datetime.now()
+        for i in range(20):
+            t = now - timedelta(seconds=(20 - i) * 20)
+            fast_detector._store(0, 27.0 + i * 0.05, None, None, t)
+
+        consistency = fast_detector._calculate_trend_consistency(0)
+        assert consistency > 0.9, f"Monoton steigend sollte Konsistenz >0.9 haben, ist {consistency}"
+
+    def test_chaotic_low_consistency(self, fast_detector):
+        """Chaotisch → Konsistenz nahe 0.5."""
+        now = datetime.now()
+        for i in range(20):
+            t = now - timedelta(seconds=(20 - i) * 20)
+            temp = 28.0 + 0.3 * math.sin(i * 1.5)
+            fast_detector._store(0, temp, None, None, t)
+
+        consistency = fast_detector._calculate_trend_consistency(0)
+        assert consistency < 0.7, f"Chaotisch sollte Konsistenz <0.7 haben, ist {consistency}"
+
+    def test_heating_with_sensor_noise(self, fast_detector):
+        """
+        Heizung mit DS18B20-Rauschen (±0.0625°C).
+        Sollte trotzdem hohe Konsistenz zeigen.
+        """
+        now = datetime.now()
+        base = 27.5
+        for i in range(20):
+            t = now - timedelta(seconds=(20 - i) * 20)
+            # Monotoner Anstieg mit minimalem Rauschen
+            step = i // 4
+            temp = base + step * 0.0625
+            fast_detector._store(0, temp, None, None, t)
+
+        consistency = fast_detector._calculate_trend_consistency(0)
+        assert consistency >= 0.85, f"Heizung mit Rauschen sollte Konsistenz >=0.85 haben, ist {consistency}"
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# DEBOUNCE
+# ═══════════════════════════════════════════════════════════════════════════════
+
+class TestDebounce:
+    def test_debounce_prevents_rapid_changes(self):
+        """Statuswechsel erst nach debounce_minutes."""
+        thresholds = PresenceThresholds(
+            debounce_minutes=15,
+            history_window_minutes=10,
+            min_samples=5,
+        )
+        det = PresenceDetector(thresholds=thresholds)
+        now = datetime.now()
+
+        # Erstes Ergebnis: OFF (kein Wechsel nötig)
+        result = det._apply_debounce(0, False, now)
+        assert result is False
+
+        # Sofortiger Wechsel auf ON → wird erlaubt (kein vorheriger Wechsel)
+        result = det._apply_debounce(0, True, now)
+        det._is_present[0] = True
+        det._last_state_change[0] = now
+        assert result is True
+
+        # Versuch sofort zurück auf OFF → wird blockiert (debounce)
+        result = det._apply_debounce(0, False, now + timedelta(minutes=5))
+        assert result is True  # Bleibt ON
+
+        # Nach 15 Minuten → Wechsel erlaubt
+        result = det._apply_debounce(0, False, now + timedelta(minutes=16))
+        assert result is False
+
+    def test_default_debounce_is_15_minutes(self, detector):
+        assert detector.thresholds.debounce_minutes == 15
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# HEIZMATTE (unverändert)
+# ═══════════════════════════════════════════════════════════════════════════════
 
 class TestHeatingPadPresence:
     def test_body_heat_detected(self, fast_detector):
@@ -134,7 +315,6 @@ class TestHeatingPadPresence:
         now = datetime.now()
         for i in range(20):
             t = now - timedelta(seconds=(20 - i) * 30)
-            # Temperature rising: body heat
             temp = 25.0 + i * 0.05
             fast_detector._store(0, temp, None, None, t)
 
@@ -146,6 +326,10 @@ class TestHeatingPadPresence:
         )
         assert conf > 0.3
 
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# SCHWITZ-ERKENNUNG (unverändert)
+# ═══════════════════════════════════════════════════════════════════════════════
 
 class TestSweatDetection:
     def test_no_sweat_normal_humidity(self, detector):
@@ -160,11 +344,9 @@ class TestSweatDetection:
     def test_sweat_high_humidity_with_rise(self, detector):
         """Very high humidity with significant rise = sweating."""
         now = datetime.now()
-        # First: establish low baseline (~100 min ago)
         for i in range(200):
             t = now - timedelta(seconds=(240 - i) * 30)
             detector._store(0, 28.0, None, 50.0, t)
-        # Then: spike to 95% (recent 20 min)
         for i in range(40):
             t = now - timedelta(seconds=(40 - i) * 30)
             detector._store(0, 28.0, None, 95.0, t)
@@ -179,6 +361,10 @@ class TestSweatDetection:
         assert detector.get_humidity_level(0) == "trocken"
 
 
+# ═══════════════════════════════════════════════════════════════════════════════
+# LECKAGE-ERKENNUNG (unverändert)
+# ═══════════════════════════════════════════════════════════════════════════════
+
 class TestLeakDetection:
     def test_no_leak_normal(self, detector):
         """Normal conditions = no leak."""
@@ -187,19 +373,16 @@ class TestLeakDetection:
     def test_leak_sustained_high_humidity(self, detector):
         """3+ hours of >85% humidity = potential leak."""
         now = datetime.now()
-        for i in range(400):  # ~3.3 hours at 30s
+        for i in range(400):
             t = now - timedelta(seconds=(400 - i) * 30)
             detector._store(0, 28.0, None, 90.0, t)
 
         assert detector.is_potential_leak(0) is True
 
 
-class TestHysteresis:
-    def test_asymmetric_hysteresis(self, detector):
-        """Enter fast (5min), leave slow (20min)."""
-        assert detector.thresholds.presence_enter_minutes == 5
-        assert detector.thresholds.presence_leave_minutes == 20
-
+# ═══════════════════════════════════════════════════════════════════════════════
+# DIAGNOSTICS
+# ═══════════════════════════════════════════════════════════════════════════════
 
 class TestDiagnostics:
     def test_diagnostics_structure(self, detector):
@@ -207,6 +390,46 @@ class TestDiagnostics:
         assert "is_present" in diag
         assert "confidence" in diag
         assert "reason" in diag
+        assert "water_variance" in diag
+        assert "trend_consistency" in diag
         assert "water_temp_std" in diag
         assert "buffer_sizes" in diag
-        assert "hysteresis" in diag
+        assert "debounce_minutes" in diag
+        assert "thresholds" in diag
+
+    def test_diagnostics_after_detection(self, fast_detector):
+        """After running detection, diagnostics should have real values."""
+        now = datetime.now()
+        for i in range(20):
+            t = now - timedelta(seconds=(20 - i) * 20)
+            fast_detector._store(0, 28.0 + i * 0.01, None, None, t)
+
+        fast_detector.detect_presence(zone_index=0, water_temp=28.2)
+        diag = fast_detector.get_diagnostics(0)
+
+        assert diag["water_variance"] >= 0
+        assert 0.0 <= diag["trend_consistency"] <= 1.0
+        assert diag["buffer_sizes"]["water"] == 21  # 20 from _store + 1 from detect_presence
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# DATEN SAMMELN (noch nicht genug Daten)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+class TestDataCollection:
+    def test_initial_collecting_data(self, detector):
+        """First few readings should return 'collecting data'."""
+        is_present, conf, reason = detector.detect_presence(zone_index=0, water_temp=28.0)
+        assert conf == 0.0
+        assert "Daten" in reason
+
+    def test_not_enough_samples(self, detector):
+        """Under min_samples should stay in collecting mode."""
+        now = datetime.now()
+        for i in range(5):  # default min_samples=20, so 5 is not enough
+            t = now - timedelta(seconds=(5 - i) * 30)
+            detector._store(0, 28.0, None, None, t)
+
+        is_present, conf, reason = detector.detect_presence(zone_index=0, water_temp=28.0)
+        assert conf == 0.0
+        assert "Daten" in reason
