@@ -247,6 +247,21 @@ DEFAULT_BOOST_OFFSET = 2.0          # +2°C beim Schnellheizen
 DEFAULT_COMFORT_OFFSET = 0.5        # +0.5°C beim Ausschlafen
 BOOST_MAX_TEMP = 34.0               # Absolute Obergrenze Boost (Hardware-Thermostat = Backup)
 
+# ═══════════════════════════════════════════════════════════════════════════════
+# PRÄSENZ-ERKENNUNG (Varianz-basiert, kalibriert Apr 2026)
+# ═══════════════════════════════════════════════════════════════════════════════
+# Kern-Erkenntnis: Heizung allein → gleichmäßiger Anstieg (niedrige Varianz)
+#                  Person im Bett → chaotische Schwankungen (hohe Varianz)
+
+PRESENCE_HISTORY_MINUTES = 30           # Analysefenster für Varianz/Trend
+PRESENCE_VARIANCE_LOW = 0.02            # σ² darunter = definitiv Heizung
+PRESENCE_VARIANCE_HIGH = 0.08           # σ² darüber = definitiv Person
+PRESENCE_TREND_THRESHOLD = 0.85         # Konsistenz darüber = monoton (Heizung)
+PRESENCE_TREND_CHAOTIC = 0.6            # Konsistenz darunter = chaotisch (Person)
+PRESENCE_MIN_SAMPLES = 20              # Mindestens 20 Messwerte für Analyse
+PRESENCE_DEBOUNCE_MINUTES = 15          # Minimum zwischen Statuswechseln
+PRESENCE_BODY_TEMP_DIFF = 1.5           # °C Differenz Auflage-Wasser für Körperkontakt
+
 # Device Info
 MANUFACTURER = "Rejuvenation Bed"
 SW_VERSION = "0.7.0"
