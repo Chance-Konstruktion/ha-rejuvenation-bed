@@ -43,6 +43,7 @@ _LOGGER = logging.getLogger(__name__)
 # KALIBRIERTE SCHWELLWERTE (Apr 2026, Doppelbett 2x2m, 1 Heizung aktiv)
 # ═══════════════════════════════════════════════════════════════════════════════
 
+
 @dataclass
 class PresenceThresholds:
     """Kalibrierte Schwellwerte aus echten Messdaten."""
@@ -50,14 +51,14 @@ class PresenceThresholds:
     # PRIMÄR: Varianz-basierte Erkennung (30min Fenster)
     # Leeres Bett (Heizung):  Varianz < 0.02, Trend-Konsistenz > 0.85
     # Person drin:            Varianz > 0.08, Trend-Konsistenz < 0.6
-    variance_low: float = PRESENCE_VARIANCE_LOW       # σ² darunter = Heizung
-    variance_high: float = PRESENCE_VARIANCE_HIGH      # σ² darüber = Person
+    variance_low: float = PRESENCE_VARIANCE_LOW  # σ² darunter = Heizung
+    variance_high: float = PRESENCE_VARIANCE_HIGH  # σ² darüber = Person
     trend_threshold: float = PRESENCE_TREND_THRESHOLD  # Konsistenz darüber = monoton
-    trend_chaotic: float = PRESENCE_TREND_CHAOTIC      # Konsistenz darunter = chaotisch
+    trend_chaotic: float = PRESENCE_TREND_CHAOTIC  # Konsistenz darunter = chaotisch
 
     # Analyse-Fenster
     history_window_minutes: int = PRESENCE_HISTORY_MINUTES  # 30min
-    min_samples: int = PRESENCE_MIN_SAMPLES                 # Mindestens 20
+    min_samples: int = PRESENCE_MIN_SAMPLES  # Mindestens 20
 
     # Debounce (verhindert Flackern!)
     debounce_minutes: int = PRESENCE_DEBOUNCE_MINUTES  # 15min zwischen Wechseln
@@ -72,12 +73,12 @@ class PresenceThresholds:
     body_temp_diff: float = PRESENCE_BODY_TEMP_DIFF  # °C Diff Auflage-Wasser
 
     # SCHWITZ-ERKENNUNG (nach User-Feedback angepasst!)
-    sweat_humidity_abs: float = 93.0          # Absolut >93% = STARK FEUCHT
-    sweat_humidity_rise: float = 35.0         # Anstieg >35% über Baseline
-    sweat_confirm_minutes: int = 15           # Muss 15 min anhalten
+    sweat_humidity_abs: float = 93.0  # Absolut >93% = STARK FEUCHT
+    sweat_humidity_rise: float = 35.0  # Anstieg >35% über Baseline
+    sweat_confirm_minutes: int = 15  # Muss 15 min anhalten
 
     # LECKAGE (Sicherheit)
-    leak_humidity_abs: float = 85.0           # >85% über 3h = Alarm
+    leak_humidity_abs: float = 85.0  # >85% über 3h = Alarm
     leak_confirm_hours: float = 3.0
 
     # Hysterese (Legacy, für Heizmatte)
@@ -112,7 +113,9 @@ class PresenceDetector:
         # Diagnostics
         self._last_water_variance: dict[int, float] = {}
         self._last_trend_consistency: dict[int, float] = {}
-        self._last_water_std: dict[int, float] = {}  # Kompatibilität mit BedIntelligence
+        self._last_water_std: dict[int, float] = (
+            {}
+        )  # Kompatibilität mit BedIntelligence
         self._last_air_std: dict[int, float] = {}
         self._last_confidence: dict[int, float] = {}
         self._last_reason: dict[int, str] = {}
@@ -152,8 +155,9 @@ class PresenceDetector:
         # Priorität 1: Dedizierter Präsenz-Sensor überschreibt alles
         # ─────────────────────────────────────────────────────────────
         if presence_sensor_state is not None:
-            self._set_state(zone_index, presence_sensor_state, 1.0,
-                          "Präsenz-Sensor", now)
+            self._set_state(
+                zone_index, presence_sensor_state, 1.0, "Präsenz-Sensor", now
+            )
             return presence_sensor_state, 1.0, "Präsenz-Sensor"
 
         # ─────────────────────────────────────────────────────────────
@@ -179,14 +183,13 @@ class PresenceDetector:
         trend_consistency = self._calculate_trend_consistency(zone_index)
 
         # Kompatibilität: water_std für BedIntelligence
-        self._last_water_std[zone_index] = variance ** 0.5
+        self._last_water_std[zone_index] = variance**0.5
         self._last_water_variance[zone_index] = variance
         self._last_trend_consistency[zone_index] = trend_consistency
 
         # Luft-Varianz (sekundär)
         air_std = self._calc_std(
-            self._air_temps.get(zone_index),
-            self.thresholds.history_window_minutes
+            self._air_temps.get(zone_index), self.thresholds.history_window_minutes
         )
         self._last_air_std[zone_index] = air_std or 0.0
 
@@ -194,8 +197,12 @@ class PresenceDetector:
         # Entscheidungslogik: Varianz + Trend-Konsistenz
         # ─────────────────────────────────────────────────────────────
         raw_present, confidence, reasons = self._determine_presence(
-            variance, trend_consistency, air_std, heater_active,
-            water_temp, surface_temp
+            variance,
+            trend_consistency,
+            air_std,
+            heater_active,
+            water_temp,
+            surface_temp,
         )
 
         # ─────────────────────────────────────────────────────────────
@@ -444,7 +451,9 @@ class PresenceDetector:
             if excess > 0.1:
                 raw_present = True
                 confidence = 0.70
-                reasons.append(f"⚡+Körper ({trend:.2f}°C, erwartet {expected_rise:.2f})")
+                reasons.append(
+                    f"⚡+Körper ({trend:.2f}°C, erwartet {expected_rise:.2f})"
+                )
             else:
                 confidence = 0.15
                 reasons.append(f"⚡Heizen ({trend:.2f}°C)")
@@ -504,7 +513,7 @@ class PresenceDetector:
         n = len(values)
         mean = sum(values) / n
         variance = sum((x - mean) ** 2 for x in values) / n
-        return variance ** 0.5
+        return variance**0.5
 
     # ═══════════════════════════════════════════════════════════════════════
     # SCHWITZ-ERKENNUNG (konservativ!)
@@ -525,9 +534,7 @@ class PresenceDetector:
         now = datetime.now()
 
         # Letzte 15 Minuten
-        recent_cutoff = now - timedelta(
-            minutes=self.thresholds.sweat_confirm_minutes
-        )
+        recent_cutoff = now - timedelta(minutes=self.thresholds.sweat_confirm_minutes)
         recent = [val for ts, val in buffer if ts > recent_cutoff and val is not None]
         if len(recent) < 5:
             return False
@@ -536,7 +543,9 @@ class PresenceDetector:
 
         # Baseline: Minimum der letzten 6 Stunden
         baseline_cutoff = now - timedelta(hours=6)
-        all_vals = [val for ts, val in buffer if ts > baseline_cutoff and val is not None]
+        all_vals = [
+            val for ts, val in buffer if ts > baseline_cutoff and val is not None
+        ]
         if not all_vals:
             return False
 
