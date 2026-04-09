@@ -32,6 +32,7 @@ def fast_detector():
 # GRUNDLEGENDE TESTS
 # ═══════════════════════════════════════════════════════════════════════════════
 
+
 class TestPresenceDetectorInit:
     def test_default_thresholds(self, detector):
         assert detector.thresholds.variance_low == 0.02
@@ -50,13 +51,14 @@ class TestPresenceDetectorInit:
 
     def test_legacy_water_variance_threshold_exists(self, detector):
         """BedIntelligence sets this for calibration compatibility."""
-        assert hasattr(detector.thresholds, 'water_variance_threshold')
+        assert hasattr(detector.thresholds, "water_variance_threshold")
         assert detector.thresholds.water_variance_threshold == 0.040
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # DEDIZIERTER SENSOR OVERRIDE
 # ═══════════════════════════════════════════════════════════════════════════════
+
 
 class TestPresenceSensorOverride:
     def test_dedicated_sensor_overrides(self, detector):
@@ -83,6 +85,7 @@ class TestPresenceSensorOverride:
 # ═══════════════════════════════════════════════════════════════════════════════
 # KERN-TEST: HEIZUNG vs. PERSON (DAS HAUPTPROBLEM!)
 # ═══════════════════════════════════════════════════════════════════════════════
+
 
 class TestHeatingVsPresence:
     """
@@ -112,7 +115,9 @@ class TestHeatingVsPresence:
         is_present, conf, reason = fast_detector.detect_presence(
             zone_index=0, water_temp=base_temp + 0.375
         )
-        assert is_present is False, f"Heizung allein darf NICHT als Präsenz erkannt werden! reason={reason}"
+        assert (
+            is_present is False
+        ), f"Heizung allein darf NICHT als Präsenz erkannt werden! reason={reason}"
         assert conf < 0.3
 
     def test_chaotic_person_presence(self, fast_detector):
@@ -133,7 +138,9 @@ class TestHeatingVsPresence:
         is_present, conf, reason = fast_detector.detect_presence(
             zone_index=0, water_temp=28.1
         )
-        assert is_present is True, f"Chaotische Schwankungen MÜSSEN als Präsenz erkannt werden! reason={reason}"
+        assert (
+            is_present is True
+        ), f"Chaotische Schwankungen MÜSSEN als Präsenz erkannt werden! reason={reason}"
         assert conf > 0.5
 
     def test_real_data_heating_pattern(self, fast_detector):
@@ -145,11 +152,36 @@ class TestHeatingVsPresence:
         # Echte Heizungsdaten (vereinfacht): 27.375 → 29.5 über Stunden
         # Hier 10 Minuten-Fenster mit typischem Muster
         heating_temps = [
-            27.375, 27.375, 27.375, 27.4375, 27.4375, 27.4375,
-            27.5, 27.5, 27.5, 27.5625, 27.5625, 27.5625,
-            27.625, 27.625, 27.625, 27.6875, 27.6875, 27.6875,
-            27.75, 27.75, 27.75, 27.8125, 27.8125, 27.8125,
-            27.875, 27.875, 27.875, 27.9375, 27.9375, 27.9375,
+            27.375,
+            27.375,
+            27.375,
+            27.4375,
+            27.4375,
+            27.4375,
+            27.5,
+            27.5,
+            27.5,
+            27.5625,
+            27.5625,
+            27.5625,
+            27.625,
+            27.625,
+            27.625,
+            27.6875,
+            27.6875,
+            27.6875,
+            27.75,
+            27.75,
+            27.75,
+            27.8125,
+            27.8125,
+            27.8125,
+            27.875,
+            27.875,
+            27.875,
+            27.9375,
+            27.9375,
+            27.9375,
         ]
         for i, temp in enumerate(heating_temps):
             t = now - timedelta(seconds=(len(heating_temps) - i) * 20)
@@ -158,7 +190,9 @@ class TestHeatingVsPresence:
         is_present, conf, reason = fast_detector.detect_presence(
             zone_index=0, water_temp=27.9375
         )
-        assert is_present is False, f"Echtes Heizungsmuster darf NICHT als Präsenz erkannt werden! reason={reason}"
+        assert (
+            is_present is False
+        ), f"Echtes Heizungsmuster darf NICHT als Präsenz erkannt werden! reason={reason}"
 
     def test_sudden_person_entry(self, fast_detector):
         """
@@ -183,12 +217,15 @@ class TestHeatingVsPresence:
         is_present, conf, reason = fast_detector.detect_presence(
             zone_index=0, water_temp=29.2
         )
-        assert is_present is True, f"Person-Einstieg muss erkannt werden! reason={reason}"
+        assert (
+            is_present is True
+        ), f"Person-Einstieg muss erkannt werden! reason={reason}"
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # VARIANZ-BERECHNUNG
 # ═══════════════════════════════════════════════════════════════════════════════
+
 
 class TestVarianceCalculation:
     def test_zero_variance_constant_temp(self, fast_detector):
@@ -228,6 +265,7 @@ class TestVarianceCalculation:
 # TREND-KONSISTENZ
 # ═══════════════════════════════════════════════════════════════════════════════
 
+
 class TestTrendConsistency:
     def test_monotonic_rise_high_consistency(self, fast_detector):
         """Monoton steigend → Konsistenz nahe 1.0."""
@@ -237,7 +275,9 @@ class TestTrendConsistency:
             fast_detector._store(0, 27.0 + i * 0.05, None, None, t)
 
         consistency = fast_detector._calculate_trend_consistency(0)
-        assert consistency > 0.9, f"Monoton steigend sollte Konsistenz >0.9 haben, ist {consistency}"
+        assert (
+            consistency > 0.9
+        ), f"Monoton steigend sollte Konsistenz >0.9 haben, ist {consistency}"
 
     def test_chaotic_low_consistency(self, fast_detector):
         """Chaotisch → Konsistenz nahe 0.5."""
@@ -248,7 +288,9 @@ class TestTrendConsistency:
             fast_detector._store(0, temp, None, None, t)
 
         consistency = fast_detector._calculate_trend_consistency(0)
-        assert consistency < 0.7, f"Chaotisch sollte Konsistenz <0.7 haben, ist {consistency}"
+        assert (
+            consistency < 0.7
+        ), f"Chaotisch sollte Konsistenz <0.7 haben, ist {consistency}"
 
     def test_heating_with_sensor_noise(self, fast_detector):
         """
@@ -265,12 +307,15 @@ class TestTrendConsistency:
             fast_detector._store(0, temp, None, None, t)
 
         consistency = fast_detector._calculate_trend_consistency(0)
-        assert consistency >= 0.85, f"Heizung mit Rauschen sollte Konsistenz >=0.85 haben, ist {consistency}"
+        assert (
+            consistency >= 0.85
+        ), f"Heizung mit Rauschen sollte Konsistenz >=0.85 haben, ist {consistency}"
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # DEBOUNCE
 # ═══════════════════════════════════════════════════════════════════════════════
+
 
 class TestDebounce:
     def test_debounce_prevents_rapid_changes(self):
@@ -309,6 +354,7 @@ class TestDebounce:
 # HEIZMATTE (unverändert)
 # ═══════════════════════════════════════════════════════════════════════════════
 
+
 class TestHeatingPadPresence:
     def test_body_heat_detected(self, fast_detector):
         """Rising temp without heater = body heat = presence."""
@@ -330,6 +376,7 @@ class TestHeatingPadPresence:
 # ═══════════════════════════════════════════════════════════════════════════════
 # SCHWITZ-ERKENNUNG (unverändert)
 # ═══════════════════════════════════════════════════════════════════════════════
+
 
 class TestSweatDetection:
     def test_no_sweat_normal_humidity(self, detector):
@@ -365,6 +412,7 @@ class TestSweatDetection:
 # LECKAGE-ERKENNUNG (unverändert)
 # ═══════════════════════════════════════════════════════════════════════════════
 
+
 class TestLeakDetection:
     def test_no_leak_normal(self, detector):
         """Normal conditions = no leak."""
@@ -383,6 +431,7 @@ class TestLeakDetection:
 # ═══════════════════════════════════════════════════════════════════════════════
 # DIAGNOSTICS
 # ═══════════════════════════════════════════════════════════════════════════════
+
 
 class TestDiagnostics:
     def test_diagnostics_structure(self, detector):
@@ -409,17 +458,22 @@ class TestDiagnostics:
 
         assert diag["water_variance"] >= 0
         assert 0.0 <= diag["trend_consistency"] <= 1.0
-        assert diag["buffer_sizes"]["water"] == 21  # 20 from _store + 1 from detect_presence
+        assert (
+            diag["buffer_sizes"]["water"] == 21
+        )  # 20 from _store + 1 from detect_presence
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # DATEN SAMMELN (noch nicht genug Daten)
 # ═══════════════════════════════════════════════════════════════════════════════
 
+
 class TestDataCollection:
     def test_initial_collecting_data(self, detector):
         """First few readings should return 'collecting data'."""
-        is_present, conf, reason = detector.detect_presence(zone_index=0, water_temp=28.0)
+        is_present, conf, reason = detector.detect_presence(
+            zone_index=0, water_temp=28.0
+        )
         assert conf == 0.0
         assert "Daten" in reason
 
@@ -430,6 +484,8 @@ class TestDataCollection:
             t = now - timedelta(seconds=(5 - i) * 30)
             detector._store(0, 28.0, None, None, t)
 
-        is_present, conf, reason = detector.detect_presence(zone_index=0, water_temp=28.0)
+        is_present, conf, reason = detector.detect_presence(
+            zone_index=0, water_temp=28.0
+        )
         assert conf == 0.0
         assert "Daten" in reason
