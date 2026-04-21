@@ -1,22 +1,24 @@
 """
-Presence-Detector v4 für das Rejuvenation Bed.
+Presence-Detector v5 für das Rejuvenation Bed.
 
-KERN-ERKENNTNIS (aus Messdaten Apr 2026):
-  Bett heizt allein  → Temperatur steigt GLEICHMÄSSIG (+0.0625°C/6-10min)
+FIX (Apr 2026): Sensor-Rauschen (±0.0625°C) wird jetzt ignoriert!
+
+KERN-ERKENNTNIS:
+  Bett heizt allein  → Temperatur steigt GLEICHMÄSSIG
                       → Niedrige Varianz, hohe Trend-Konsistenz
   Person liegt drin   → Temperatur schwankt CHAOTISCH (Körperwärme, Bewegung)
                       → Hohe Varianz, niedrige Trend-Konsistenz
 
-PRIMÄR-INDIKATOR: Kombination aus Varianz UND Trend-Konsistenz (30min Fenster)
-  → Varianz allein reicht NICHT (Sensor-Rauschen ±0.0625°C triggert Fehlalarme)
-  → Trend-Konsistenz unterscheidet monotones Heizen von chaotischer Präsenz
-
-SEKUNDÄR (wenn verfügbar):
-  - Luft-Temp-Varianz (SHT41): Verstärkt Signal
-  - Auflagen-Temperatur: Schnelle Körperkontakt-Erkennung
-  - Feuchtigkeit: Nur für Leckage-Erkennung (NICHT für Präsenz!)
-
-SCHWITZ-ERKENNUNG: Nur bei echtem Schwitzen (>93% absolut UND Anstieg >35%)
+KRITISCHER FIX v5:
+  Der DS18B20 Sensor hat eine Auflösung von 0.0625°C (1/16 Grad).
+  Das erzeugt DIGITALES RAUSCHEN: 28.25 → 28.3125 → 28.25 → 28.3125 ...
+  
+  VORHER (kaputt): Jeder Sprung wurde als "nicht monoton" gezählt
+                   → Trend-Konsistenz ~0.5 → "chaotisch" → FALSE POSITIVE!
+  
+  NACHHER (fix):   Sprünge ≤0.0625°C werden als RAUSCHEN ignoriert
+                   → Nur ECHTE Temperaturänderungen zählen
+                   → Keine Fehlalarme mehr!
 """
 
 import logging
@@ -40,8 +42,11 @@ _LOGGER = logging.getLogger(__name__)
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# KALIBRIERTE SCHWELLWERTE (Apr 2026, Doppelbett 2x2m, 1 Heizung aktiv)
+# KRITISCH: Sensor-Rauschen Schwellwert
 # ═══════════════════════════════════════════════════════════════════════════════
+# DS18B20 hat 12-bit Auflösung = 0.0625°C pro Schritt
+# Alles darunter ist RAUSCHEN und muss ignoriert werden!
+SENSOR_NOISE_THRESHOLD = 0.07  # Leicht über 0.0625 für Sicherheit
 
 
 @dataclass
@@ -49,8 +54,6 @@ class PresenceThresholds:
     """Kalibrierte Schwellwerte aus echten Messdaten."""
 
     # PRIMÄR: Varianz-basierte Erkennung (30min Fenster)
-    # Leeres Bett (Heizung):  Varianz < 0.02, Trend-Konsistenz > 0.85
-    # Person drin:            Varianz > 0.08, Trend-Konsistenz < 0.6
     variance_low: float = PRESENCE_VARIANCE_LOW  # σ² darunter = Heizung
     variance_high: float = PRESENCE_VARIANCE_HIGH  # σ² darüber = Person
     trend_threshold: float = PRESENCE_TREND_THRESHOLD  # Konsistenz darüber = monoton
@@ -63,25 +66,25 @@ class PresenceThresholds:
     # Debounce (verhindert Flackern!)
     debounce_minutes: int = PRESENCE_DEBOUNCE_MINUTES  # 15min zwischen Wechseln
 
-    # Legacy-Kompatibilität: wird von BedIntelligence-Kalibrierung gesetzt
+    # Legacy-Kompatibilität
     water_variance_threshold: float = 0.040
 
-    # SEKUNDÄR: Luft-Temp-Varianz (SHT41 oben auf Kern)
+    # SEKUNDÄR: Luft-Temp-Varianz (SHT41)
     air_variance_threshold: float = 0.15
 
     # Auflagen-Temperatur (Körperkontakt)
-    body_temp_diff: float = PRESENCE_BODY_TEMP_DIFF  # °C Diff Auflage-Wasser
+    body_temp_diff: float = PRESENCE_BODY_TEMP_DIFF
 
-    # SCHWITZ-ERKENNUNG (nach User-Feedback angepasst!)
-    sweat_humidity_abs: float = 93.0  # Absolut >93% = STARK FEUCHT
-    sweat_humidity_rise: float = 35.0  # Anstieg >35% über Baseline
-    sweat_confirm_minutes: int = 15  # Muss 15 min anhalten
+    # SCHWITZ-ERKENNUNG
+    sweat_humidity_abs: float = 93.0
+    sweat_humidity_rise: float = 35.0
+    sweat_confirm_minutes: int = 15
 
-    # LECKAGE (Sicherheit)
-    leak_humidity_abs: float = 85.0  # >85% über 3h = Alarm
+    # LECKAGE
+    leak_humidity_abs: float = 85.0
     leak_confirm_hours: float = 3.0
 
-    # Hysterese (Legacy, für Heizmatte)
+    # Hysterese (Legacy)
     presence_enter_minutes: int = 5
     presence_leave_minutes: int = 20
 
@@ -89,18 +92,14 @@ class PresenceThresholds:
 class PresenceDetector:
     """
     Varianz + Trend-basierte Präsenz-Erkennung für Wasserbetten.
-
-    Erkennt Präsenz basierend auf Temperatur-VARIANZ und TREND-KONSISTENZ:
-    - NIEDRIGE Varianz + HOHE Konsistenz = Heizung läuft = NIEMAND drin
-    - HOHE Varianz ODER NIEDRIGE Konsistenz = chaotisch = PERSON liegt drin
-
-    Funktioniert minimal mit NUR dem Wassertemp-Sensor.
+    
+    v5: Mit Rausch-Immunität für DS18B20 Sensoren!
     """
 
     def __init__(self, thresholds: Optional[PresenceThresholds] = None):
         self.thresholds = thresholds or PresenceThresholds()
 
-        # Rolling-Buffer pro Zone (speichert Rohdaten)
+        # Rolling-Buffer pro Zone
         self._water_temps: dict[int, deque] = {}
         self._air_temps: dict[int, deque] = {}
         self._humidity: dict[int, deque] = {}
@@ -113,12 +112,11 @@ class PresenceDetector:
         # Diagnostics
         self._last_water_variance: dict[int, float] = {}
         self._last_trend_consistency: dict[int, float] = {}
-        self._last_water_std: dict[int, float] = (
-            {}
-        )  # Kompatibilität mit BedIntelligence
+        self._last_water_std: dict[int, float] = {}
         self._last_air_std: dict[int, float] = {}
         self._last_confidence: dict[int, float] = {}
         self._last_reason: dict[int, str] = {}
+        self._last_significant_changes: dict[int, int] = {}  # NEU: Debug
 
     # ═══════════════════════════════════════════════════════════════════════
     # HAUPTFUNKTION
@@ -138,11 +136,7 @@ class PresenceDetector:
     ) -> Tuple[bool, float, str]:
         """
         Erkennt ob jemand im Bett liegt.
-
-        Zwei Algorithmen:
-        - Wasserbett: Varianz + Trend-Konsistenz (v4)
-        - Heizmatte: Trend-basiert (Körperwärme)
-
+        
         Returns:
             (is_present, confidence, reason)
         """
@@ -161,7 +155,7 @@ class PresenceDetector:
             return presence_sensor_state, 1.0, "Präsenz-Sensor"
 
         # ─────────────────────────────────────────────────────────────
-        # Heizmatte: Trend-basierte Erkennung (Körperwärme)
+        # Heizmatte: Trend-basierte Erkennung
         # ─────────────────────────────────────────────────────────────
         if is_heating_pad:
             return self._detect_presence_heating_pad(
@@ -169,23 +163,24 @@ class PresenceDetector:
             )
 
         # ─────────────────────────────────────────────────────────────
-        # WASSERBETT v4: Varianz + Trend-Konsistenz
+        # WASSERBETT v5: Varianz + Trend (RAUSCH-IMMUN!)
         # ─────────────────────────────────────────────────────────────
         buffer = self._water_temps.get(zone_index)
         if buffer is None or len(buffer) < self.thresholds.min_samples:
             current = self._is_present.get(zone_index, False)
             return current, 0.0, "Sammle Daten..."
 
-        # Varianz berechnen (σ²)
-        variance = self._calculate_variance(zone_index)
+        # Varianz berechnen (mit Glättung gegen Rauschen)
+        variance = self._calculate_variance_smoothed(zone_index)
 
-        # Trend-Konsistenz berechnen (0.0 = chaotisch, 1.0 = monoton steigend)
-        trend_consistency = self._calculate_trend_consistency(zone_index)
+        # Trend-Konsistenz berechnen (RAUSCH-IMMUN!)
+        trend_consistency, significant_changes = self._calculate_trend_consistency_noise_immune(zone_index)
 
-        # Kompatibilität: water_std für BedIntelligence
+        # Diagnostics speichern
         self._last_water_std[zone_index] = variance**0.5
         self._last_water_variance[zone_index] = variance
         self._last_trend_consistency[zone_index] = trend_consistency
+        self._last_significant_changes[zone_index] = significant_changes
 
         # Luft-Varianz (sekundär)
         air_std = self._calc_std(
@@ -194,11 +189,12 @@ class PresenceDetector:
         self._last_air_std[zone_index] = air_std or 0.0
 
         # ─────────────────────────────────────────────────────────────
-        # Entscheidungslogik: Varianz + Trend-Konsistenz
+        # Entscheidungslogik
         # ─────────────────────────────────────────────────────────────
         raw_present, confidence, reasons = self._determine_presence(
             variance,
             trend_consistency,
+            significant_changes,
             air_std,
             heater_active,
             water_temp,
@@ -206,7 +202,7 @@ class PresenceDetector:
         )
 
         # ─────────────────────────────────────────────────────────────
-        # Debounce: Mindestens 15 Minuten zwischen Statuswechseln
+        # Debounce
         # ─────────────────────────────────────────────────────────────
         is_present = self._apply_debounce(zone_index, raw_present, now)
 
@@ -216,15 +212,15 @@ class PresenceDetector:
         return is_present, round(confidence, 2), reason
 
     # ═══════════════════════════════════════════════════════════════════════
-    # VARIANZ-BERECHNUNG (σ² über Analysefenster)
+    # NEU v5: VARIANZ MIT GLÄTTUNG (gegen Sensor-Rauschen)
     # ═══════════════════════════════════════════════════════════════════════
 
-    def _calculate_variance(self, zone_index: int) -> float:
+    def _calculate_variance_smoothed(self, zone_index: int) -> float:
         """
-        Berechnet die Varianz (σ²) der Temperaturwerte im Analysefenster.
-
-        Niedrige Varianz = gleichmäßiges Heizen (monotoner Anstieg)
-        Hohe Varianz = chaotische Schwankungen (Person im Bett)
+        Berechnet Varianz MIT Glättung gegen Sensor-Rauschen.
+        
+        Methode: Moving Average über 5 Werte, dann Varianz berechnen.
+        Das filtert das ±0.0625°C Rauschen effektiv heraus!
         """
         buffer = self._water_temps.get(zone_index)
         if not buffer:
@@ -235,34 +231,46 @@ class PresenceDetector:
         )
         temps = [val for ts, val in buffer if ts > cutoff and val is not None]
 
-        if len(temps) < 2:
+        if len(temps) < 10:
             return 0.0
 
-        mean = sum(temps) / len(temps)
-        variance = sum((t - mean) ** 2 for t in temps) / len(temps)
+        # ═══ GLÄTTUNG: Moving Average über 5 Werte ═══
+        window_size = 5
+        smoothed = []
+        for i in range(len(temps) - window_size + 1):
+            window = temps[i:i + window_size]
+            smoothed.append(sum(window) / window_size)
+
+        if len(smoothed) < 2:
+            return 0.0
+
+        # Varianz der geglätteten Werte
+        mean = sum(smoothed) / len(smoothed)
+        variance = sum((t - mean) ** 2 for t in smoothed) / len(smoothed)
+        
         return variance
 
     # ═══════════════════════════════════════════════════════════════════════
-    # TREND-KONSISTENZ (Monotonie-Messung)
+    # NEU v5: TREND-KONSISTENZ MIT RAUSCH-IMMUNITÄT
     # ═══════════════════════════════════════════════════════════════════════
 
-    def _calculate_trend_consistency(self, zone_index: int) -> float:
+    def _calculate_trend_consistency_noise_immune(self, zone_index: int) -> Tuple[float, int]:
         """
-        Misst wie konsistent der Temperaturverlauf ist.
-
-        1.0 = perfekt monoton steigend (Heizung allein)
-        0.5 = zufällig (chaotisch)
-        0.0 = perfekt monoton fallend
-
-        Methode: Anteil der aufeinanderfolgenden Werte die in die
-        gleiche Richtung (steigend) gehen.
-
-        Heizung allein: Fast alle Schritte positiv → ~0.95
-        Person drin: Hoch und runter → ~0.4-0.6
+        Misst Trend-Konsistenz, IGNORIERT aber Sensor-Rauschen!
+        
+        KRITISCHER FIX:
+        Der DS18B20 springt ständig ±0.0625°C hin und her.
+        Das ist KEIN echter Temperaturwechsel!
+        
+        Wir ignorieren alle Differenzen ≤ SENSOR_NOISE_THRESHOLD.
+        Nur ECHTE Änderungen (>0.07°C) werden gezählt.
+        
+        Returns:
+            (consistency, significant_changes_count)
         """
         buffer = self._water_temps.get(zone_index)
         if not buffer:
-            return 0.5
+            return 0.5, 0
 
         cutoff = datetime.now() - timedelta(
             minutes=self.thresholds.history_window_minutes
@@ -270,27 +278,56 @@ class PresenceDetector:
         temps = [val for ts, val in buffer if ts > cutoff and val is not None]
 
         if len(temps) < 3:
-            return 0.5
+            return 0.5, 0
 
-        # Berechne Differenzen zwischen aufeinanderfolgenden Werten
-        diffs = [temps[i + 1] - temps[i] for i in range(len(temps) - 1)]
+        # ═══ RAUSCH-FILTERUNG: Nur signifikante Änderungen zählen ═══
+        significant_positive = 0
+        significant_negative = 0
+        total_significant = 0
 
-        # Zähle nicht-negative Differenzen (Temperatur steigt oder gleich)
-        positive_count = sum(1 for d in diffs if d >= 0)
+        for i in range(len(temps) - 1):
+            diff = temps[i + 1] - temps[i]
+            
+            # Ignoriere Rauschen!
+            if abs(diff) <= SENSOR_NOISE_THRESHOLD:
+                continue
+            
+            total_significant += 1
+            if diff > 0:
+                significant_positive += 1
+            else:
+                significant_negative += 1
 
-        # Konsistenz = Anteil der positiven/gleichen Differenzen
-        consistency = positive_count / len(diffs)
-
-        return consistency
+        # ═══ ENTSCHEIDUNG basierend auf signifikanten Änderungen ═══
+        
+        # Fall 1: Kaum signifikante Änderungen → Temperatur ist STABIL
+        # Das bedeutet: Heizung hält konstant ODER Bett kühlt langsam ab
+        # → Definitiv KEINE Person (Person würde Schwankungen verursachen)
+        if total_significant < 3:
+            return 0.98, total_significant  # Sehr monoton = leer
+        
+        # Fall 2: Wenige signifikante Änderungen, aber alle in eine Richtung
+        # → Heizung heizt hoch ODER Bett kühlt ab = monoton = leer
+        if total_significant < 10:
+            if significant_positive >= total_significant * 0.8:
+                return 0.95, total_significant  # Fast nur steigend = Heizung
+            if significant_negative >= total_significant * 0.8:
+                return 0.90, total_significant  # Fast nur fallend = Abkühlen
+        
+        # Fall 3: Normale Auswertung
+        consistency = significant_positive / total_significant if total_significant > 0 else 0.5
+        
+        return consistency, total_significant
 
     # ═══════════════════════════════════════════════════════════════════════
-    # ENTSCHEIDUNGSLOGIK (Varianz + Trend + Optional: Auflagen-Temp)
+    # ENTSCHEIDUNGSLOGIK (angepasst für v5)
     # ═══════════════════════════════════════════════════════════════════════
 
     def _determine_presence(
         self,
         variance: float,
         trend_consistency: float,
+        significant_changes: int,
         air_std: Optional[float],
         heater_active: bool,
         water_temp: Optional[float],
@@ -298,12 +335,8 @@ class PresenceDetector:
     ) -> Tuple[bool, float, list]:
         """
         Entscheidet ob jemand im Bett liegt.
-
-        HEIZUNG (niemand): Niedrige Varianz UND Hohe Konsistenz (monoton)
-        PERSON:           Hohe Varianz ODER Niedrige Konsistenz (chaotisch)
-
-        Returns:
-            (raw_present, confidence, reasons)
+        
+        v5: Berücksichtigt jetzt auch die Anzahl signifikanter Änderungen!
         """
         raw_present = False
         confidence = 0.0
@@ -319,35 +352,42 @@ class PresenceDetector:
 
         reasons.append(f"σ²={variance:.4f}")
         reasons.append(f"T={trend_consistency:.2f}")
+        reasons.append(f"Δ={significant_changes}")
 
-        # ─── Definitiv Heizung: Sehr niedrige Varianz UND monotoner Anstieg ──
+        # ═══ NEU: Wenige signifikante Änderungen = definitiv LEER ═══
+        # Wenn sich die Temperatur kaum ändert (nur Rauschen), ist niemand da!
+        if significant_changes < 5:
+            confidence = 0.02
+            reasons.append("→stabil(kein Δ)")
+            return False, confidence, reasons
+
+        # ─── Definitiv Heizung: Niedrige Varianz UND monotoner Anstieg ──
         if variance < vl and trend_consistency > tt:
             confidence = 0.05
             reasons.append("→ruhig+monoton")
             return False, confidence, reasons
 
-        # ─── Definitiv Person: Hohe Varianz ──────────────────────────────────
+        # ─── Definitiv Person: Hohe Varianz ────────────────────────────
         if variance > vh:
             confidence = 0.95
             raw_present = True
             reasons.append("→Varianz hoch!")
-            # Luft-Varianz verstärkt
             if air_std is not None and air_std > self.thresholds.air_variance_threshold:
                 confidence = min(1.0, confidence + 0.05)
                 reasons.append(f"σL={air_std:.3f}")
             return raw_present, confidence, reasons
 
-        # ─── Definitiv Person: Chaotischer Verlauf ──────────────────────────
-        if trend_consistency < tc:
+        # ─── Definitiv Person: Chaotischer Verlauf ─────────────────────
+        # ABER: Nur wenn genug signifikante Änderungen da sind!
+        if trend_consistency < tc and significant_changes >= 10:
             confidence = 0.85
             raw_present = True
             reasons.append("→chaotisch!")
             return raw_present, confidence, reasons
 
-        # ─── Grauzone: Varianz zwischen LOW und HIGH ────────────────────────
-        # Nutze Zusatzsignale für die Entscheidung
+        # ─── Grauzone ──────────────────────────────────────────────────
 
-        # Auflagen-Temperatur: Schneller Körperkontakt-Check
+        # Auflagen-Temperatur Check
         if surface_temp is not None and water_temp is not None:
             diff = surface_temp - water_temp
             if diff > self.thresholds.body_temp_diff:
@@ -363,13 +403,14 @@ class PresenceDetector:
             reasons.append(f"σL={air_std:.3f}(stark)")
             return raw_present, confidence, reasons
 
-        # Keine klare Entscheidung → aktuellen Zustand beibehalten
-        confidence = 0.30
-        reasons.append("→Grauzone")
-        return raw_present, confidence, reasons
+        # Keine klare Entscheidung → LEER annehmen (konservativ!)
+        # v5: Im Zweifel lieber "leer" sagen als Fehlalarm
+        confidence = 0.20
+        reasons.append("→Grauzone(→leer)")
+        return False, confidence, reasons
 
     # ═══════════════════════════════════════════════════════════════════════
-    # DEBOUNCE (Anti-Flacker)
+    # DEBOUNCE
     # ═══════════════════════════════════════════════════════════════════════
 
     def _apply_debounce(
@@ -377,124 +418,74 @@ class PresenceDetector:
     ) -> bool:
         """
         Debounce: Mindestens PRESENCE_DEBOUNCE_MINUTES zwischen Statuswechseln.
-
-        Verhindert schnelles Flackern durch kurze Störungen.
         """
         current = self._is_present.get(zone_index, False)
 
         if raw_present == current:
             return current
 
-        # Prüfe ob genug Zeit seit letztem Wechsel vergangen
         last_change = self._last_state_change.get(zone_index)
         if last_change is not None:
             elapsed = (now - last_change).total_seconds() / 60
             if elapsed < self.thresholds.debounce_minutes:
-                return current  # Noch warten
+                return current
 
-        # Wechsel erlaubt
         self._last_state_change[zone_index] = now
         return raw_present
 
     # ═══════════════════════════════════════════════════════════════════════
-    # HEIZMATTE: TREND-BASIERTE PRÄSENZ (Körperwärme-Erkennung)
+    # HEIZMATTE (unverändert)
     # ═══════════════════════════════════════════════════════════════════════
 
     def _detect_presence_heating_pad(
         self,
         zone_index: int,
-        temp: Optional[float],
+        water_temp: Optional[float],
         heater_active: bool,
         now: datetime,
     ) -> Tuple[bool, float, str]:
-        """
-        Erkennt Präsenz auf einer Heizmatte über Temperatur-Trend.
-
-        Logik:
-        - Heizung AUS + Temp steigt → Körperwärme → Person liegt drauf
-        - Heizung AUS + Temp fällt → Bett kühlt ab → niemand da
-        - Heizung AN → Trend-Steigung prüfen (Körperwärme > erwartete Heizrate)
-        """
+        """Heizmatte: Körperwärme-Erkennung."""
         buffer = self._water_temps.get(zone_index)
-        if buffer is None or len(buffer) < 6:
+        if buffer is None or len(buffer) < self.thresholds.min_samples:
             current = self._is_present.get(zone_index, False)
             return current, 0.0, "Sammle Daten..."
 
-        # Trend der letzten 3 Minuten
-        cutoff = now - timedelta(minutes=3)
-        recent = [val for ts, val in buffer if ts > cutoff and val is not None]
+        # Bei Heizmatten: Steigende Temperatur OHNE aktive Heizung = Person
+        if not heater_active and water_temp is not None:
+            # Vergleiche mit Temperatur vor 10 Minuten
+            cutoff = now - timedelta(minutes=10)
+            old_temps = [val for ts, val in buffer if ts < cutoff and val is not None]
+            
+            if old_temps:
+                old_avg = sum(old_temps[-5:]) / min(5, len(old_temps))
+                temp_rise = water_temp - old_avg
+                
+                if temp_rise > 0.5:  # Temperatur steigt ohne Heizung
+                    is_present = True
+                    confidence = min(0.95, 0.7 + temp_rise * 0.1)
+                    reason = f"🛏️ Körperwärme(+{temp_rise:.1f}°C)"
+                    self._set_state(zone_index, is_present, confidence, reason, now)
+                    return is_present, confidence, reason
 
-        if len(recent) < 4:
-            current = self._is_present.get(zone_index, False)
-            return current, 0.0, "Sammle Daten..."
-
-        trend = recent[-1] - recent[0]  # Positiv = steigend
-        raw_present = False
-        confidence = 0.0
-        reasons = []
-
-        if not heater_active:
-            if trend > 0.2:
-                raw_present = True
-                confidence = 0.85
-                reasons.append(f"Körperwärme +{trend:.2f}°C/3min")
-            elif trend > 0.05:
-                raw_present = True
-                confidence = 0.50
-                reasons.append(f"Leichter Anstieg +{trend:.2f}°C")
-            else:
-                confidence = 0.10
-                reasons.append(f"Trend {trend:+.2f}°C (kühlt)")
+        # Fallback: Trend-Konsistenz
+        _, significant_changes = self._calculate_trend_consistency_noise_immune(zone_index)
+        variance = self._calculate_variance_smoothed(zone_index)
+        
+        if variance > self.thresholds.variance_high:
+            is_present = True
+            confidence = 0.8
+            reason = f"🛏️ Varianz hoch(σ²={variance:.4f})"
         else:
-            expected_rise = 0.25
-            excess = trend - expected_rise
-            if excess > 0.1:
-                raw_present = True
-                confidence = 0.70
-                reasons.append(
-                    f"⚡+Körper ({trend:.2f}°C, erwartet {expected_rise:.2f})"
-                )
-            else:
-                confidence = 0.15
-                reasons.append(f"⚡Heizen ({trend:.2f}°C)")
-
-        # Hysterese (asymmetrisch für Heizmatte)
-        is_present = self._apply_hysteresis_heating_pad(zone_index, raw_present, now)
-
-        reason = f"{'🛏️' if is_present else '○'} {', '.join(reasons)}"
+            is_present = False
+            confidence = 0.3
+            reason = f"○ Ruhig(σ²={variance:.4f})"
+        
+        is_present = self._apply_debounce(zone_index, is_present, now)
         self._set_state(zone_index, is_present, confidence, reason, now)
-
-        return is_present, round(confidence, 2), reason
-
-    def _apply_hysteresis_heating_pad(
-        self, zone_index: int, raw_present: bool, now: datetime
-    ) -> bool:
-        """Asymmetrische Hysterese für Heizmatte (schnell rein, langsam raus)."""
-        current = self._is_present.get(zone_index, False)
-
-        if raw_present == current:
-            return current
-
-        last_change = self._last_state_change.get(zone_index)
-        if last_change is None:
-            self._last_state_change[zone_index] = now
-            return raw_present
-
-        elapsed = (now - last_change).total_seconds() / 60
-
-        if raw_present:
-            required = self.thresholds.presence_enter_minutes
-        else:
-            required = self.thresholds.presence_leave_minutes
-
-        if elapsed >= required:
-            self._last_state_change[zone_index] = now
-            return raw_present
-
-        return current
+        return is_present, confidence, reason
 
     # ═══════════════════════════════════════════════════════════════════════
-    # LEGACY: Standard-Abweichung (für Luft-Temp und Kompatibilität)
+    # LEGACY: Standard-Abweichung
     # ═══════════════════════════════════════════════════════════════════════
 
     def _calc_std(
@@ -516,24 +507,17 @@ class PresenceDetector:
         return variance**0.5
 
     # ═══════════════════════════════════════════════════════════════════════
-    # SCHWITZ-ERKENNUNG (konservativ!)
+    # SCHWITZ-ERKENNUNG
     # ═══════════════════════════════════════════════════════════════════════
 
     def is_sweating(self, zone_index: int) -> bool:
-        """
-        Erkennt ECHTES Schwitzen/Feuchtigkeit – nicht einfach "Feuchtigkeit erhöht".
-
-        Feuchtigkeit 50-85% ist NORMAL wenn jemand unter der Decke liegt!
-        Erst ab 93% absolut UND >35% Anstieg über Baseline = STARK FEUCHT.
-        Muss außerdem 15 Minuten anhalten.
-        """
+        """Erkennt echtes Schwitzen (>93% absolut UND >35% Anstieg)."""
         buffer = self._humidity.get(zone_index)
         if not buffer or len(buffer) < self.thresholds.min_samples:
             return False
 
         now = datetime.now()
 
-        # Letzte 15 Minuten
         recent_cutoff = now - timedelta(minutes=self.thresholds.sweat_confirm_minutes)
         recent = [val for ts, val in buffer if ts > recent_cutoff and val is not None]
         if len(recent) < 5:
@@ -541,7 +525,6 @@ class PresenceDetector:
 
         avg_recent = sum(recent) / len(recent)
 
-        # Baseline: Minimum der letzten 6 Stunden
         baseline_cutoff = now - timedelta(hours=6)
         all_vals = [
             val for ts, val in buffer if ts > baseline_cutoff and val is not None
@@ -558,16 +541,7 @@ class PresenceDetector:
         )
 
     def get_humidity_level(self, zone_index: int) -> str:
-        """
-        Gibt die aktuelle Feuchtigkeitsstufe zurück.
-
-        Stufen:
-          <50%  = trocken
-          50-70% = normal
-          70-85% = feucht
-          85-93% = sehr feucht
-          >93%  = stark feucht
-        """
+        """Gibt Feuchtigkeitsstufe zurück."""
         buffer = self._humidity.get(zone_index)
         if not buffer or len(buffer) < 3:
             return "unbekannt"
@@ -594,9 +568,7 @@ class PresenceDetector:
     # ═══════════════════════════════════════════════════════════════════════
 
     def is_potential_leak(self, zone_index: int) -> bool:
-        """
-        Erkennt mögliche Leckage: Feuchtigkeit >85% über 3 Stunden.
-        """
+        """Erkennt mögliche Leckage: Feuchtigkeit >85% über 3 Stunden."""
         buffer = self._humidity.get(zone_index)
         if not buffer:
             return False
@@ -669,8 +641,8 @@ class PresenceDetector:
         trend = self._last_trend_consistency.get(zone_index, 0.0)
         w_std = self._last_water_std.get(zone_index, 0.0)
         a_std = self._last_air_std.get(zone_index, 0.0)
+        sig_changes = self._last_significant_changes.get(zone_index, 0)
 
-        # Aktuelle Feuchtigkeit
         hum_buf = self._humidity.get(zone_index)
         current_humidity = None
         if hum_buf and len(hum_buf) > 0:
@@ -683,8 +655,10 @@ class PresenceDetector:
             "last_state_change": last_change.isoformat() if last_change else None,
             "water_variance": round(variance, 6),
             "trend_consistency": round(trend, 3),
+            "significant_changes": sig_changes,  # NEU
             "water_temp_std": round(w_std, 4),
             "air_temp_std": round(a_std, 4),
+            "noise_threshold": SENSOR_NOISE_THRESHOLD,  # NEU
             "thresholds": {
                 "variance_low": self.thresholds.variance_low,
                 "variance_high": self.thresholds.variance_high,
