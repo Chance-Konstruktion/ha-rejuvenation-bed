@@ -212,6 +212,42 @@ class PresenceDetector:
         return is_present, round(confidence, 2), reason
 
     # ═══════════════════════════════════════════════════════════════════════
+    # ROHE VARIANZ (ohne Glättung) - für Tests & Diagnose
+    # ═══════════════════════════════════════════════════════════════════════
+
+    def _calculate_variance(self, zone_index: int) -> float:
+        """
+        Berechnet die rohe Varianz über das Analyse-Fenster (ohne Glättung).
+
+        Wird von Tests verwendet, um die direkte Schwankungsbreite zu messen.
+        Die Entscheidungslogik nutzt weiterhin _calculate_variance_smoothed().
+        """
+        buffer = self._water_temps.get(zone_index)
+        if not buffer:
+            return 0.0
+
+        cutoff = datetime.now() - timedelta(
+            minutes=self.thresholds.history_window_minutes
+        )
+        temps = [val for ts, val in buffer if ts > cutoff and val is not None]
+
+        if len(temps) < 2:
+            return 0.0
+
+        mean = sum(temps) / len(temps)
+        return sum((t - mean) ** 2 for t in temps) / len(temps)
+
+    def _calculate_trend_consistency(self, zone_index: int) -> float:
+        """
+        Gibt die Rausch-immune Trend-Konsistenz zurück (ohne Zähler).
+
+        Thin Wrapper um _calculate_trend_consistency_noise_immune() für Tests
+        und Aufrufer, die nur den Konsistenz-Wert brauchen.
+        """
+        consistency, _ = self._calculate_trend_consistency_noise_immune(zone_index)
+        return consistency
+
+    # ═══════════════════════════════════════════════════════════════════════
     # NEU v5: VARIANZ MIT GLÄTTUNG (gegen Sensor-Rauschen)
     # ═══════════════════════════════════════════════════════════════════════
 
