@@ -296,36 +296,66 @@ class TestTrendConsistency:
 
 
 class TestDebounce:
-    def test_debounce_prevents_rapid_changes(self):
-        """Statuswechsel erst nach debounce_minutes."""
+    def test_asymmetric_hysteresis(self):
+        """
+        Asymmetrische Hysterese: schnell rein (5 min), langsam raus (20 min).
+        Verhindert Flackern und verpasste Einstiege.
+        """
         thresholds = PresenceThresholds(
-            debounce_minutes=15,
+            presence_enter_minutes=5,
+            presence_leave_minutes=20,
             history_window_minutes=10,
             min_samples=5,
         )
         det = PresenceDetector(thresholds=thresholds)
         now = datetime.now()
 
-        # Erstes Ergebnis: OFF (kein Wechsel nötig)
-        result = det._apply_debounce(0, False, now)
-        assert result is False
+        # Start: OFF, kein Wechselbedarf
+        assert det._apply_debounce(0, False, now) is False
 
-        # Sofortiger Wechsel auf ON → wird erlaubt (kein vorheriger Wechsel)
-        result = det._apply_debounce(0, True, now)
-        det._is_present[0] = True
-        det._last_state_change[0] = now
-        assert result is True
+        # Erster "present" → Pending startet, Status bleibt OFF
+        assert det._apply_debounce(0, True, now) is False
 
-        # Versuch sofort zurück auf OFF → wird blockiert (debounce)
-        result = det._apply_debounce(0, False, now + timedelta(minutes=5))
-        assert result is True  # Bleibt ON
+        # Nach 3 Minuten → zu früh für 5-min Einstieg
+        assert det._apply_debounce(0, True, now + timedelta(minutes=3)) is False
 
-        # Nach 15 Minuten → Wechsel erlaubt
-        result = det._apply_debounce(0, False, now + timedelta(minutes=16))
-        assert result is False
+        # Nach 5+ Minuten konstant "present" → Wechsel auf ON
+        assert det._apply_debounce(0, True, now + timedelta(minutes=5)) is True
 
-    def test_default_debounce_is_15_minutes(self, detector):
-        assert detector.thresholds.debounce_minutes == 15
+        # Kurzzeitiges "not present" → Pending OFF startet, bleibt ON
+        t1 = now + timedelta(minutes=6)
+        assert det._apply_debounce(0, False, t1) is True
+
+        # Nach 10 min OFF-Pending → immer noch ON (braucht 20)
+        assert det._apply_debounce(0, False, t1 + timedelta(minutes=10)) is True
+
+        # Nach 20+ min konstant "not present" → Wechsel auf OFF
+        assert det._apply_debounce(0, False, t1 + timedelta(minutes=20)) is False
+
+    def test_pending_resets_on_flip(self):
+        """Wechselt das Signal zurück vor Ablauf, wird Pending verworfen."""
+        thresholds = PresenceThresholds(
+            presence_enter_minutes=5,
+            presence_leave_minutes=20,
+            history_window_minutes=10,
+            min_samples=5,
+        )
+        det = PresenceDetector(thresholds=thresholds)
+        now = datetime.now()
+
+        # OFF → Pending ON startet bei t=0
+        assert det._apply_debounce(0, True, now) is False
+        # Nach 3 min zurück auf False → Pending wird verworfen
+        assert det._apply_debounce(0, False, now + timedelta(minutes=3)) is False
+        # Nach 4 weiteren min wieder True → Timer startet NEU (nicht weiter)
+        assert det._apply_debounce(0, True, now + timedelta(minutes=7)) is False
+        # Erst 5 min später ist Einstieg bestätigt
+        assert det._apply_debounce(0, True, now + timedelta(minutes=12)) is True
+
+    def test_default_enter_leave_minutes(self, detector):
+        """Standard-Hysterese: 5 min rein, 20 min raus."""
+        assert detector.thresholds.presence_enter_minutes == 5
+        assert detector.thresholds.presence_leave_minutes == 20
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
