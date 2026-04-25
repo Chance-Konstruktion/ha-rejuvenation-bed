@@ -104,7 +104,7 @@ class PresenceThresholds:
 class PresenceDetector:
     """
     Varianz + Trend-basierte Präsenz-Erkennung für Wasserbetten.
-    
+
     v5: Mit Rausch-Immunität für DS18B20 Sensoren!
     """
 
@@ -152,7 +152,7 @@ class PresenceDetector:
     ) -> Tuple[bool, float, str]:
         """
         Erkennt ob jemand im Bett liegt.
-        
+
         Returns:
             (is_present, confidence, reason)
         """
@@ -165,18 +165,14 @@ class PresenceDetector:
         # Priorität 1: Dedizierter Präsenz-Sensor überschreibt alles
         # ─────────────────────────────────────────────────────────────
         if presence_sensor_state is not None:
-            self._set_state(
-                zone_index, presence_sensor_state, 1.0, "Präsenz-Sensor", now
-            )
+            self._set_state(zone_index, presence_sensor_state, 1.0, "Präsenz-Sensor", now)
             return presence_sensor_state, 1.0, "Präsenz-Sensor"
 
         # ─────────────────────────────────────────────────────────────
         # Heizmatte: Trend-basierte Erkennung
         # ─────────────────────────────────────────────────────────────
         if is_heating_pad:
-            return self._detect_presence_heating_pad(
-                zone_index, water_temp, heater_active, now
-            )
+            return self._detect_presence_heating_pad(zone_index, water_temp, heater_active, now)
 
         # ─────────────────────────────────────────────────────────────
         # WASSERBETT v7: detrended σ als Primär-Signal
@@ -192,12 +188,8 @@ class PresenceDetector:
         detrended_std = self._calculate_detrended_std(zone_index)
 
         # Rohes σ und Trend-Diagnostik (für Logs & Debug)
-        raw_std = (
-            self._calc_std(buffer, self.thresholds.history_window_minutes) or 0.0
-        )
-        trend_consistency, significant_changes = (
-            self._calculate_trend_consistency_noise_immune(zone_index)
-        )
+        raw_std = self._calc_std(buffer, self.thresholds.history_window_minutes) or 0.0
+        trend_consistency, significant_changes = self._calculate_trend_consistency_noise_immune(zone_index)
 
         # Diagnostics speichern (water_std = das tatsächlich verwendete Signal)
         self._last_water_std[zone_index] = detrended_std
@@ -206,9 +198,7 @@ class PresenceDetector:
         self._last_significant_changes[zone_index] = significant_changes
 
         # Luft-Varianz (sekundär, unterstützend wenn vorhanden)
-        air_std = self._calc_std(
-            self._air_temps.get(zone_index), self.thresholds.history_window_minutes
-        )
+        air_std = self._calc_std(self._air_temps.get(zone_index), self.thresholds.history_window_minutes)
         self._last_air_std[zone_index] = air_std or 0.0
 
         # ─────────────────────────────────────────────────────────────
@@ -251,9 +241,7 @@ class PresenceDetector:
         if not buffer:
             return 0.0
 
-        cutoff = datetime.now() - timedelta(
-            minutes=self.thresholds.history_window_minutes
-        )
+        cutoff = datetime.now() - timedelta(minutes=self.thresholds.history_window_minutes)
         temps = [val for ts, val in buffer if ts > cutoff and val is not None]
 
         if len(temps) < 2:
@@ -292,9 +280,7 @@ class PresenceDetector:
         if not buffer:
             return 0.0
 
-        cutoff = datetime.now() - timedelta(
-            minutes=self.thresholds.history_window_minutes
-        )
+        cutoff = datetime.now() - timedelta(minutes=self.thresholds.history_window_minutes)
         temps = [val for ts, val in buffer if ts > cutoff and val is not None]
 
         n = len(temps)
@@ -312,9 +298,7 @@ class PresenceDetector:
         intercept = y_mean - slope * x_mean
 
         # σ der Residuen (nach Abzug der Trendlinie)
-        residuals_sq = sum(
-            (temps[i] - (slope * i + intercept)) ** 2 for i in range(n)
-        )
+        residuals_sq = sum((temps[i] - (slope * i + intercept)) ** 2 for i in range(n))
         return (residuals_sq / n) ** 0.5
 
     # ═══════════════════════════════════════════════════════════════════════
@@ -324,7 +308,7 @@ class PresenceDetector:
     def _calculate_variance_smoothed(self, zone_index: int) -> float:
         """
         Berechnet Varianz MIT Glättung gegen Sensor-Rauschen.
-        
+
         Methode: Moving Average über 5 Werte, dann Varianz berechnen.
         Das filtert das ±0.0625°C Rauschen effektiv heraus!
         """
@@ -332,9 +316,7 @@ class PresenceDetector:
         if not buffer:
             return 0.0
 
-        cutoff = datetime.now() - timedelta(
-            minutes=self.thresholds.history_window_minutes
-        )
+        cutoff = datetime.now() - timedelta(minutes=self.thresholds.history_window_minutes)
         temps = [val for ts, val in buffer if ts > cutoff and val is not None]
 
         if len(temps) < 10:
@@ -344,7 +326,7 @@ class PresenceDetector:
         window_size = 5
         smoothed = []
         for i in range(len(temps) - window_size + 1):
-            window = temps[i:i + window_size]
+            window = temps[i : i + window_size]
             smoothed.append(sum(window) / window_size)
 
         if len(smoothed) < 2:
@@ -353,7 +335,7 @@ class PresenceDetector:
         # Varianz der geglätteten Werte
         mean = sum(smoothed) / len(smoothed)
         variance = sum((t - mean) ** 2 for t in smoothed) / len(smoothed)
-        
+
         return variance
 
     # ═══════════════════════════════════════════════════════════════════════
@@ -363,14 +345,14 @@ class PresenceDetector:
     def _calculate_trend_consistency_noise_immune(self, zone_index: int) -> Tuple[float, int]:
         """
         Misst Trend-Konsistenz, IGNORIERT aber Sensor-Rauschen!
-        
+
         KRITISCHER FIX:
         Der DS18B20 springt ständig ±0.0625°C hin und her.
         Das ist KEIN echter Temperaturwechsel!
-        
+
         Wir ignorieren alle Differenzen ≤ SENSOR_NOISE_THRESHOLD.
         Nur ECHTE Änderungen (>0.07°C) werden gezählt.
-        
+
         Returns:
             (consistency, significant_changes_count)
         """
@@ -378,9 +360,7 @@ class PresenceDetector:
         if not buffer:
             return 0.5, 0
 
-        cutoff = datetime.now() - timedelta(
-            minutes=self.thresholds.history_window_minutes
-        )
+        cutoff = datetime.now() - timedelta(minutes=self.thresholds.history_window_minutes)
         temps = [val for ts, val in buffer if ts > cutoff and val is not None]
 
         if len(temps) < 3:
@@ -393,11 +373,11 @@ class PresenceDetector:
 
         for i in range(len(temps) - 1):
             diff = temps[i + 1] - temps[i]
-            
+
             # Ignoriere Rauschen!
             if abs(diff) <= SENSOR_NOISE_THRESHOLD:
                 continue
-            
+
             total_significant += 1
             if diff > 0:
                 significant_positive += 1
@@ -405,13 +385,13 @@ class PresenceDetector:
                 significant_negative += 1
 
         # ═══ ENTSCHEIDUNG basierend auf signifikanten Änderungen ═══
-        
+
         # Fall 1: Kaum signifikante Änderungen → Temperatur ist STABIL
         # Das bedeutet: Heizung hält konstant ODER Bett kühlt langsam ab
         # → Definitiv KEINE Person (Person würde Schwankungen verursachen)
         if total_significant < 3:
             return 0.98, total_significant  # Sehr monoton = leer
-        
+
         # Fall 2: Wenige signifikante Änderungen, aber alle in eine Richtung
         # → Heizung heizt hoch ODER Bett kühlt ab = monoton = leer
         if total_significant < 10:
@@ -419,10 +399,10 @@ class PresenceDetector:
                 return 0.95, total_significant  # Fast nur steigend = Heizung
             if significant_negative >= total_significant * 0.8:
                 return 0.90, total_significant  # Fast nur fallend = Abkühlen
-        
+
         # Fall 3: Normale Auswertung
         consistency = significant_positive / total_significant if total_significant > 0 else 0.5
-        
+
         return consistency, total_significant
 
     # ═══════════════════════════════════════════════════════════════════════
@@ -480,11 +460,7 @@ class PresenceDetector:
             reasons.append("→ruhig")
 
         # ─── Chaotischer Verlauf verstärkt Confidence ─────────────────
-        if (
-            trend_consistency < tc
-            and significant_changes >= 5
-            and not raw_present
-        ):
+        if trend_consistency < tc and significant_changes >= 5 and not raw_present:
             raw_present = True
             confidence = max(confidence, 0.75)
             reasons.append("→chaotisch")
@@ -512,9 +488,7 @@ class PresenceDetector:
     # DEBOUNCE
     # ═══════════════════════════════════════════════════════════════════════
 
-    def _apply_debounce(
-        self, zone_index: int, raw_present: bool, now: datetime
-    ) -> bool:
+    def _apply_debounce(self, zone_index: int, raw_present: bool, now: datetime) -> bool:
         """
         Asymmetrische Hysterese (v3-Stil, schnell rein / langsam raus):
         • Einsteigen (OFF→ON): presence_enter_minutes konstant "da" (default 5)
@@ -541,11 +515,7 @@ class PresenceDetector:
 
         # Prüfen ob Wartezeit abgelaufen (funktioniert auch bei required=0)
         elapsed = (now - pending_since).total_seconds() / 60
-        required = (
-            self.thresholds.presence_enter_minutes
-            if raw_present
-            else self.thresholds.presence_leave_minutes
-        )
+        required = self.thresholds.presence_enter_minutes if raw_present else self.thresholds.presence_leave_minutes
 
         if elapsed >= required:
             self._pending_state[zone_index] = None
@@ -578,11 +548,11 @@ class PresenceDetector:
             # Vergleiche mit Temperatur vor 10 Minuten
             cutoff = now - timedelta(minutes=10)
             old_temps = [val for ts, val in buffer if ts < cutoff and val is not None]
-            
+
             if old_temps:
                 old_avg = sum(old_temps[-5:]) / min(5, len(old_temps))
                 temp_rise = water_temp - old_avg
-                
+
                 if temp_rise > 0.5:  # Temperatur steigt ohne Heizung
                     is_present = True
                     confidence = min(0.95, 0.7 + temp_rise * 0.1)
@@ -593,7 +563,7 @@ class PresenceDetector:
         # Fallback: Trend-Konsistenz
         _, significant_changes = self._calculate_trend_consistency_noise_immune(zone_index)
         variance = self._calculate_variance_smoothed(zone_index)
-        
+
         if variance > self.thresholds.variance_high:
             is_present = True
             confidence = 0.8
@@ -602,7 +572,7 @@ class PresenceDetector:
             is_present = False
             confidence = 0.3
             reason = f"○ Ruhig(σ²={variance:.4f})"
-        
+
         is_present = self._apply_debounce(zone_index, is_present, now)
         self._set_state(zone_index, is_present, confidence, reason, now)
         return is_present, confidence, reason
@@ -611,9 +581,7 @@ class PresenceDetector:
     # LEGACY: Standard-Abweichung
     # ═══════════════════════════════════════════════════════════════════════
 
-    def _calc_std(
-        self, buffer: Optional[deque], window_minutes: int
-    ) -> Optional[float]:
+    def _calc_std(self, buffer: Optional[deque], window_minutes: int) -> Optional[float]:
         """Berechnet Standardabweichung über rollendes Zeitfenster."""
         if buffer is None or len(buffer) < self.thresholds.min_samples:
             return None
@@ -649,19 +617,14 @@ class PresenceDetector:
         avg_recent = sum(recent) / len(recent)
 
         baseline_cutoff = now - timedelta(hours=6)
-        all_vals = [
-            val for ts, val in buffer if ts > baseline_cutoff and val is not None
-        ]
+        all_vals = [val for ts, val in buffer if ts > baseline_cutoff and val is not None]
         if not all_vals:
             return False
 
         baseline = min(all_vals)
         rise = avg_recent - baseline
 
-        return (
-            avg_recent > self.thresholds.sweat_humidity_abs
-            and rise > self.thresholds.sweat_humidity_rise
-        )
+        return avg_recent > self.thresholds.sweat_humidity_abs and rise > self.thresholds.sweat_humidity_rise
 
     def get_humidity_level(self, zone_index: int) -> str:
         """Gibt Feuchtigkeitsstufe zurück."""
