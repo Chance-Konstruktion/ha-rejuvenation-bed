@@ -207,6 +207,112 @@ class TestHeatingVsPresence:
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
+# REGRESSIONS-TESTS: NUR EIN WASSER-SENSOR (v7-Fix)
+# ═══════════════════════════════════════════════════════════════════════════════
+# Die häufigste Hardware-Kombination: ein DS18B20 am Wasserbett, sonst nichts.
+# v5/v6 hatten hier kritische False-Negatives durch zu aggressive Rauschfilter
+# bzw. falsche σ²-Schwellen. Diese Tests sichern v7 ab.
+
+
+def _quantize_ds18b20(t: float) -> float:
+    """Simuliert die 0.0625°C Quantisierung eines echten DS18B20."""
+    return round(t * 16) / 16
+
+
+class TestSingleSensorPresence:
+    def test_person_still_quantized_signal(self, fast_detector):
+        """
+        Ruhig liegende Person + DS18B20-Quantisierung.
+        Rohe σ ≈ 0.05°C, aber einzelne Sample-Sprünge sind <0.07°C.
+        v6 hat das fälschlich als Heizung gewertet — v7 muss ON sagen.
+        """
+        now = datetime.now()
+        for i in range(30):
+            t = now - timedelta(seconds=(30 - i) * 60)
+            temp = _quantize_ds18b20(
+                28.0 + 0.06 * math.sin(i * 0.4) + 0.03 * math.cos(i * 1.7)
+            )
+            fast_detector._store(0, temp, None, None, t)
+
+        is_present, conf, reason = fast_detector.detect_presence(
+            zone_index=0, water_temp=28.0
+        )
+        assert is_present is True, (
+            f"Ruhig liegende Person mit Quantisierung muss erkannt werden! reason={reason}"
+        )
+
+    def test_person_plus_heating_simultaneously(self, fast_detector):
+        """
+        Person liegt im Bett WÄHREND das Bett heizt — typischer Nacht-Fall.
+        Rohes σ ist hoch durch die Rampe, aber detrended σ zeigt die Person.
+        """
+        now = datetime.now()
+        for i in range(30):
+            t = now - timedelta(seconds=(30 - i) * 60)
+            # Heizrampe + Person-Schwankungen
+            temp = _quantize_ds18b20(
+                28.0
+                + (i / 30) * 0.3
+                + 0.05 * math.sin(i * 0.4)
+                + 0.02 * math.cos(i * 1.3)
+            )
+            fast_detector._store(0, temp, None, None, t)
+
+        is_present, conf, reason = fast_detector.detect_presence(
+            zone_index=0, water_temp=28.3
+        )
+        assert is_present is True, (
+            f"Person + Heizung gleichzeitig muss erkannt werden! reason={reason}"
+        )
+
+    def test_pure_heating_ramp_stays_off(self, fast_detector):
+        """
+        Reine Heiz-Rampe (kein Mensch), egal wie steil.
+        Detrended σ zieht die Rampe ab → fast 0 → OFF.
+        """
+        now = datetime.now()
+        # Aggressive Rampe: 27.5 → 28.0 in 30 min
+        for i in range(30):
+            t = now - timedelta(seconds=(30 - i) * 60)
+            temp = _quantize_ds18b20(27.5 + (i / 30) * 0.5)
+            fast_detector._store(0, temp, None, None, t)
+
+        is_present, conf, reason = fast_detector.detect_presence(
+            zone_index=0, water_temp=28.0
+        )
+        assert is_present is False, (
+            f"Reine Heiz-Rampe darf NICHT als Präsenz erkannt werden! reason={reason}"
+        )
+
+    def test_detrended_std_separates_heating_from_person(self, fast_detector):
+        """
+        Direkter Vergleich: gleiches rohes σ, aber unterschiedliche Ursache.
+        Detrended σ muss klar zwischen Heizung (≈0) und Person (≈σ) trennen.
+        """
+        now = datetime.now()
+        # Samples 20s auseinander damit alle ins 10-min-Fenster passen
+        # Heizungs-Rampe (linearer Anstieg)
+        for i in range(30):
+            t = now - timedelta(seconds=(30 - i) * 20)
+            fast_detector._store(0, 27.5 + (i / 30) * 0.5, None, None, t)
+        heating_detrended = fast_detector._calculate_detrended_std(0)
+
+        # Reset, Person ohne Heizung (Schwankungen um konstante Temperatur)
+        det2 = type(fast_detector)(thresholds=fast_detector.thresholds)
+        for i in range(30):
+            t = now - timedelta(seconds=(30 - i) * 20)
+            det2._store(0, 28.0 + 0.1 * math.sin(i * 0.5), None, None, t)
+        person_detrended = det2._calculate_detrended_std(0)
+
+        assert heating_detrended < 0.02, (
+            f"Heizungs-Rampe sollte detrended σ < 0.02 haben, ist {heating_detrended}"
+        )
+        assert person_detrended > 0.04, (
+            f"Person sollte detrended σ > 0.04 haben, ist {person_detrended}"
+        )
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
 # VARIANZ-BERECHNUNG
 # ═══════════════════════════════════════════════════════════════════════════════
 

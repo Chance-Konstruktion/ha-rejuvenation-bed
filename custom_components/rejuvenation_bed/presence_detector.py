@@ -1,24 +1,32 @@
 """
-Presence-Detector v6 für das Rejuvenation Bed.
+Presence-Detector v7 für das Rejuvenation Bed.
 
-FIX (Apr 2026): Zurück zur sensitiven v3-Erkennung (σ-basiert) plus v5
-Heizungs-Schutz. v5 war zu konservativ und hat Präsenz NIE mehr erkannt.
+FIX (Apr 2026): Funktioniert jetzt zuverlässig mit NUR einem Wasser-Sensor.
 
 KERN-ERKENNTNIS:
-  Bewegung im Wasserbett → Wasserwellen → DS18B20 schwankt
-  Leeres Bett            → Wasser ruhig → DS18B20 stabil (σ < 0.03°C)
-  Person im Bett         → Wasser unruhig → DS18B20 instabil (σ > 0.04°C)
+  Heizung allein     → Temperatur steigt LINEAR (saubere Rampe)
+  Person im Bett     → Temperatur schwankt um eine Trendlinie
 
-PRIMÄRER INDIKATOR: Rohe Standardabweichung σ der Wassertemperatur
-  • σ > 0.08°C (2× threshold)  → Präsenz sehr sicher (conf 0.95)
-  • σ > 0.04°C (1× threshold)  → Präsenz wahrscheinlich (conf 0.75)
-  • σ > 0.028°C (0.7×)         → Grenzfall (Luftsensor entscheidet)
-  • σ ≤ 0.028°C                → Wasser ruhig → leer
+PRIMÄR-INDIKATOR: Detrended σ (Standardabweichung NACH Abzug der
+linearen Heizrampe). Trennt sauber:
+  • Heizung pur (steile Rampe):   detrended ≈ 0.02°C  → leer
+  • Heizung pur (flache Rampe):   detrended ≈ 0.02°C  → leer
+  • Person ruhig liegend:          detrended ≈ 0.04-0.06°C → da
+  • Person + Heizung gleichzeitig: detrended ≈ 0.04°C → da
+  • Person aktiv:                  detrended ≈ 0.10°C → da
 
-HEIZUNGS-SCHUTZ (gegen False-Positives):
-  Wenn σ² sehr niedrig UND Trend-Konsistenz sehr hoch
-  UND kaum signifikante Änderungen → reines Heizen, kein Mensch.
-  DS18B20-Rauschen (±0.0625°C) wird dabei ignoriert.
+WARUM detrended statt rohem σ:
+  v6 nutzte rohes σ. Bei steilem Heizen (z.B. 27.5→28.0 in 30min)
+  ist σ=0.144 — weit über der 0.04-Schwelle, also FALSE POSITIVE.
+  Detrended σ zieht die Rampe ab → nur die Restschwankung bleibt.
+  Bei reiner Rampe ≈ 0, bei Person ≈ tatsächliche Wellenstärke.
+
+WARUM nicht der alte Rauschfilter:
+  DS18B20 quantisiert auf 0.0625°C. Eine ruhig liegende Person
+  erzeugt σ≈0.05°C, aber EINZELNE Sample-Sprünge sind <0.07°C.
+  Der Rauschfilter warf alle Person-Signale weg → Heizungs-Guard
+  griff fälschlich → Sensor triggerte nie.
+  Detrended σ braucht keine Rauschfilterung mehr.
 
 HYSTERESE (asymmetrisch, wie v3):
   Einsteigen: 5 min konstant "da"  → schnelle Reaktion
@@ -171,31 +179,33 @@ class PresenceDetector:
             )
 
         # ─────────────────────────────────────────────────────────────
-        # WASSERBETT v6: σ (v3) als Primär-Signal + v5 Heizungs-Schutz
+        # WASSERBETT v7: detrended σ als Primär-Signal
         # ─────────────────────────────────────────────────────────────
         buffer = self._water_temps.get(zone_index)
         if buffer is None or len(buffer) < self.thresholds.min_samples:
             current = self._is_present.get(zone_index, False)
             return current, 0.0, "Sammle Daten..."
 
-        # Rohe σ (Standardabweichung) — wie v3. Das ist das Primär-Signal.
-        water_std = (
+        # PRIMÄR: detrended σ (σ nach Abzug der linearen Heiz-Rampe)
+        # Das ist immun gegen monotones Heizen und funktioniert mit nur
+        # einem Wasser-Sensor.
+        detrended_std = self._calculate_detrended_std(zone_index)
+
+        # Rohes σ und Trend-Diagnostik (für Logs & Debug)
+        raw_std = (
             self._calc_std(buffer, self.thresholds.history_window_minutes) or 0.0
         )
-
-        # Zusatz-Signale nur zur Absicherung gegen Heizungs-False-Positives:
-        smoothed_variance = self._calculate_variance_smoothed(zone_index)
         trend_consistency, significant_changes = (
             self._calculate_trend_consistency_noise_immune(zone_index)
         )
 
-        # Diagnostics speichern
-        self._last_water_std[zone_index] = water_std
-        self._last_water_variance[zone_index] = smoothed_variance
+        # Diagnostics speichern (water_std = das tatsächlich verwendete Signal)
+        self._last_water_std[zone_index] = detrended_std
+        self._last_water_variance[zone_index] = detrended_std**2
         self._last_trend_consistency[zone_index] = trend_consistency
         self._last_significant_changes[zone_index] = significant_changes
 
-        # Luft-Varianz (sekundär, unterstützend)
+        # Luft-Varianz (sekundär, unterstützend wenn vorhanden)
         air_std = self._calc_std(
             self._air_temps.get(zone_index), self.thresholds.history_window_minutes
         )
@@ -205,8 +215,8 @@ class PresenceDetector:
         # Entscheidungslogik
         # ─────────────────────────────────────────────────────────────
         raw_present, confidence, reasons = self._determine_presence(
-            water_std,
-            smoothed_variance,
+            detrended_std,
+            raw_std,
             trend_consistency,
             significant_changes,
             air_std,
@@ -261,6 +271,51 @@ class PresenceDetector:
         """
         consistency, _ = self._calculate_trend_consistency_noise_immune(zone_index)
         return consistency
+
+    # ═══════════════════════════════════════════════════════════════════════
+    # NEU v7: DETRENDED σ — Primär-Signal für Präsenz
+    # ═══════════════════════════════════════════════════════════════════════
+
+    def _calculate_detrended_std(self, zone_index: int) -> float:
+        """
+        Berechnet σ NACH Abzug der linearen Heiz-Rampe.
+
+        Rohes σ kann hoch sein, weil das Bett gleichmäßig heizt — das ist
+        KEIN Mensch. Detrended σ misst nur die Reststreuung um die
+        Trendlinie und ist damit immun gegen monotone Heizrampen.
+
+        Reine Heizung (linear)  → detrended ≈ 0
+        Person ruhig liegend    → detrended ≈ 0.04-0.06°C
+        Person aktiv            → detrended > 0.10°C
+        """
+        buffer = self._water_temps.get(zone_index)
+        if not buffer:
+            return 0.0
+
+        cutoff = datetime.now() - timedelta(
+            minutes=self.thresholds.history_window_minutes
+        )
+        temps = [val for ts, val in buffer if ts > cutoff and val is not None]
+
+        n = len(temps)
+        if n < 3:
+            return 0.0
+
+        # Linear-Regression: y = slope*x + intercept
+        x_mean = (n - 1) / 2
+        y_mean = sum(temps) / n
+        num = sum((i - x_mean) * (temps[i] - y_mean) for i in range(n))
+        den = sum((i - x_mean) ** 2 for i in range(n))
+        if den == 0:
+            return 0.0
+        slope = num / den
+        intercept = y_mean - slope * x_mean
+
+        # σ der Residuen (nach Abzug der Trendlinie)
+        residuals_sq = sum(
+            (temps[i] - (slope * i + intercept)) ** 2 for i in range(n)
+        )
+        return (residuals_sq / n) ** 0.5
 
     # ═══════════════════════════════════════════════════════════════════════
     # NEU v5: VARIANZ MIT GLÄTTUNG (gegen Sensor-Rauschen)
@@ -376,8 +431,8 @@ class PresenceDetector:
 
     def _determine_presence(
         self,
-        water_std: float,
-        smoothed_variance: float,
+        detrended_std: float,
+        raw_std: float,
         trend_consistency: float,
         significant_changes: int,
         air_std: Optional[float],
@@ -389,62 +444,52 @@ class PresenceDetector:
         """
         Entscheidet ob jemand im Bett liegt.
 
-        v6: σ (v3-Stil) als Primär-Signal, mit v5 Heizungs-Schutz als Guard.
+        v7: detrended σ als Primär-Signal — funktioniert mit nur EINEM
+        Wasser-Sensor und ist immun gegen monotones Heizen.
         """
         reasons = []
 
         if heater_active:
             reasons.append("⚡Heiz")
 
-        reasons.append(f"σ={water_std:.3f}")
-        reasons.append(f"T={trend_consistency:.2f}")
-        reasons.append(f"Δ={significant_changes}")
+        reasons.append(f"σd={detrended_std:.3f}")
+        reasons.append(f"σr={raw_std:.3f}")
 
         wt = self.thresholds.water_variance_threshold  # σ-Schwelle, default 0.040
-        vl = self.thresholds.variance_low  # σ²-Guard
-        tt = self.thresholds.trend_threshold
         tc = self.thresholds.trend_chaotic
 
-        # ─── Guard 1: reines Heizen (monoton) ──────────────────────────
-        # Sehr hohe Trend-Konsistenz + kaum echte Sprünge (Rauschfilter!)
-        # → reine Temperatur-Rampe, kein Mensch. σ kann dabei durchaus
-        # hoch sein (wenn Bett stark heizt), aber ein Mensch würde
-        # Rauf-Runter-Schwankungen verursachen.
-        if trend_consistency > tt and significant_changes <= 2:
-            reasons.append("→Heizung(monoton)")
-            return False, 0.05, reasons
-
-        # ─── Guard 2: Wasser komplett ruhig ────────────────────────────
-        # Wenn σ² unter vl UND kaum echte Änderungen → stabiles leeres Bett
-        if smoothed_variance < vl and significant_changes <= 2:
-            reasons.append("→stabil(leer)")
-            return False, 0.05, reasons
-
-        # ─── Primär: σ-basierte Stufen (v3-Stil) ──────────────────────
+        # ─── Primär: detrended σ Stufen ────────────────────────────────
+        # Detrended σ zieht die Heiz-Rampe ab, Rest ist nur Wellen-Aktivität.
         raw_present = False
-        if water_std > wt * 2:
+        if detrended_std > wt * 2:  # > 0.08
             confidence = 0.95
             raw_present = True
-            reasons.append("→σ hoch")
-        elif water_std > wt:
-            confidence = 0.75
+            reasons.append("→stark")
+        elif detrended_std > wt:  # > 0.04
+            confidence = 0.85
             raw_present = True
             reasons.append("→Präsenz")
-        elif water_std > wt * 0.7:
-            confidence = 0.40
-            reasons.append("→Grenzbereich")
+        elif detrended_std > wt * 0.7:  # > 0.028
+            # Auch dieser Bereich wird als Präsenz gewertet — sonst werden
+            # ruhige Schläfer auf gut gedämpften Wasserbetten verpasst.
+            confidence = 0.65
+            raw_present = True
+            reasons.append("→leicht")
         else:
             confidence = 0.10
-            reasons.append("→Wasser ruhig")
+            reasons.append("→ruhig")
 
-        # ─── Chaotischer Verlauf bestätigt Präsenz ────────────────────
-        # Wenn Temperatur chaotisch springt, ist das ein starker Mensch-Indikator.
-        if trend_consistency < tc and significant_changes >= 5:
+        # ─── Chaotischer Verlauf verstärkt Confidence ─────────────────
+        if (
+            trend_consistency < tc
+            and significant_changes >= 5
+            and not raw_present
+        ):
             raw_present = True
-            confidence = max(confidence, 0.80)
+            confidence = max(confidence, 0.75)
             reasons.append("→chaotisch")
 
-        # ─── Luft-Varianz als Verstärker ──────────────────────────────
+        # ─── Luft-Varianz als Verstärker (wenn vorhanden) ─────────────
         if air_std is not None:
             at = self.thresholds.air_variance_threshold
             if air_std > at:
@@ -460,13 +505,6 @@ class PresenceDetector:
                 raw_present = True
                 confidence = max(confidence, 0.80)
                 reasons.append(f"Körper(Δ={diff:.1f}°C)")
-
-        # ─── Grauzone: aktuellen Zustand halten ───────────────────────
-        # Nicht erzwungen OFF (das war v5 Fehler). Lieber Status quo,
-        # damit Hysterese stabil bleibt und kein unnötiger Ausstieg passiert.
-        if not raw_present and confidence >= 0.30:
-            raw_present = self._is_present.get(zone_index, False)
-            reasons.append("→halte Status")
 
         return raw_present, confidence, reasons
 
