@@ -229,17 +229,11 @@ class TestSingleSensorPresence:
         now = datetime.now()
         for i in range(30):
             t = now - timedelta(seconds=(30 - i) * 60)
-            temp = _quantize_ds18b20(
-                28.0 + 0.06 * math.sin(i * 0.4) + 0.03 * math.cos(i * 1.7)
-            )
+            temp = _quantize_ds18b20(28.0 + 0.06 * math.sin(i * 0.4) + 0.03 * math.cos(i * 1.7))
             fast_detector._store(0, temp, None, None, t)
 
-        is_present, conf, reason = fast_detector.detect_presence(
-            zone_index=0, water_temp=28.0
-        )
-        assert is_present is True, (
-            f"Ruhig liegende Person mit Quantisierung muss erkannt werden! reason={reason}"
-        )
+        is_present, conf, reason = fast_detector.detect_presence(zone_index=0, water_temp=28.0)
+        assert is_present is True, f"Ruhig liegende Person mit Quantisierung muss erkannt werden! reason={reason}"
 
     def test_person_plus_heating_simultaneously(self, fast_detector):
         """
@@ -250,20 +244,11 @@ class TestSingleSensorPresence:
         for i in range(30):
             t = now - timedelta(seconds=(30 - i) * 60)
             # Heizrampe + Person-Schwankungen
-            temp = _quantize_ds18b20(
-                28.0
-                + (i / 30) * 0.3
-                + 0.05 * math.sin(i * 0.4)
-                + 0.02 * math.cos(i * 1.3)
-            )
+            temp = _quantize_ds18b20(28.0 + (i / 30) * 0.3 + 0.05 * math.sin(i * 0.4) + 0.02 * math.cos(i * 1.3))
             fast_detector._store(0, temp, None, None, t)
 
-        is_present, conf, reason = fast_detector.detect_presence(
-            zone_index=0, water_temp=28.3
-        )
-        assert is_present is True, (
-            f"Person + Heizung gleichzeitig muss erkannt werden! reason={reason}"
-        )
+        is_present, conf, reason = fast_detector.detect_presence(zone_index=0, water_temp=28.3)
+        assert is_present is True, f"Person + Heizung gleichzeitig muss erkannt werden! reason={reason}"
 
     def test_pure_heating_ramp_stays_off(self, fast_detector):
         """
@@ -277,12 +262,8 @@ class TestSingleSensorPresence:
             temp = _quantize_ds18b20(27.5 + (i / 30) * 0.5)
             fast_detector._store(0, temp, None, None, t)
 
-        is_present, conf, reason = fast_detector.detect_presence(
-            zone_index=0, water_temp=28.0
-        )
-        assert is_present is False, (
-            f"Reine Heiz-Rampe darf NICHT als Präsenz erkannt werden! reason={reason}"
-        )
+        is_present, conf, reason = fast_detector.detect_presence(zone_index=0, water_temp=28.0)
+        assert is_present is False, f"Reine Heiz-Rampe darf NICHT als Präsenz erkannt werden! reason={reason}"
 
     def test_detrended_std_separates_heating_from_person(self, fast_detector):
         """
@@ -304,12 +285,8 @@ class TestSingleSensorPresence:
             det2._store(0, 28.0 + 0.1 * math.sin(i * 0.5), None, None, t)
         person_detrended = det2._calculate_detrended_std(0)
 
-        assert heating_detrended < 0.02, (
-            f"Heizungs-Rampe sollte detrended σ < 0.02 haben, ist {heating_detrended}"
-        )
-        assert person_detrended > 0.04, (
-            f"Person sollte detrended σ > 0.04 haben, ist {person_detrended}"
-        )
+        assert heating_detrended < 0.02, f"Heizungs-Rampe sollte detrended σ < 0.02 haben, ist {heating_detrended}"
+        assert person_detrended > 0.04, f"Person sollte detrended σ > 0.04 haben, ist {person_detrended}"
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
