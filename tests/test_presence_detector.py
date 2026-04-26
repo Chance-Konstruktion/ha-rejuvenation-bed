@@ -237,14 +237,25 @@ class TestSingleSensorPresence:
 
     def test_person_plus_heating_simultaneously(self, fast_detector):
         """
-        Person liegt im Bett WÄHREND das Bett heizt — typischer Nacht-Fall.
-        Rohes σ ist hoch durch die Rampe, aber detrended σ zeigt die Person.
+        Person steigt während der Aufheizphase ins Bett — typischer Nacht-Fall.
+        Echte CSV-Daten zeigen: Einstieg erzeugt einen kurzen Chaos-Burst,
+        danach stabilisiert sich die Temperatur. Der Chaos-Lock hält ON.
         """
         now = datetime.now()
-        for i in range(30):
-            t = now - timedelta(seconds=(30 - i) * 60)
-            # Heizrampe + Person-Schwankungen
-            temp = _quantize_ds18b20(28.0 + (i / 30) * 0.3 + 0.05 * math.sin(i * 0.4) + 0.02 * math.cos(i * 1.3))
+        # Phase 1 (5 min): Bett heizt ruhig auf
+        for i in range(15):
+            t = now - timedelta(seconds=(60 - i) * 60)
+            temp = _quantize_ds18b20(28.0 + (i / 30) * 0.3)
+            fast_detector._store(0, temp, None, None, t)
+        # Phase 2 (3 min): Person steigt ein, Wellen
+        for i in range(15, 24):
+            t = now - timedelta(seconds=(60 - i) * 60)
+            temp = _quantize_ds18b20(28.15 + 0.3 * math.sin(i * 0.9) + 0.15 * math.cos(i * 2.1))
+            fast_detector._store(0, temp, None, None, t)
+        # Phase 3 (rest): stabilisiert sich nahe Körpertemperatur
+        for i in range(24, 60):
+            t = now - timedelta(seconds=(60 - i) * 60)
+            temp = _quantize_ds18b20(28.3 + 0.04 * math.sin(i * 0.4))
             fast_detector._store(0, temp, None, None, t)
 
         is_present, conf, reason = fast_detector.detect_presence(zone_index=0, water_temp=28.3)
@@ -287,6 +298,84 @@ class TestSingleSensorPresence:
 
         assert heating_detrended < 0.02, f"Heizungs-Rampe sollte detrended σ < 0.02 haben, ist {heating_detrended}"
         assert person_detrended > 0.04, f"Person sollte detrended σ > 0.04 haben, ist {person_detrended}"
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# v8: CSV-BASIERTE REGRESSIONS-TESTS (echte Nacht-Daten)
+# ═══════════════════════════════════════════════════════════════════════════════
+# Diese Tests sichern die drei klaren Phasen aus den User-Aussagen ab:
+# 1. Slope > +0.20 °C/h → leeres Bett heizt auf
+# 2. Slope ≈ 0 nach Aufheizphase → Person eingestiegen
+# 3. Slope < -0.10 °C/h → Person ausgestiegen, Bett kühlt aus
+
+
+class TestSlopeBasedDetection:
+    @pytest.fixture
+    def long_window_detector(self):
+        """30-min Fenster für realistische Slope-Messungen."""
+        thresholds = PresenceThresholds(
+            history_window_minutes=30,
+            min_samples=10,
+            presence_enter_minutes=0,
+            presence_leave_minutes=0,
+        )
+        return PresenceDetector(thresholds=thresholds)
+
+    def test_heating_phase_stays_off(self, long_window_detector):
+        """Bett heizt linear auf (slope > 0.2°C/h, kein Mensch) → OFF."""
+        now = datetime.now()
+        # 90 min lineares Aufheizen mit ~0.4°C/h
+        for i in range(90):
+            t = now - timedelta(seconds=(90 - i) * 60)
+            long_window_detector._store(0, 28.0 + i * 0.4 / 60, None, None, t)
+
+        is_p, conf, reason = long_window_detector.detect_presence(0, water_temp=28.6)
+        assert is_p is False, f"Aufheizphase muss OFF sein! reason={reason}"
+
+    def test_cooling_phase_marks_empty(self, long_window_detector):
+        """Bett kühlt linear ab (slope < -0.1°C/h) → OFF."""
+        now = datetime.now()
+        # 90 min lineares Abkühlen mit ~-0.3°C/h
+        for i in range(90):
+            t = now - timedelta(seconds=(90 - i) * 60)
+            long_window_detector._store(0, 30.0 - i * 0.3 / 60, None, None, t)
+
+        is_p, conf, reason = long_window_detector.detect_presence(0, water_temp=29.55)
+        assert is_p is False, f"Cooling phase muss OFF sein! reason={reason}"
+
+    def test_chaos_burst_triggers_lock(self, long_window_detector):
+        """Chaos-Burst → ON + Lock für 60 min, hält auch durch ruhige Phasen."""
+        now = datetime.now()
+        # Phase 1: ruhiges Aufheizen
+        for i in range(60):
+            t = now - timedelta(seconds=(120 - i) * 60)
+            long_window_detector._store(0, 28.0 + i * 0.5 / 60, None, None, t)
+        # Phase 2: Chaos-Burst (5 Samples)
+        for i in range(60, 65):
+            t = now - timedelta(seconds=(120 - i) * 60)
+            temp = 28.5 + 0.4 * math.sin(i * 1.7)
+            long_window_detector._store(0, temp, None, None, t)
+        # Phase 3: stabil bei 30°C
+        for i in range(65, 120):
+            t = now - timedelta(seconds=(120 - i) * 60)
+            long_window_detector._store(0, 30.0 + 0.03 * math.sin(i * 0.4), None, None, t)
+
+        is_p, conf, reason = long_window_detector.detect_presence(0, water_temp=30.0)
+        assert is_p is True, f"Chaos + danach stabil muss ON sein! reason={reason}"
+
+    def test_rise_then_stable_marks_entry(self, long_window_detector):
+        """Aufheizen → stabil OHNE Chaos = Person stieg leise ein."""
+        now = datetime.now()
+        # 90 min: 60 min Aufheizen, dann 30 min stabil bei 30°C
+        for i in range(60):
+            t = now - timedelta(seconds=(90 - i) * 60)
+            long_window_detector._store(0, 28.0 + i * 1.0 / 60, None, None, t)
+        for i in range(60, 90):
+            t = now - timedelta(seconds=(90 - i) * 60)
+            long_window_detector._store(0, 29.0 + 0.03 * math.sin(i * 0.4), None, None, t)
+
+        is_p, conf, reason = long_window_detector.detect_presence(0, water_temp=29.0)
+        assert is_p is True, f"Rise→Stable muss ON triggern! reason={reason}"
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
