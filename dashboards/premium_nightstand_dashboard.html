@@ -212,12 +212,7 @@
         color: var(--amber-text);
       }
 
-      /* ────────────────────────────────────────── BED ZONES ── */
-      .zones {
-        display: grid;
-        grid-template-columns: 1fr 1fr;
-        gap: 10px;
-      }
+      /* ────────────────────────────────────────── BED ZONE ── */
       .zone {
         background: var(--bezel);
         border: 1px solid var(--bezel-edge);
@@ -225,6 +220,24 @@
         padding: 14px 12px;
         text-align: center;
         position: relative;
+      }
+      .zone.solo {
+        padding: 22px 18px;
+      }
+      .zone.solo .zone-temp {
+        font-size: 78px;
+      }
+      .zone.solo .zone-target {
+        font-size: 13px;
+        margin-top: 6px;
+      }
+      .zone.solo .pill {
+        font-size: 11px;
+        padding: 5px 10px;
+      }
+      .zone.solo .pill-row {
+        margin-top: 14px;
+        gap: 8px;
       }
       .zone-label {
         font-size: 11px;
@@ -505,8 +518,8 @@
           width: 12px;
           height: 12px;
         }
-        .zone-temp {
-          font-size: 56px;
+        .zone.solo .zone-temp {
+          font-size: 96px;
         }
       }
 
@@ -523,8 +536,8 @@
           width: 8px;
           height: 8px;
         }
-        .zone-temp {
-          font-size: 36px;
+        .zone.solo .zone-temp {
+          font-size: 60px;
         }
         .modes {
           font-size: 10px;
@@ -537,13 +550,12 @@
       <!-- ────────────── HEADER BEZEL: brand + status LEDs ── -->
       <header class="bezel">
         <div class="leds">
-          <span class="led" id="led-pl" title="Presence Left"></span>
-          <span class="led" id="led-pr" title="Presence Right"></span>
+          <span class="led" id="led-pres" title="Presence"></span>
           <span class="led red" id="led-heat" title="Heating"></span>
           <span class="led green" id="led-alarm" title="Alarm armed"></span>
         </div>
         <div class="brand">
-          REJUVENATION<span class="dot">·</span>BED
+          REJUVENATION<span class="dot">·</span><span id="side-label">BED</span>
         </div>
       </header>
 
@@ -562,25 +574,14 @@
         </div>
       </section>
 
-      <!-- ────────────── BED ZONES: only what matters ── -->
-      <section class="zones">
-        <div class="zone">
-          <div class="zone-label">LEFT</div>
-          <div class="zone-temp" id="t-left">--.-°</div>
-          <div class="zone-target" id="g-left">→ --.-°</div>
-          <div class="pill-row">
-            <span class="pill bed" id="p-left">EMPTY</span>
-            <span class="pill" id="h-left">IDLE</span>
-          </div>
-        </div>
-        <div class="zone">
-          <div class="zone-label">RIGHT</div>
-          <div class="zone-temp" id="t-right">--.-°</div>
-          <div class="zone-target" id="g-right">→ --.-°</div>
-          <div class="pill-row">
-            <span class="pill bed" id="p-right">EMPTY</span>
-            <span class="pill" id="h-right">IDLE</span>
-          </div>
+      <!-- ────────────── BED ZONE (single side) ── -->
+      <section class="zone solo">
+        <div class="zone-label" id="zone-label">BED</div>
+        <div class="zone-temp" id="t-bed">--.-°</div>
+        <div class="zone-target" id="g-bed">→ --.-°</div>
+        <div class="pill-row">
+          <span class="pill bed" id="p-bed">EMPTY</span>
+          <span class="pill" id="h-bed">IDLE</span>
         </div>
       </section>
 
@@ -629,28 +630,29 @@
         </div>
 
         <div class="sep"></div>
-        <div class="sep-label">BED</div>
-        <div class="field">
-          <label>Climate · Left</label>
-          <input type="text" id="cfg-cl-left" placeholder="climate.rejuvenation_bed_links" />
+        <div class="sep-label">BED · DEINE SEITE</div>
+        <div class="hint" style="margin-bottom: 14px;">
+          Trage die Entitäten DEINER Bettseite ein. Wer einen Partner hat,
+          richtet sich auf seinem Tablet das gleiche Dashboard mit den
+          eigenen Entitäten ein — eigener Wecker, eigenes Licht.
         </div>
         <div class="field">
-          <label>Climate · Right</label>
-          <input type="text" id="cfg-cl-right" placeholder="climate.rejuvenation_bed_rechts" />
+          <label>Side Label (was im Header & über der Temp steht)</label>
+          <input type="text" id="cfg-side-label" placeholder="LINKS" maxlength="12" />
         </div>
         <div class="field">
-          <label>Presence Sensor · Left</label>
-          <input type="text" id="cfg-pres-left" placeholder="binary_sensor.bett_links_belegung" />
+          <label>Climate Entity</label>
+          <input type="text" id="cfg-climate" placeholder="climate.rejuvenation_bed_links" />
         </div>
         <div class="field">
-          <label>Presence Sensor · Right</label>
-          <input type="text" id="cfg-pres-right" placeholder="binary_sensor.bett_rechts_belegung" />
+          <label>Presence Sensor (optional)</label>
+          <input type="text" id="cfg-presence" placeholder="binary_sensor.bett_links_belegung" />
         </div>
 
         <div class="sep"></div>
         <div class="sep-label">NIGHTSTAND</div>
         <div class="field">
-          <label>Light Entity (alles was switch.* oder light.* ist)</label>
+          <label>Light Entity (light.* oder switch.*)</label>
           <input type="text" id="cfg-light" placeholder="light.nachttisch" />
         </div>
         <div class="field">
@@ -752,10 +754,9 @@
       const DEFAULT_CFG = {
         haUrl: "",
         token: "",
-        clLeft: "",
-        clRight: "",
-        presLeft: "",
-        presRight: "",
+        sideLabel: "BED",
+        climate: "",
+        presence: "",
         light: "",
         alarm: "",
         boost: "",
@@ -766,7 +767,12 @@
       function loadCfg() {
         try {
           const raw = localStorage.getItem(CFG_KEY);
-          return raw ? { ...DEFAULT_CFG, ...JSON.parse(raw) } : { ...DEFAULT_CFG };
+          if (!raw) return { ...DEFAULT_CFG };
+          const parsed = JSON.parse(raw);
+          // Migration: alte clLeft/presLeft → climate/presence
+          if (!parsed.climate && parsed.clLeft) parsed.climate = parsed.clLeft;
+          if (!parsed.presence && parsed.presLeft) parsed.presence = parsed.presLeft;
+          return { ...DEFAULT_CFG, ...parsed };
         } catch {
           return { ...DEFAULT_CFG };
         }
@@ -827,11 +833,11 @@
         return isNaN(n) ? "--.-°" : `${n.toFixed(1)}°`;
       }
 
-      function paintZone(side, climate, presence) {
-        const t = $(`t-${side}`);
-        const g = $(`g-${side}`);
-        const p = $(`p-${side}`);
-        const h = $(`h-${side}`);
+      function paintZone(climate, presence) {
+        const t = $("t-bed");
+        const g = $("g-bed");
+        const p = $("p-bed");
+        const h = $("h-bed");
 
         if (climate && climate.attributes) {
           t.textContent = fmtTemp(climate.attributes.current_temperature);
@@ -885,16 +891,11 @@
       //  UPDATE LOOP
       // ─────────────────────────────────────────────────────────
       const DEMO = {
-        clLeft: {
+        climate: {
           state: "heat",
           attributes: { current_temperature: 29.4, temperature: 30.0, hvac_action: "heating" },
         },
-        clRight: {
-          state: "heat",
-          attributes: { current_temperature: 28.8, temperature: 30.0, hvac_action: "idle" },
-        },
-        presLeft: { state: "on" },
-        presRight: { state: "off" },
+        presence: { state: "on" },
         light: { state: "off" },
         alarm: { state: "" },
         boost: { state: "off" },
@@ -925,11 +926,9 @@
           return (await haGet(entity)) || null;
         };
 
-        const [cl, cr, pl, pr, lt, al, bo, si, va] = await Promise.all([
-          get(cfg.clLeft, DEMO.clLeft),
-          get(cfg.clRight, DEMO.clRight),
-          get(cfg.presLeft, DEMO.presLeft),
-          get(cfg.presRight, DEMO.presRight),
+        const [cl, pr, lt, al, bo, si, va] = await Promise.all([
+          get(cfg.climate, DEMO.climate),
+          get(cfg.presence, DEMO.presence),
           get(cfg.light, DEMO.light),
           get(cfg.alarm, DEMO.alarm),
           get(cfg.boost, DEMO.boost),
@@ -937,8 +936,7 @@
           get(cfg.vac, DEMO.vac),
         ]);
 
-        paintZone("left", cl, pl);
-        paintZone("right", cr, pr);
+        paintZone(cl, pr);
         paintLight(lt);
         paintAlarm(al);
         paintMode("btn-boost", bo);
@@ -946,12 +944,15 @@
         paintMode("btn-vac", va);
 
         // Header LEDs
-        setLed("led-pl", pl && pl.state === "on", "amber");
-        setLed("led-pr", pr && pr.state === "on", "amber");
+        setLed("led-pres", pr && pr.state === "on", "amber");
         const heating =
-          (cl && cl.attributes && cl.attributes.hvac_action === "heating") ||
-          (cr && cr.attributes && cr.attributes.hvac_action === "heating");
+          cl && cl.attributes && cl.attributes.hvac_action === "heating";
         setLed("led-heat", heating, "red");
+
+        // Side label (header brand + zone label)
+        const label = (cfg.sideLabel || "BED").toUpperCase();
+        $("side-label").textContent = label;
+        $("zone-label").textContent = label;
 
         // Light name display
         const lname = $("light-name");
@@ -1000,10 +1001,9 @@
       const FIELD_MAP = {
         haUrl: "cfg-haurl",
         token: "cfg-token",
-        clLeft: "cfg-cl-left",
-        clRight: "cfg-cl-right",
-        presLeft: "cfg-pres-left",
-        presRight: "cfg-pres-right",
+        sideLabel: "cfg-side-label",
+        climate: "cfg-climate",
+        presence: "cfg-presence",
         light: "cfg-light",
         alarm: "cfg-alarm",
         boost: "cfg-boost",
