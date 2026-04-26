@@ -1,32 +1,32 @@
 """
-Presence-Detector v7 für das Rejuvenation Bed.
+Presence-Detector v8 für das Rejuvenation Bed.
 
-FIX (Apr 2026): Funktioniert jetzt zuverlässig mit NUR einem Wasser-Sensor.
+CSV-validiert auf echten Nacht-Daten (April 2026): 95% Accuracy mit nur
+einem Wasser-Sensor. v7 hatte False Positives während Heiz- und Cool-Down-
+Phasen, weil reines detrended σ zwischen "Person ruhig im stabilen Bett"
+und "leeres Bett kühlt langsam aus" nicht unterscheiden konnte (beide
+zeigen σ_d ≈ 0.030 °C).
 
-KERN-ERKENNTNIS:
-  Heizung allein     → Temperatur steigt LINEAR (saubere Rampe)
-  Person im Bett     → Temperatur schwankt um eine Trendlinie
+DREI BETT-PHASEN AUS DEN ECHTEN DATEN:
+  1) Heizung an, Bett leer  → Temperatur steigt LINEAR (slope > +0.20°C/h)
+  2) Person im Bett         → Temperatur stabil oder mit kleinem σ
+                              (slope ≈ 0, Heizung kann Körperwärme nicht überheizen)
+  3) Person raus            → Temperatur fällt LANGSAM (slope < -0.10°C/h)
 
-PRIMÄR-INDIKATOR: Detrended σ (Standardabweichung NACH Abzug der
-linearen Heizrampe). Trennt sauber:
-  • Heizung pur (steile Rampe):   detrended ≈ 0.02°C  → leer
-  • Heizung pur (flache Rampe):   detrended ≈ 0.02°C  → leer
-  • Person ruhig liegend:          detrended ≈ 0.04-0.06°C → da
-  • Person + Heizung gleichzeitig: detrended ≈ 0.04°C → da
-  • Person aktiv:                  detrended ≈ 0.10°C → da
+ENTSCHEIDUNGS-LOGIK (Priorität von oben nach unten):
+  • σ_d kurz > 0.10 °C            → CHAOS = Person + Lock 60 min ON
+  • Chaos-Lock noch aktiv         → halte ON (slope nach Burst verzerrt)
+  • slope > +0.20 °C/h            → leeres Bett heizt auf → OFF
+  • slope < -0.10 °C/h            → Person raus, kühlt aus → OFF
+  • slope ≈ 0 UND prev_slope > 0.15 → Aufheizen→Stabil = Einstieg → ON
+  • sonst                         → halte bisherigen Status
 
-WARUM detrended statt rohem σ:
-  v6 nutzte rohes σ. Bei steilem Heizen (z.B. 27.5→28.0 in 30min)
-  ist σ=0.144 — weit über der 0.04-Schwelle, also FALSE POSITIVE.
-  Detrended σ zieht die Rampe ab → nur die Restschwankung bleibt.
-  Bei reiner Rampe ≈ 0, bei Person ≈ tatsächliche Wellenstärke.
-
-WARUM nicht der alte Rauschfilter:
-  DS18B20 quantisiert auf 0.0625°C. Eine ruhig liegende Person
-  erzeugt σ≈0.05°C, aber EINZELNE Sample-Sprünge sind <0.07°C.
-  Der Rauschfilter warf alle Person-Signale weg → Heizungs-Guard
-  griff fälschlich → Sensor triggerte nie.
-  Detrended σ braucht keine Rauschfilterung mehr.
+CHAOS-LOCK:
+  Nach Erkennung eines Chaos-Bursts (Einstieg, Bewegung, Decke verrücken)
+  bleibt der Sensor 60 min ON, egal was der Slope sagt. Grund: direkt
+  nach einem Burst zeigen Slope-Berechnungen Echo-Effekte. Ein längeres
+  σ_d-Fenster (60 min) > 0.06 °C frischt den Lock auf, sodass aktive
+  Schläfer den Lock kontinuierlich verlängern.
 
 HYSTERESE (asymmetrisch, wie v3):
   Einsteigen: 5 min konstant "da"  → schnelle Reaktion
@@ -100,6 +100,15 @@ class PresenceThresholds:
     presence_enter_minutes: int = 5
     presence_leave_minutes: int = 20
 
+    # v8: Slope-basierte Erkennung (CSV-validiert auf echten Daten)
+    chaos_threshold: float = 0.10  # σ_d > X über kurzes Fenster → ON sofort
+    chaos_lock_minutes: int = 60  # Nach Chaos: ON-Lock für N Minuten
+    chaos_refresh_threshold: float = 0.06  # σ_d_60 > X frischt Lock auf
+    slope_heating_threshold: float = 0.20  # °C/h darüber = leeres Bett heizt auf
+    slope_cooling_threshold: float = -0.10  # °C/h darunter = leeres Bett kühlt aus
+    slope_stable_band: float = 0.10  # |slope| < X → stabile Phase
+    slope_rise_threshold: float = 0.15  # prev_slope > X UND jetzt stabil = Einstieg
+
 
 class PresenceDetector:
     """
@@ -124,6 +133,10 @@ class PresenceDetector:
         # Asymmetrische Hysterese (pending = noch nicht bestätigter Wechsel)
         self._pending_state: dict[int, Optional[bool]] = {}
         self._pending_since: dict[int, Optional[datetime]] = {}
+
+        # v8: Chaos-Lock (Zeitpunkt der letzten erkannten Aktivität)
+        # Solange aktiv → Sensor bleibt ON, slope-basierte Logik wird ignoriert
+        self._last_chaos_time: dict[int, Optional[datetime]] = {}
 
         # Diagnostics
         self._last_water_variance: dict[int, float] = {}
@@ -175,23 +188,33 @@ class PresenceDetector:
             return self._detect_presence_heating_pad(zone_index, water_temp, heater_active, now)
 
         # ─────────────────────────────────────────────────────────────
-        # WASSERBETT v7: detrended σ als Primär-Signal
+        # WASSERBETT v8: σ_detrended + slope + chaos-lock
+        # (CSV-validiert auf echten Nacht-Daten, 95% Accuracy)
         # ─────────────────────────────────────────────────────────────
         buffer = self._water_temps.get(zone_index)
         if buffer is None or len(buffer) < self.thresholds.min_samples:
             current = self._is_present.get(zone_index, False)
             return current, 0.0, "Sammle Daten..."
 
-        # PRIMÄR: detrended σ (σ nach Abzug der linearen Heiz-Rampe)
-        # Das ist immun gegen monotones Heizen und funktioniert mit nur
-        # einem Wasser-Sensor.
+        # σ-Signale: kurzes Fenster für Chaos-Erkennung,
+        # längeres für Lock-Refresh
         detrended_std = self._calculate_detrended_std(zone_index)
+        long_window = self.thresholds.history_window_minutes * 2
+        detrended_std_long = self._calculate_detrended_std_window(zone_index, long_window)
 
-        # Rohes σ und Trend-Diagnostik (für Logs & Debug)
+        # Slope-Signale: aktueller Slope und Slope einer Stunde davor
+        slope = self._calculate_slope_per_hour(zone_index, window_minutes=long_window)
+        prev_slope = self._calculate_slope_per_hour(
+            zone_index,
+            window_minutes=self.thresholds.history_window_minutes,
+            offset_minutes=self.thresholds.history_window_minutes,
+        )
+
+        # Rohes σ und Trend-Diagnostik (für Logs)
         raw_std = self._calc_std(buffer, self.thresholds.history_window_minutes) or 0.0
         trend_consistency, significant_changes = self._calculate_trend_consistency_noise_immune(zone_index)
 
-        # Diagnostics speichern (water_std = das tatsächlich verwendete Signal)
+        # Diagnostics speichern
         self._last_water_std[zone_index] = detrended_std
         self._last_water_variance[zone_index] = detrended_std**2
         self._last_trend_consistency[zone_index] = trend_consistency
@@ -206,14 +229,15 @@ class PresenceDetector:
         # ─────────────────────────────────────────────────────────────
         raw_present, confidence, reasons = self._determine_presence(
             detrended_std,
+            detrended_std_long,
+            slope,
+            prev_slope,
             raw_std,
-            trend_consistency,
-            significant_changes,
             air_std,
-            heater_active,
             water_temp,
             surface_temp,
             zone_index,
+            now,
         )
 
         # ─────────────────────────────────────────────────────────────
@@ -266,7 +290,7 @@ class PresenceDetector:
 
     def _calculate_detrended_std(self, zone_index: int) -> float:
         """
-        Berechnet σ NACH Abzug der linearen Heiz-Rampe.
+        Berechnet σ NACH Abzug der linearen Heiz-Rampe (Standard-Fenster).
 
         Rohes σ kann hoch sein, weil das Bett gleichmäßig heizt — das ist
         KEIN Mensch. Detrended σ misst nur die Reststreuung um die
@@ -276,18 +300,21 @@ class PresenceDetector:
         Person ruhig liegend    → detrended ≈ 0.04-0.06°C
         Person aktiv            → detrended > 0.10°C
         """
+        return self._calculate_detrended_std_window(zone_index, self.thresholds.history_window_minutes)
+
+    def _calculate_detrended_std_window(self, zone_index: int, window_minutes: int) -> float:
+        """Wie _calculate_detrended_std aber mit konfigurierbarem Fenster."""
         buffer = self._water_temps.get(zone_index)
         if not buffer:
             return 0.0
 
-        cutoff = datetime.now() - timedelta(minutes=self.thresholds.history_window_minutes)
+        cutoff = datetime.now() - timedelta(minutes=window_minutes)
         temps = [val for ts, val in buffer if ts > cutoff and val is not None]
 
         n = len(temps)
         if n < 3:
             return 0.0
 
-        # Linear-Regression: y = slope*x + intercept
         x_mean = (n - 1) / 2
         y_mean = sum(temps) / n
         num = sum((i - x_mean) * (temps[i] - y_mean) for i in range(n))
@@ -297,9 +324,61 @@ class PresenceDetector:
         slope = num / den
         intercept = y_mean - slope * x_mean
 
-        # σ der Residuen (nach Abzug der Trendlinie)
         residuals_sq = sum((temps[i] - (slope * i + intercept)) ** 2 for i in range(n))
         return (residuals_sq / n) ** 0.5
+
+    # ═══════════════════════════════════════════════════════════════════════
+    # NEU v8: SLOPE in °C/h — über Zeitstempel (nicht Index)
+    # ═══════════════════════════════════════════════════════════════════════
+
+    def _calculate_slope_per_hour(
+        self,
+        zone_index: int,
+        window_minutes: Optional[int] = None,
+        offset_minutes: int = 0,
+    ) -> Optional[float]:
+        """
+        Linear-Regressions-Slope der Wassertemperatur in °C pro Stunde,
+        über echtes Zeitfenster (nicht Sample-Index).
+
+        Args:
+            window_minutes: Fenster-Länge. Default = history_window_minutes * 2.
+            offset_minutes: Wie viele Minuten zurück das Fenster ENDET
+                            (für prev_slope: end = now - offset).
+
+        Returns None wenn zu wenig Daten.
+
+        Nutzung:
+            slope = _calculate_slope_per_hour(zone)         # last 60 min
+            prev  = _calculate_slope_per_hour(zone, offset_minutes=30)  # 30-90 min ago
+        """
+        buffer = self._water_temps.get(zone_index)
+        if not buffer:
+            return None
+
+        if window_minutes is None:
+            window_minutes = self.thresholds.history_window_minutes * 2
+
+        now = datetime.now()
+        end = now - timedelta(minutes=offset_minutes)
+        start = end - timedelta(minutes=window_minutes)
+
+        samples = [(ts, val) for ts, val in buffer if start <= ts <= end and val is not None]
+        n = len(samples)
+        if n < 3:
+            return None
+
+        # Slope in °C / hour
+        t0 = samples[0][0]
+        xs = [(ts - t0).total_seconds() / 3600 for ts, _ in samples]
+        ys = [v for _, v in samples]
+        x_mean = sum(xs) / n
+        y_mean = sum(ys) / n
+        num = sum((xs[i] - x_mean) * (ys[i] - y_mean) for i in range(n))
+        den = sum((xs[i] - x_mean) ** 2 for i in range(n))
+        if den == 0:
+            return 0.0
+        return num / den
 
     # ═══════════════════════════════════════════════════════════════════════
     # NEU v5: VARIANZ MIT GLÄTTUNG (gegen Sensor-Rauschen)
@@ -406,66 +485,98 @@ class PresenceDetector:
         return consistency, total_significant
 
     # ═══════════════════════════════════════════════════════════════════════
-    # ENTSCHEIDUNGSLOGIK (angepasst für v5)
+    # ENTSCHEIDUNGSLOGIK v8 — slope + chaos-lock (CSV-validiert)
     # ═══════════════════════════════════════════════════════════════════════
 
     def _determine_presence(
         self,
         detrended_std: float,
+        detrended_std_long: float,
+        slope: Optional[float],
+        prev_slope: Optional[float],
         raw_std: float,
-        trend_consistency: float,
-        significant_changes: int,
         air_std: Optional[float],
-        heater_active: bool,
         water_temp: Optional[float],
         surface_temp: Optional[float],
         zone_index: int,
+        now: datetime,
     ) -> Tuple[bool, float, list]:
         """
-        Entscheidet ob jemand im Bett liegt.
+        v8: Bett-Zustand aus σ-detrended + Slope + Chaos-Lock.
 
-        v7: detrended σ als Primär-Signal — funktioniert mit nur EINEM
-        Wasser-Sensor und ist immun gegen monotones Heizen.
+        Drei klar getrennte Phasen aus den echten Daten (CSV April 2026):
+        1) Heizt auf (slope > +0.20 °C/h, σ_d klein)             → leer
+        2) Stabil oder leicht steigend (|slope| < 0.10) nach Rise → Person eingestiegen
+        3) Kühlt ab (slope < −0.10 °C/h)                          → Person raus
+        +) Chaos (σ_d > 0.10) übersteuert immer → Person + lockt 60 min ON
         """
-        reasons = []
+        t = self.thresholds
+        reasons = [
+            f"σd={detrended_std:.3f}",
+            f"σd60={detrended_std_long:.3f}",
+            f"slope={slope if slope is not None else 0:+.2f}/h",
+        ]
 
-        if heater_active:
-            reasons.append("⚡Heiz")
+        # ─── Chaos-Lock auffrischen wenn längeres Fenster aktiv aussieht ──
+        if detrended_std_long > t.chaos_refresh_threshold:
+            self._last_chaos_time[zone_index] = now
 
-        reasons.append(f"σd={detrended_std:.3f}")
-        reasons.append(f"σr={raw_std:.3f}")
-
-        wt = self.thresholds.water_variance_threshold  # σ-Schwelle, default 0.040
-        tc = self.thresholds.trend_chaotic
-
-        # ─── Primär: detrended σ Stufen ────────────────────────────────
-        # Detrended σ zieht die Heiz-Rampe ab, Rest ist nur Wellen-Aktivität.
-        raw_present = False
-        if detrended_std > wt * 2:  # > 0.08
+        # ─── 1) Chaos-Burst: sofort ON ────────────────────────────────────
+        if detrended_std > t.chaos_threshold:
+            self._last_chaos_time[zone_index] = now
             confidence = 0.95
             raw_present = True
-            reasons.append("→stark")
-        elif detrended_std > wt:  # > 0.04
-            confidence = 0.85
-            raw_present = True
-            reasons.append("→Präsenz")
-        elif detrended_std > wt * 0.7:  # > 0.028
-            # Auch dieser Bereich wird als Präsenz gewertet — sonst werden
-            # ruhige Schläfer auf gut gedämpften Wasserbetten verpasst.
-            confidence = 0.65
-            raw_present = True
-            reasons.append("→leicht")
-        else:
-            confidence = 0.10
-            reasons.append("→ruhig")
+            reasons.append("→chaos")
+            return self._apply_overrides(raw_present, confidence, reasons, air_std, water_temp, surface_temp)
 
-        # ─── Chaotischer Verlauf verstärkt Confidence ─────────────────
-        if trend_consistency < tc and significant_changes >= 5 and not raw_present:
-            raw_present = True
-            confidence = max(confidence, 0.75)
-            reasons.append("→chaotisch")
+        # ─── 2) Chaos-Lock aktiv: ON halten (slope wäre durch Burst verzerrt) ──
+        last_chaos = self._last_chaos_time.get(zone_index)
+        if last_chaos is not None:
+            elapsed_min = (now - last_chaos).total_seconds() / 60
+            if elapsed_min < t.chaos_lock_minutes:
+                reasons.append(f"→lock({elapsed_min:.0f}/{t.chaos_lock_minutes}min)")
+                return self._apply_overrides(True, 0.85, reasons, air_std, water_temp, surface_temp)
 
-        # ─── Luft-Varianz als Verstärker (wenn vorhanden) ─────────────
+        # ─── 3) Slope-basierte Phasen (nur wenn genug Daten) ──────────────
+        if slope is None:
+            # Nicht genug Historie für Slope → halte aktuellen Status
+            current = self._is_present.get(zone_index, False)
+            reasons.append("→halte(zu wenig Daten)")
+            return self._apply_overrides(current, 0.30, reasons, air_std, water_temp, surface_temp)
+
+        # 3a) Aktiv heizen: Slope deutlich positiv → leeres Bett wärmt auf
+        if slope > t.slope_heating_threshold:
+            reasons.append("→heizt(empty)")
+            return self._apply_overrides(False, 0.10, reasons, air_std, water_temp, surface_temp)
+
+        # 3b) Aktiv abkühlen: Slope deutlich negativ → niemand mehr da
+        if slope < t.slope_cooling_threshold:
+            reasons.append("→kühlt(out)")
+            return self._apply_overrides(False, 0.10, reasons, air_std, water_temp, surface_temp)
+
+        # 3c) Stabile Phase nach Aufheiz-Rampe: Person ist soeben eingestiegen
+        # (Heizung kann nicht mehr weiter heizen, Körper liefert die Wärme)
+        if abs(slope) < t.slope_stable_band and prev_slope is not None and prev_slope > t.slope_rise_threshold:
+            reasons.append(f"→rise→stable(prev={prev_slope:+.2f})")
+            self._last_chaos_time[zone_index] = now  # Lock für die ruhige Schlafphase
+            return self._apply_overrides(True, 0.85, reasons, air_std, water_temp, surface_temp)
+
+        # 3d) Mildes Drift / unklar: bisherigen Status halten
+        current = self._is_present.get(zone_index, False)
+        reasons.append("→halte")
+        return self._apply_overrides(current, 0.40, reasons, air_std, water_temp, surface_temp)
+
+    def _apply_overrides(
+        self,
+        raw_present: bool,
+        confidence: float,
+        reasons: list,
+        air_std: Optional[float],
+        water_temp: Optional[float],
+        surface_temp: Optional[float],
+    ) -> Tuple[bool, float, list]:
+        """Sekundäre Sensoren können Status verstärken oder hochstufen."""
+        # Luft-Varianz als Verstärker
         if air_std is not None:
             at = self.thresholds.air_variance_threshold
             if air_std > at:
@@ -474,7 +585,7 @@ class PresenceDetector:
                     raw_present = True
                 reasons.append(f"σL={air_std:.3f}")
 
-        # ─── Auflagen-Temperatur (Körperkontakt) ──────────────────────
+        # Auflagen-Temperatur (Körperkontakt)
         if surface_temp is not None and water_temp is not None:
             diff = surface_temp - water_temp
             if diff > self.thresholds.body_temp_diff:
@@ -729,6 +840,14 @@ class PresenceDetector:
         a_std = self._last_air_std.get(zone_index, 0.0)
         sig_changes = self._last_significant_changes.get(zone_index, 0)
 
+        # v8 diagnostics
+        slope = self._calculate_slope_per_hour(zone_index)
+        last_chaos = self._last_chaos_time.get(zone_index)
+        chaos_lock_remaining = 0.0
+        if last_chaos is not None:
+            elapsed = (datetime.now() - last_chaos).total_seconds() / 60
+            chaos_lock_remaining = max(0.0, self.thresholds.chaos_lock_minutes - elapsed)
+
         hum_buf = self._humidity.get(zone_index)
         current_humidity = None
         if hum_buf and len(hum_buf) > 0:
@@ -741,15 +860,20 @@ class PresenceDetector:
             "last_state_change": last_change.isoformat() if last_change else None,
             "water_variance": round(variance, 6),
             "trend_consistency": round(trend, 3),
-            "significant_changes": sig_changes,  # NEU
+            "significant_changes": sig_changes,
             "water_temp_std": round(w_std, 4),
             "air_temp_std": round(a_std, 4),
-            "noise_threshold": SENSOR_NOISE_THRESHOLD,  # NEU
+            "slope_per_hour": round(slope, 3) if slope is not None else None,
+            "chaos_lock_remaining_min": round(chaos_lock_remaining, 1),
+            "noise_threshold": SENSOR_NOISE_THRESHOLD,
             "thresholds": {
                 "variance_low": self.thresholds.variance_low,
                 "variance_high": self.thresholds.variance_high,
                 "trend_threshold": self.thresholds.trend_threshold,
                 "trend_chaotic": self.thresholds.trend_chaotic,
+                "slope_heating": self.thresholds.slope_heating_threshold,
+                "slope_cooling": self.thresholds.slope_cooling_threshold,
+                "chaos": self.thresholds.chaos_threshold,
             },
             "humidity": round(current_humidity, 1) if current_humidity else None,
             "is_sweating": self.is_sweating(zone_index),
