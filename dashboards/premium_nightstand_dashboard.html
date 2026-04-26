@@ -3,494 +3,1048 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
-    <title>Premium Wasserbett Nachttisch-Cockpit</title>
+    <meta name="theme-color" content="#000000" />
+    <title>Rejuvenation · Nightstand</title>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700;800&family=JetBrains+Mono:wght@400;700&display=swap" rel="stylesheet" />
-    <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-    <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+    <link
+      href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=VT323&display=swap"
+      rel="stylesheet"
+    />
     <style>
       :root {
-        --bg: #0a0a0a;
-        --bg-2: #000000;
-        --amber: #ffb347;
-        --amber-2: #f59e0b;
-        --amber-3: #d97706;
-        --text: #ffd8a6;
-        --muted: #a47a40;
-        --line: rgba(255, 179, 71, 0.22);
-        --shadow: 0 0 24px rgba(245, 158, 11, 0.28);
+        --bg: #000000;
+        --bezel: #0a0905;
+        --bezel-edge: #1a1308;
+        --amber-on: #ffae3a;
+        --amber-glow: #ff8a1a;
+        --amber-deep: #c25a00;
+        --amber-dim: #2a1d0b;
+        --amber-text: #ffc66e;
+        --amber-mute: #6b4d22;
+        --red-led: #ff3030;
+        --red-led-dim: #2a0606;
+        --green-led: #2dff8a;
+        --green-led-dim: #052a14;
       }
 
-      * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+      * {
+        box-sizing: border-box;
+        -webkit-tap-highlight-color: transparent;
+        user-select: none;
+      }
 
-      html, body {
+      html,
+      body {
         margin: 0;
+        padding: 0;
         width: 100%;
-        height: 100%;
-        background: radial-gradient(circle at 50% 10%, #111 0%, var(--bg) 50%, var(--bg-2) 100%);
-        color: var(--text);
-        font-family: Inter, "Segoe UI", system-ui, sans-serif;
-        overflow: hidden;
+        min-height: 100vh;
+        background: var(--bg);
+        color: var(--amber-text);
+        font-family: "Share Tech Mono", "VT323", ui-monospace, monospace;
+        overflow-x: hidden;
       }
 
-      #root {
-        width: 100%;
-        height: 100%;
+      /* Subtle CRT scan-line overlay across the whole device */
+      body::after {
+        content: "";
+        position: fixed;
+        inset: 0;
+        pointer-events: none;
+        background: repeating-linear-gradient(
+          to bottom,
+          rgba(255, 174, 58, 0.025) 0px,
+          rgba(255, 174, 58, 0.025) 1px,
+          transparent 1px,
+          transparent 3px
+        );
+        z-index: 50;
+        mix-blend-mode: screen;
       }
 
-      .app {
-        width: 100%;
-        height: 100%;
-        padding: 20px;
+      .device {
+        max-width: 520px;
+        margin: 0 auto;
+        padding: 18px 14px 28px;
         display: grid;
-        grid-template-rows: auto 1fr;
         gap: 14px;
       }
 
-      .chrome {
+      /* ──────────────────────────────────────────────── BEZEL ── */
+      .bezel {
+        background: linear-gradient(180deg, #14100a 0%, #0a0805 100%);
+        border: 1px solid var(--bezel-edge);
+        border-radius: 16px;
+        padding: 12px 14px;
         display: flex;
         align-items: center;
         justify-content: space-between;
-        border: 1px solid var(--line);
-        border-radius: 14px;
-        padding: 10px 14px;
-        background: rgba(255, 179, 71, 0.03);
+        box-shadow:
+          inset 0 1px 0 rgba(255, 174, 58, 0.06),
+          0 0 0 1px rgba(255, 174, 58, 0.04);
       }
 
-      .brand { font-weight: 700; letter-spacing: .05em; color: var(--amber); }
-      .status-icons { display: flex; gap: 12px; color: var(--amber-2); opacity: .95; }
-
-      .main {
-        display: grid;
-        grid-template-columns: 1.15fr 0.95fr;
-        gap: 16px;
-        min-height: 0;
-      }
-
-      .panel {
-        border: 1px solid var(--line);
-        border-radius: 20px;
-        padding: 16px;
-        background: linear-gradient(180deg, rgba(255,179,71,0.06), rgba(255,179,71,0.015));
-        box-shadow: inset 0 0 40px rgba(255, 179, 71, 0.03);
-        min-height: 0;
-      }
-
-      .left {
-        display: grid;
-        grid-template-rows: auto auto 1fr auto;
-        gap: 14px;
-      }
-
-      .right {
-        display: grid;
-        grid-template-rows: auto auto auto 1fr;
+      .leds {
+        display: flex;
         gap: 12px;
+      }
+      .led {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: var(--amber-dim);
+        box-shadow: inset 0 0 2px rgba(0, 0, 0, 0.6);
+        transition: all 0.3s;
+      }
+      .led.on {
+        background: var(--amber-on);
+        box-shadow:
+          0 0 6px var(--amber-glow),
+          0 0 12px rgba(255, 138, 26, 0.6);
+      }
+      .led.red.on {
+        background: var(--red-led);
+        box-shadow:
+          0 0 6px var(--red-led),
+          0 0 12px rgba(255, 48, 48, 0.6);
+      }
+      .led.green.on {
+        background: var(--green-led);
+        box-shadow:
+          0 0 6px var(--green-led),
+          0 0 12px rgba(45, 255, 138, 0.5);
+      }
+
+      .brand {
+        font-size: 11px;
+        letter-spacing: 0.32em;
+        color: var(--amber-mute);
+      }
+      .brand .dot {
+        color: var(--amber-on);
+      }
+
+      /* ─────────────────────────────────────────── CLOCK FACE ── */
+      .face {
+        background: radial-gradient(
+            ellipse at top,
+            rgba(255, 174, 58, 0.05),
+            transparent 60%
+          ),
+          var(--bezel);
+        border: 1px solid var(--bezel-edge);
+        border-radius: 18px;
+        padding: 24px 18px 18px;
+        position: relative;
+        overflow: hidden;
+        box-shadow: inset 0 0 60px rgba(255, 138, 26, 0.04);
+      }
+
+      /* speaker-grille slats accent on top */
+      .face::before {
+        content: "";
+        position: absolute;
+        top: 8px;
+        left: 12%;
+        right: 12%;
+        height: 4px;
+        background: repeating-linear-gradient(
+          90deg,
+          rgba(255, 174, 58, 0.18) 0,
+          rgba(255, 174, 58, 0.18) 2px,
+          transparent 2px,
+          transparent 4px
+        );
+        border-radius: 2px;
       }
 
       .clock {
-        font-family: "JetBrains Mono", monospace;
-        font-size: clamp(36px, 6vw, 72px);
-        font-weight: 700;
-        letter-spacing: .03em;
-        color: var(--amber);
-        text-shadow: var(--shadow);
-      }
-
-      .sub { color: var(--muted); font-size: .9rem; }
-
-      .bed-stage { text-align: center; }
-
-      .bed-icon {
-        margin: 10px auto 8px;
-        width: min(92%, 560px);
-        height: 145px;
-        border: 1.5px solid var(--amber-3);
-        border-radius: 18px;
-        position: relative;
-        box-shadow: 0 0 28px rgba(217, 119, 6, 0.25);
-      }
-
-      .bed-icon::before, .bed-icon::after {
-        content: "";
-        position: absolute;
-        border: 1.5px solid var(--amber-2);
-      }
-
-      .bed-icon::before {
-        left: 8%; right: 8%; top: 24%; height: 46%;
-        border-radius: 10px;
-      }
-
-      .bed-icon::after {
-        left: 5%; width: 90%; bottom: -10px; height: 12px;
-        border-radius: 8px;
-        background: rgba(255, 179, 71, 0.08);
-      }
-
-      .temp {
-        font-family: "JetBrains Mono", monospace;
-        font-size: clamp(30px, 5vw, 58px);
-        font-weight: 800;
-        color: #ffd49b;
-      }
-
-      .phase {
-        color: var(--amber-2);
-        font-weight: 600;
-        margin-top: 6px;
-      }
-
-      .alarm-block {
-        display: grid;
-        grid-template-columns: 1fr auto;
-        gap: 10px;
-        align-items: center;
-      }
-
-      .alarm-time {
-        font-family: "JetBrains Mono", monospace;
-        font-size: clamp(32px, 5vw, 56px);
-        font-weight: 800;
-        letter-spacing: .03em;
-      }
-
-      .alarm-controls {
         display: flex;
         align-items: center;
-        gap: 8px;
+        justify-content: center;
+        gap: 4px;
+        margin: 14px 0 6px;
       }
 
-      .btn {
-        min-width: 44px;
-        min-height: 44px;
-        border-radius: 12px;
-        border: 1px solid var(--line);
-        background: rgba(255, 179, 71, 0.06);
-        color: var(--amber);
-        font-size: 1.25rem;
-        font-weight: 700;
-        cursor: pointer;
-        transition: transform .15s ease, box-shadow .18s ease, background .18s ease;
+      .digit {
+        width: 56px;
+        height: 96px;
       }
 
-      .btn:hover, .btn:active {
-        transform: translateY(-1px);
-        box-shadow: var(--shadow);
-        background: rgba(255, 179, 71, 0.12);
+      .colon {
+        display: flex;
+        flex-direction: column;
+        justify-content: center;
+        align-items: center;
+        gap: 16px;
+        height: 96px;
+        padding: 0 4px;
+      }
+      .colon span {
+        width: 10px;
+        height: 10px;
+        background: var(--amber-on);
+        border-radius: 50%;
+        box-shadow: 0 0 8px var(--amber-glow), 0 0 16px rgba(255, 138, 26, 0.5);
+        animation: blink 2s steps(2) infinite;
+      }
+      @keyframes blink {
+        0%,
+        50% {
+          opacity: 1;
+        }
+        50.01%,
+        100% {
+          opacity: 0.15;
+        }
       }
 
-      .toggles {
+      .meta {
+        display: flex;
+        justify-content: space-between;
+        margin-top: 10px;
+        font-size: 13px;
+        color: var(--amber-mute);
+        letter-spacing: 0.2em;
+      }
+      .meta .alarm-line {
+        color: var(--amber-text);
+      }
+
+      /* ────────────────────────────────────────── BED ZONES ── */
+      .zones {
         display: grid;
-        grid-template-columns: repeat(2, minmax(0,1fr));
+        grid-template-columns: 1fr 1fr;
         gap: 10px;
       }
-
-      .toggle {
-        min-height: 60px;
+      .zone {
+        background: var(--bezel);
+        border: 1px solid var(--bezel-edge);
         border-radius: 14px;
-        border: 1px solid var(--line);
-        padding: 10px;
+        padding: 14px 12px;
+        text-align: center;
+        position: relative;
+      }
+      .zone-label {
+        font-size: 11px;
+        letter-spacing: 0.32em;
+        color: var(--amber-mute);
+        margin-bottom: 6px;
+      }
+      .zone-temp {
+        font-family: "VT323", monospace;
+        font-size: 44px;
+        line-height: 1;
+        color: var(--amber-on);
+        text-shadow: 0 0 6px var(--amber-glow), 0 0 14px rgba(255, 138, 26, 0.4);
+        letter-spacing: 0.04em;
+      }
+      .zone-target {
+        font-size: 11px;
+        color: var(--amber-mute);
+        margin-top: 4px;
+        letter-spacing: 0.15em;
+      }
+      .pill-row {
+        display: flex;
+        justify-content: center;
+        gap: 6px;
+        margin-top: 10px;
+      }
+      .pill {
+        font-size: 9px;
+        letter-spacing: 0.2em;
+        padding: 3px 7px;
+        border: 1px solid var(--amber-dim);
+        border-radius: 10px;
+        color: var(--amber-mute);
+      }
+      .pill.on {
+        color: var(--amber-on);
+        border-color: var(--amber-deep);
+        box-shadow: inset 0 0 8px rgba(255, 138, 26, 0.18);
+      }
+      .pill.bed.on {
+        color: var(--green-led);
+        border-color: rgba(45, 255, 138, 0.4);
+        box-shadow: inset 0 0 8px rgba(45, 255, 138, 0.15);
+      }
+
+      /* ────────────────────────────────────── LIGHT ROCKER ── */
+      .light-row {
+        background: var(--bezel);
+        border: 1px solid var(--bezel-edge);
+        border-radius: 14px;
+        padding: 14px 16px;
         display: flex;
         align-items: center;
         justify-content: space-between;
-        background: rgba(255, 179, 71, 0.03);
-        transition: box-shadow .2s ease, border-color .2s ease, background .2s ease;
+        gap: 12px;
       }
-
-      .toggle.active {
-        border-color: var(--amber);
-        box-shadow: var(--shadow);
-        background: rgba(255, 179, 71, 0.12);
+      .light-label {
+        font-size: 12px;
+        letter-spacing: 0.3em;
+        color: var(--amber-mute);
       }
-
-      .toggle-label { display: flex; gap: 8px; align-items: center; font-weight: 700; }
-
-      .switch {
-        width: 52px;
-        height: 30px;
-        border-radius: 999px;
-        border: 1px solid var(--line);
+      .light-name {
+        font-size: 10px;
+        letter-spacing: 0.15em;
+        color: var(--amber-text);
+        opacity: 0.6;
+        margin-top: 3px;
+      }
+      .light-name.muted {
+        color: var(--amber-mute);
+      }
+      .rocker {
         position: relative;
-        background: rgba(255,255,255,0.08);
+        width: 96px;
+        height: 44px;
+        background: #0a0805;
+        border: 1px solid var(--bezel-edge);
+        border-radius: 8px;
+        cursor: pointer;
+        overflow: hidden;
+        flex-shrink: 0;
       }
-
-      .switch::after {
-        content: "";
+      .rocker-knob {
         position: absolute;
-        top: 3px;
-        left: 3px;
-        width: 22px;
-        height: 22px;
+        top: 2px;
+        left: 2px;
+        width: 46px;
+        height: 38px;
+        background: linear-gradient(180deg, #2a1d0b, #100a04);
+        border: 1px solid var(--amber-deep);
+        border-radius: 6px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 11px;
+        letter-spacing: 0.18em;
+        color: var(--amber-mute);
+        transition: all 0.25s cubic-bezier(0.5, 0, 0.4, 1.4);
+      }
+      .rocker.on .rocker-knob {
+        left: calc(100% - 48px);
+        background: linear-gradient(180deg, #ff9f1a, #c66600);
+        color: #1a0e02;
+        font-weight: 700;
+        border-color: var(--amber-on);
+        box-shadow: 0 0 14px rgba(255, 138, 26, 0.5);
+      }
+      .rocker-track-text {
+        position: absolute;
+        inset: 0;
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0 10px;
+        font-size: 10px;
+        letter-spacing: 0.2em;
+        color: var(--amber-mute);
+        pointer-events: none;
+      }
+
+      /* ─────────────────────────────────────── MODE BUTTONS ── */
+      .modes {
+        display: grid;
+        grid-template-columns: repeat(4, 1fr);
+        gap: 8px;
+      }
+      .btn {
+        background: var(--bezel);
+        border: 1px solid var(--bezel-edge);
+        border-radius: 10px;
+        padding: 14px 4px 10px;
+        color: var(--amber-mute);
+        font-family: inherit;
+        font-size: 11px;
+        letter-spacing: 0.25em;
+        cursor: pointer;
+        position: relative;
+        transition: all 0.15s;
+      }
+      .btn::before {
+        content: "";
+        display: block;
+        width: 6px;
+        height: 6px;
         border-radius: 50%;
-        background: #f7e5ca;
-        transition: transform .2s ease;
+        background: var(--amber-dim);
+        margin: 0 auto 8px;
+      }
+      .btn.on {
+        color: var(--amber-on);
+        border-color: var(--amber-deep);
+        box-shadow:
+          inset 0 0 12px rgba(255, 138, 26, 0.18),
+          0 0 12px rgba(255, 138, 26, 0.15);
+      }
+      .btn.on::before {
+        background: var(--amber-on);
+        box-shadow: 0 0 6px var(--amber-glow);
+      }
+      .btn:active {
+        transform: scale(0.96);
       }
 
-      .toggle.active .switch {
-        background: rgba(245, 158, 11, 0.35);
+      /* ─────────────────────────────────────── DEBUG LINE ── */
+      .telemetry {
+        font-size: 10px;
+        color: var(--amber-mute);
+        letter-spacing: 0.18em;
+        text-align: center;
+        opacity: 0.45;
       }
 
-      .toggle.active .switch::after { transform: translateX(22px); }
-
-      .feedback {
-        min-height: 22px;
-        color: var(--amber-2);
-        opacity: 0;
-        transform: translateY(4px);
-        transition: opacity .25s ease, transform .25s ease;
-        font-size: .92rem;
+      /* ────────────────────────────────────── SETTINGS MODAL ── */
+      .modal {
+        position: fixed;
+        inset: 0;
+        background: rgba(0, 0, 0, 0.85);
+        backdrop-filter: blur(4px);
+        display: none;
+        align-items: flex-start;
+        justify-content: center;
+        padding: 30px 14px;
+        z-index: 100;
+        overflow-y: auto;
+      }
+      .modal.show {
+        display: flex;
+      }
+      .modal-card {
+        max-width: 480px;
+        width: 100%;
+        background: var(--bezel);
+        border: 1px solid var(--amber-deep);
+        border-radius: 18px;
+        padding: 22px;
+        box-shadow: 0 0 40px rgba(255, 138, 26, 0.18);
+      }
+      .modal-card h2 {
+        margin: 0 0 4px;
+        font-size: 14px;
+        letter-spacing: 0.4em;
+        color: var(--amber-on);
+        font-weight: normal;
+      }
+      .modal-card .hint {
+        font-size: 11px;
+        color: var(--amber-mute);
+        margin-bottom: 18px;
+        letter-spacing: 0.1em;
+      }
+      .field {
+        margin-bottom: 14px;
+      }
+      .field label {
+        display: block;
+        font-size: 10px;
+        letter-spacing: 0.3em;
+        color: var(--amber-mute);
+        margin-bottom: 5px;
+      }
+      .field input {
+        width: 100%;
+        background: #0a0805;
+        border: 1px solid var(--bezel-edge);
+        border-radius: 6px;
+        padding: 9px 10px;
+        color: var(--amber-text);
+        font-family: inherit;
+        font-size: 13px;
+        letter-spacing: 0.05em;
+      }
+      .field input:focus {
+        outline: none;
+        border-color: var(--amber-deep);
+        box-shadow: 0 0 0 1px var(--amber-deep);
+      }
+      .modal-actions {
+        display: flex;
+        gap: 8px;
+        margin-top: 14px;
+      }
+      .modal-actions .btn {
+        flex: 1;
+        padding: 12px 4px;
+      }
+      .modal-actions .btn::before {
+        display: none;
+      }
+      .modal-actions .btn.primary {
+        color: var(--amber-on);
+        border-color: var(--amber-deep);
       }
 
-      .feedback.show {
-        opacity: 1;
-        transform: translateY(0);
+      /* group separator */
+      .sep {
+        height: 1px;
+        background: var(--bezel-edge);
+        margin: 16px 0 12px;
+      }
+      .sep-label {
+        font-size: 10px;
+        letter-spacing: 0.32em;
+        color: var(--amber-mute);
+        margin-bottom: 8px;
       }
 
-      /* MINI ANSICHT (z.B. Z Flip Außendisplay) */
-      @media (max-width: 799px) {
-        .app {
-          padding: 10px;
-          gap: 8px;
-          grid-template-rows: auto 1fr;
+      /* ───────────────────────────────────── RESPONSIVE ── */
+      @media (min-width: 600px) {
+        .digit {
+          width: 68px;
+          height: 116px;
         }
-
-        .chrome { padding: 8px 10px; border-radius: 10px; }
-        .brand { font-size: .78rem; }
-
-        .main {
-          display: block;
-          height: 100%;
+        .colon {
+          height: 116px;
         }
-
-        .left, .right {
-          grid-template-rows: none;
-          display: flex;
-          flex-direction: column;
-          gap: 8px;
-          height: 100%;
+        .colon span {
+          width: 12px;
+          height: 12px;
         }
-
-        .panel {
-          padding: 10px;
-          border-radius: 12px;
+        .zone-temp {
+          font-size: 56px;
         }
+      }
 
-        .bed-stage,
-        .alarm-controls .btn,
-        .sub-phase,
-        .bed-icon,
-        .main .left .phase,
-        .main .left .bed-graphic,
-        .desktop-only {
-          display: none !important;
+      @media (max-width: 360px) {
+        .digit {
+          width: 46px;
+          height: 80px;
         }
-
-        .clock {
-          font-size: clamp(54px, 17vw, 88px);
-          line-height: 1;
-          text-align: center;
+        .colon {
+          height: 80px;
+          gap: 12px;
         }
-
-        .alarm-time {
-          font-size: clamp(28px, 9vw, 40px);
-          text-align: center;
+        .colon span {
+          width: 8px;
+          height: 8px;
         }
-
-        .mini-alarm-state {
-          display: block;
-          text-align: center;
-          color: var(--amber-2);
-          font-weight: 700;
-          margin-top: 2px;
+        .zone-temp {
+          font-size: 36px;
         }
-
-        .temp {
-          font-size: clamp(30px, 10vw, 42px);
-          text-align: center;
-        }
-
-        .toggles {
-          grid-template-columns: repeat(2, minmax(0, 1fr));
-          gap: 8px;
-        }
-
-        .toggle {
-          min-height: 72px;
-          padding: 8px;
-          border-radius: 12px;
-        }
-
-        .toggle-label {
-          flex-direction: column;
-          align-items: flex-start;
-          gap: 4px;
-          font-size: .92rem;
-        }
-
-        .switch {
-          width: 60px;
-          height: 34px;
-        }
-
-        .switch::after {
-          width: 26px;
-          height: 26px;
-          top: 3px;
-          left: 3px;
-        }
-
-        .toggle.active .switch::after { transform: translateX(26px); }
-
-        .full-width { grid-column: 1 / -1; }
-
-        .feedback {
-          min-height: 18px;
-          text-align: center;
-          font-size: .8rem;
+        .modes {
+          font-size: 10px;
         }
       }
     </style>
   </head>
   <body>
-    <div id="root"></div>
+    <main class="device">
+      <!-- ────────────── HEADER BEZEL: brand + status LEDs ── -->
+      <header class="bezel">
+        <div class="leds">
+          <span class="led" id="led-pl" title="Presence Left"></span>
+          <span class="led" id="led-pr" title="Presence Right"></span>
+          <span class="led red" id="led-heat" title="Heating"></span>
+          <span class="led green" id="led-alarm" title="Alarm armed"></span>
+        </div>
+        <div class="brand">
+          REJUVENATION<span class="dot">·</span>BED
+        </div>
+      </header>
 
-    <script type="text/babel">
-      const { useEffect, useMemo, useState } = React;
+      <!-- ────────────── CLOCK FACE: time + alarm ── -->
+      <section class="face">
+        <div class="clock" id="clock">
+          <svg class="digit" id="d1" viewBox="0 0 100 160"></svg>
+          <svg class="digit" id="d2" viewBox="0 0 100 160"></svg>
+          <div class="colon"><span></span><span></span></div>
+          <svg class="digit" id="d3" viewBox="0 0 100 160"></svg>
+          <svg class="digit" id="d4" viewBox="0 0 100 160"></svg>
+        </div>
+        <div class="meta">
+          <span id="dateline">— · — —</span>
+          <span class="alarm-line" id="alarmline">⏰ —:—</span>
+        </div>
+      </section>
 
-      function pad(n) { return String(n).padStart(2, '0'); }
-
-      function ClockText({ now }) {
-        return <div className="clock">{pad(now.getHours())}:{pad(now.getMinutes())}</div>;
-      }
-
-      function ToggleCard({ icon, label, active, onToggle, className = "" }) {
-        return (
-          <button className={`toggle ${active ? 'active' : ''} ${className}`} onClick={onToggle}>
-            <span className="toggle-label"><span>{icon}</span><span>{label}</span></span>
-            <span className="switch" />
-          </button>
-        );
-      }
-
-      function App() {
-        const [now, setNow] = useState(new Date());
-        const [temp, setTemp] = useState(28.5);
-        const [alarmHour, setAlarmHour] = useState(6);
-        const [alarmMinute, setAlarmMinute] = useState(30);
-        const [alarmEnabled, setAlarmEnabled] = useState(true);
-        const [lightOn, setLightOn] = useState(false);
-        const [boostOn, setBoostOn] = useState(false);
-        const [sickOn, setSickOn] = useState(false);
-        const [feedback, setFeedback] = useState("");
-
-        useEffect(() => {
-          const t = setInterval(() => setNow(new Date()), 1000);
-          return () => clearInterval(t);
-        }, []);
-
-        useEffect(() => {
-          const id = setInterval(() => {
-            setTemp((v) => {
-              const next = v + (Math.random() - 0.5) * 0.08;
-              return Math.max(26.8, Math.min(31.2, Number(next.toFixed(1))));
-            });
-          }, 5000);
-          return () => clearInterval(id);
-        }, []);
-
-        useEffect(() => {
-          if (!feedback) return;
-          const id = setTimeout(() => setFeedback(""), 1300);
-          return () => clearTimeout(id);
-        }, [feedback]);
-
-        const alarmText = `${pad(alarmHour)}:${pad(alarmMinute)}`;
-
-        const phase = useMemo(() => {
-          const h = now.getHours();
-          if (h >= 23 || h < 3) return "Tiefschlaf";
-          if (h >= 3 && h < 6) return "REM-Phase";
-          if (h >= 6 && h < 9) return "Aufwachphase";
-          return "Standby";
-        }, [now]);
-
-        const adjustAlarm = (delta) => {
-          const total = (alarmHour * 60 + alarmMinute + delta + 24 * 60) % (24 * 60);
-          setAlarmHour(Math.floor(total / 60));
-          setAlarmMinute(total % 60);
-          setFeedback(`Wecker: ${pad(Math.floor(total / 60))}:${pad(total % 60)}`);
-        };
-
-        const toggle = (setter, label, activeLabel = "aktiv", offLabel = "aus") => {
-          setter((prev) => {
-            const next = !prev;
-            setFeedback(`${label} ${next ? activeLabel : offLabel}`);
-            return next;
-          });
-        };
-
-        return (
-          <div className="app">
-            <div className="chrome">
-              <div className="brand">WASSERBETT · PREMIUM COCKPIT</div>
-              <div className="status-icons" aria-label="Statussymbole">
-                <span title="WLAN">📶</span>
-                <span title="Batterie">🔋 86%</span>
-              </div>
-            </div>
-
-            <div className="main">
-              <section className="panel left">
-                <ClockText now={now} />
-                <div className="sub desktop-only">Live-Uhr · lokale Zeit</div>
-
-                <div className="bed-stage desktop-only">
-                  <div className="bed-icon bed-graphic" />
-                  <div className="temp">{temp.toFixed(1)}°C</div>
-                  <div className="phase">Biorhythmus: {phase}</div>
-                </div>
-
-                <div className="mini-alarm-state" style={{ display: 'none' }}>
-                  {alarmEnabled ? "⏰ Wecker aktiv" : "🔕 Wecker aus"}
-                </div>
-
-                <div className={`feedback ${feedback ? 'show' : ''}`}>{feedback || ' '}</div>
-              </section>
-
-              <section className="panel right">
-                <div className="alarm-block">
-                  <div>
-                    <div className="sub">Weckzeit</div>
-                    <div className="alarm-time">{alarmText}</div>
-                    <div className="mini-alarm-state">{alarmEnabled ? '⏰ Aktiv' : '🔕 Aus'}</div>
-                  </div>
-
-                  <div className="alarm-controls desktop-only">
-                    <button className="btn" onClick={() => adjustAlarm(-5)} aria-label="Minus 5 Minuten">−</button>
-                    <button className="btn" onClick={() => adjustAlarm(+5)} aria-label="Plus 5 Minuten">+</button>
-                  </div>
-                </div>
-
-                <div className="temp">{temp.toFixed(1)}°C</div>
-
-                <div className="toggles">
-                  <ToggleCard icon="⏰" label="Wecker" active={alarmEnabled} onToggle={() => toggle(setAlarmEnabled, 'Wecker', 'an', 'aus')} />
-                  <ToggleCard icon="⚡" label="Boost" active={boostOn} onToggle={() => toggle(setBoostOn, 'Boost', 'aktiv', 'aus')} />
-                  <ToggleCard icon="🤒" label="Krankmodus" active={sickOn} onToggle={() => toggle(setSickOn, 'Krankmodus', 'aktiv', 'aus')} />
-                  <ToggleCard icon="💡" label="Licht" active={lightOn} onToggle={() => toggle(setLightOn, 'Licht', 'an', 'aus')} className="full-width" />
-                </div>
-
-                <div className="sub desktop-only">Touch-optimiert · Hauptansicht ≥ 800px · Miniansicht &lt; 800px</div>
-              </section>
-            </div>
+      <!-- ────────────── BED ZONES: only what matters ── -->
+      <section class="zones">
+        <div class="zone">
+          <div class="zone-label">LEFT</div>
+          <div class="zone-temp" id="t-left">--.-°</div>
+          <div class="zone-target" id="g-left">→ --.-°</div>
+          <div class="pill-row">
+            <span class="pill bed" id="p-left">EMPTY</span>
+            <span class="pill" id="h-left">IDLE</span>
           </div>
-        );
+        </div>
+        <div class="zone">
+          <div class="zone-label">RIGHT</div>
+          <div class="zone-temp" id="t-right">--.-°</div>
+          <div class="zone-target" id="g-right">→ --.-°</div>
+          <div class="pill-row">
+            <span class="pill bed" id="p-right">EMPTY</span>
+            <span class="pill" id="h-right">IDLE</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- ────────────── CONFIGURABLE LIGHT SWITCH ── -->
+      <section class="light-row">
+        <div>
+          <div class="light-label">NIGHT LIGHT</div>
+          <div class="light-name muted" id="light-name">— not configured —</div>
+        </div>
+        <div class="rocker" id="light-rocker" role="switch" aria-checked="false">
+          <div class="rocker-track-text">
+            <span>OFF</span><span>ON</span>
+          </div>
+          <div class="rocker-knob" id="rocker-knob">OFF</div>
+        </div>
+      </section>
+
+      <!-- ────────────── MODE BUTTONS ── -->
+      <section class="modes">
+        <button class="btn" id="btn-boost">BOOST</button>
+        <button class="btn" id="btn-sick">SICK</button>
+        <button class="btn" id="btn-vac">HOLD</button>
+        <button class="btn" id="btn-set">SET</button>
+      </section>
+
+      <div class="telemetry" id="telemetry">DEMO MODE · open SET to wire entities</div>
+    </main>
+
+    <!-- ────────────── SETTINGS MODAL ── -->
+    <div class="modal" id="modal">
+      <div class="modal-card">
+        <h2>SETTINGS</h2>
+        <div class="hint">
+          Trag deine Home-Assistant-Entitäten ein. Alles wird lokal im Browser
+          gespeichert (keine Cloud, kein Server).
+        </div>
+
+        <div class="sep-label">CONNECTION</div>
+        <div class="field">
+          <label>HA URL (z.B. http://homeassistant.local:8123)</label>
+          <input type="text" id="cfg-haurl" placeholder="leave empty for demo mode" />
+        </div>
+        <div class="field">
+          <label>Long-Lived Access Token</label>
+          <input type="password" id="cfg-token" placeholder="optional" />
+        </div>
+
+        <div class="sep"></div>
+        <div class="sep-label">BED</div>
+        <div class="field">
+          <label>Climate · Left</label>
+          <input type="text" id="cfg-cl-left" placeholder="climate.rejuvenation_bed_links" />
+        </div>
+        <div class="field">
+          <label>Climate · Right</label>
+          <input type="text" id="cfg-cl-right" placeholder="climate.rejuvenation_bed_rechts" />
+        </div>
+        <div class="field">
+          <label>Presence Sensor · Left</label>
+          <input type="text" id="cfg-pres-left" placeholder="binary_sensor.bett_links_belegung" />
+        </div>
+        <div class="field">
+          <label>Presence Sensor · Right</label>
+          <input type="text" id="cfg-pres-right" placeholder="binary_sensor.bett_rechts_belegung" />
+        </div>
+
+        <div class="sep"></div>
+        <div class="sep-label">NIGHTSTAND</div>
+        <div class="field">
+          <label>Light Entity (alles was switch.* oder light.* ist)</label>
+          <input type="text" id="cfg-light" placeholder="light.nachttisch" />
+        </div>
+        <div class="field">
+          <label>Alarm Sensor (z.B. sensor.next_alarm)</label>
+          <input type="text" id="cfg-alarm" placeholder="sensor.next_alarm" />
+        </div>
+
+        <div class="sep"></div>
+        <div class="sep-label">MODES (optional)</div>
+        <div class="field">
+          <label>Boost Switch</label>
+          <input type="text" id="cfg-boost" placeholder="switch.bett_links_schnellheizen" />
+        </div>
+        <div class="field">
+          <label>Sick Switch</label>
+          <input type="text" id="cfg-sick" placeholder="switch.bett_links_krank_modus" />
+        </div>
+        <div class="field">
+          <label>Vacation Switch</label>
+          <input type="text" id="cfg-vac" placeholder="switch.bett_urlaub_modus" />
+        </div>
+
+        <div class="modal-actions">
+          <button class="btn" id="cfg-cancel">CANCEL</button>
+          <button class="btn primary" id="cfg-save">SAVE</button>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      // ─────────────────────────────────────────────────────────
+      //  7-SEGMENT DIGIT RENDERING (SVG)
+      // ─────────────────────────────────────────────────────────
+      // Segments are arranged as:
+      //         a
+      //       ┌───┐
+      //     f │   │ b
+      //       ├─g─┤
+      //     e │   │ c
+      //       └───┘
+      //         d
+      const SEGMENTS = {
+        a: "M18,12 L82,12 L74,20 L26,20 Z",
+        b: "M82,16 L88,22 L88,72 L82,78 L78,72 L78,22 Z",
+        c: "M82,84 L88,90 L88,140 L82,148 L78,140 L78,90 Z",
+        d: "M18,150 L82,150 L74,142 L26,142 Z",
+        e: "M18,84 L22,90 L22,140 L18,148 L12,140 L12,90 Z",
+        f: "M18,16 L22,22 L22,72 L18,78 L12,72 L12,22 Z",
+        g: "M18,80 L26,74 L74,74 L82,80 L74,86 L26,86 Z",
+      };
+      const DIGITS = {
+        0: "abcdef",
+        1: "bc",
+        2: "abged",
+        3: "abgcd",
+        4: "fgbc",
+        5: "afgcd",
+        6: "afgcde",
+        7: "abc",
+        8: "abcdefg",
+        9: "abcdfg",
+        " ": "",
+      };
+
+      function renderDigit(svg, char) {
+        svg.innerHTML = "";
+        const active = DIGITS[char] || "";
+        Object.entries(SEGMENTS).forEach(([seg, d]) => {
+          const path = document.createElementNS(
+            "http://www.w3.org/2000/svg",
+            "path"
+          );
+          path.setAttribute("d", d);
+          if (active.includes(seg)) {
+            path.setAttribute("fill", "var(--amber-on)");
+            path.setAttribute(
+              "style",
+              "filter: drop-shadow(0 0 3px var(--amber-glow)) drop-shadow(0 0 8px rgba(255,138,26,.5));"
+            );
+          } else {
+            path.setAttribute("fill", "var(--amber-dim)");
+          }
+          svg.appendChild(path);
+        });
       }
 
-      ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+      function renderClock(hh, mm) {
+        const s = String(hh).padStart(2, " ") + String(mm).padStart(2, "0");
+        renderDigit(document.getElementById("d1"), s[0]);
+        renderDigit(document.getElementById("d2"), s[1]);
+        renderDigit(document.getElementById("d3"), s[2]);
+        renderDigit(document.getElementById("d4"), s[3]);
+      }
+
+      // ─────────────────────────────────────────────────────────
+      //  CONFIG / LOCAL STORAGE
+      // ─────────────────────────────────────────────────────────
+      const CFG_KEY = "rejuvenation.nightstand.cfg.v1";
+      const DEFAULT_CFG = {
+        haUrl: "",
+        token: "",
+        clLeft: "",
+        clRight: "",
+        presLeft: "",
+        presRight: "",
+        light: "",
+        alarm: "",
+        boost: "",
+        sick: "",
+        vac: "",
+      };
+
+      function loadCfg() {
+        try {
+          const raw = localStorage.getItem(CFG_KEY);
+          return raw ? { ...DEFAULT_CFG, ...JSON.parse(raw) } : { ...DEFAULT_CFG };
+        } catch {
+          return { ...DEFAULT_CFG };
+        }
+      }
+      function saveCfg(cfg) {
+        localStorage.setItem(CFG_KEY, JSON.stringify(cfg));
+      }
+      let cfg = loadCfg();
+
+      // ─────────────────────────────────────────────────────────
+      //  HOME-ASSISTANT REST CLIENT (optional)
+      // ─────────────────────────────────────────────────────────
+      async function haGet(entity) {
+        if (!cfg.haUrl || !cfg.token || !entity) return null;
+        try {
+          const r = await fetch(`${cfg.haUrl}/api/states/${entity}`, {
+            headers: { Authorization: `Bearer ${cfg.token}` },
+          });
+          if (!r.ok) return null;
+          return await r.json();
+        } catch {
+          return null;
+        }
+      }
+      async function haCallService(domain, service, data) {
+        if (!cfg.haUrl || !cfg.token) return false;
+        try {
+          const r = await fetch(`${cfg.haUrl}/api/services/${domain}/${service}`, {
+            method: "POST",
+            headers: {
+              Authorization: `Bearer ${cfg.token}`,
+              "Content-Type": "application/json",
+            },
+            body: JSON.stringify(data),
+          });
+          return r.ok;
+        } catch {
+          return false;
+        }
+      }
+
+      // ─────────────────────────────────────────────────────────
+      //  UI BINDING
+      // ─────────────────────────────────────────────────────────
+      const $ = (id) => document.getElementById(id);
+
+      function setLed(id, on, kind = "amber") {
+        const el = $(id);
+        el.classList.toggle("on", !!on);
+        el.classList.toggle("red", kind === "red");
+        el.classList.toggle("green", kind === "green");
+      }
+
+      function fmtTemp(s) {
+        if (s == null || s === "" || s === "unknown" || s === "unavailable")
+          return "--.-°";
+        const n = parseFloat(s);
+        return isNaN(n) ? "--.-°" : `${n.toFixed(1)}°`;
+      }
+
+      function paintZone(side, climate, presence) {
+        const t = $(`t-${side}`);
+        const g = $(`g-${side}`);
+        const p = $(`p-${side}`);
+        const h = $(`h-${side}`);
+
+        if (climate && climate.attributes) {
+          t.textContent = fmtTemp(climate.attributes.current_temperature);
+          g.textContent = `→ ${fmtTemp(climate.attributes.temperature)}`;
+          const action = climate.attributes.hvac_action;
+          const heating = action === "heating";
+          h.textContent = heating ? "HEAT" : action ? action.toUpperCase() : "IDLE";
+          h.classList.toggle("on", heating);
+        }
+        if (presence) {
+          const isOn = presence.state === "on";
+          p.textContent = isOn ? "IN BED" : "EMPTY";
+          p.classList.toggle("on", isOn);
+        }
+      }
+
+      function paintLight(state) {
+        const rocker = $("light-rocker");
+        const knob = $("rocker-knob");
+        const isOn = state && state.state === "on";
+        rocker.classList.toggle("on", isOn);
+        rocker.setAttribute("aria-checked", isOn ? "true" : "false");
+        knob.textContent = isOn ? "ON" : "OFF";
+      }
+
+      function paintAlarm(state) {
+        const line = $("alarmline");
+        if (!state || !state.state || state.state === "unavailable") {
+          line.textContent = "⏰ —:—";
+          setLed("led-alarm", false);
+          return;
+        }
+        const t = new Date(state.state);
+        if (isNaN(t)) {
+          line.textContent = `⏰ ${state.state}`;
+          setLed("led-alarm", true, "green");
+          return;
+        }
+        const hh = String(t.getHours()).padStart(2, "0");
+        const mm = String(t.getMinutes()).padStart(2, "0");
+        line.textContent = `⏰ ${hh}:${mm}`;
+        setLed("led-alarm", true, "green");
+      }
+
+      function paintMode(buttonId, state) {
+        const isOn = state && state.state === "on";
+        $(buttonId).classList.toggle("on", isOn);
+      }
+
+      // ─────────────────────────────────────────────────────────
+      //  UPDATE LOOP
+      // ─────────────────────────────────────────────────────────
+      const DEMO = {
+        clLeft: {
+          state: "heat",
+          attributes: { current_temperature: 29.4, temperature: 30.0, hvac_action: "heating" },
+        },
+        clRight: {
+          state: "heat",
+          attributes: { current_temperature: 28.8, temperature: 30.0, hvac_action: "idle" },
+        },
+        presLeft: { state: "on" },
+        presRight: { state: "off" },
+        light: { state: "off" },
+        alarm: { state: "" },
+        boost: { state: "off" },
+        sick: { state: "off" },
+        vac: { state: "off" },
+      };
+
+      function updateClock() {
+        const now = new Date();
+        const hh = now.getHours();
+        const mm = now.getMinutes();
+        renderClock(hh, mm);
+        const days = ["SUN", "MON", "TUE", "WED", "THU", "FRI", "SAT"];
+        const months = [
+          "JAN", "FEB", "MAR", "APR", "MAY", "JUN",
+          "JUL", "AUG", "SEP", "OCT", "NOV", "DEC",
+        ];
+        $("dateline").textContent = `${days[now.getDay()]} · ${String(now.getDate()).padStart(2, "0")} ${months[now.getMonth()]}`;
+      }
+
+      async function refresh() {
+        const useDemo = !cfg.haUrl || !cfg.token;
+        const tele = $("telemetry");
+
+        const get = async (entity, demoState) => {
+          if (useDemo) return demoState;
+          if (!entity) return null;
+          return (await haGet(entity)) || null;
+        };
+
+        const [cl, cr, pl, pr, lt, al, bo, si, va] = await Promise.all([
+          get(cfg.clLeft, DEMO.clLeft),
+          get(cfg.clRight, DEMO.clRight),
+          get(cfg.presLeft, DEMO.presLeft),
+          get(cfg.presRight, DEMO.presRight),
+          get(cfg.light, DEMO.light),
+          get(cfg.alarm, DEMO.alarm),
+          get(cfg.boost, DEMO.boost),
+          get(cfg.sick, DEMO.sick),
+          get(cfg.vac, DEMO.vac),
+        ]);
+
+        paintZone("left", cl, pl);
+        paintZone("right", cr, pr);
+        paintLight(lt);
+        paintAlarm(al);
+        paintMode("btn-boost", bo);
+        paintMode("btn-sick", si);
+        paintMode("btn-vac", va);
+
+        // Header LEDs
+        setLed("led-pl", pl && pl.state === "on", "amber");
+        setLed("led-pr", pr && pr.state === "on", "amber");
+        const heating =
+          (cl && cl.attributes && cl.attributes.hvac_action === "heating") ||
+          (cr && cr.attributes && cr.attributes.hvac_action === "heating");
+        setLed("led-heat", heating, "red");
+
+        // Light name display
+        const lname = $("light-name");
+        if (cfg.light) {
+          lname.textContent = cfg.light;
+          lname.classList.remove("muted");
+        } else {
+          lname.textContent = "— not configured —";
+          lname.classList.add("muted");
+        }
+
+        tele.textContent = useDemo
+          ? "DEMO MODE · open SET to wire entities"
+          : `LIVE · ${cfg.haUrl.replace(/^https?:\/\//, "")} · ${new Date().toLocaleTimeString()}`;
+      }
+
+      // ─────────────────────────────────────────────────────────
+      //  ACTIONS
+      // ─────────────────────────────────────────────────────────
+      function entityDomain(entity) {
+        return (entity || "").split(".")[0];
+      }
+      async function toggle(entity) {
+        if (!entity) return;
+        const domain = entityDomain(entity);
+        // switch / light / input_boolean / climate -> use 'toggle'
+        await haCallService(domain, "toggle", { entity_id: entity });
+        setTimeout(refresh, 250);
+      }
+
+      $("light-rocker").addEventListener("click", () => {
+        if (!cfg.light) {
+          openSettings();
+          return;
+        }
+        toggle(cfg.light);
+      });
+
+      $("btn-boost").addEventListener("click", () => toggle(cfg.boost));
+      $("btn-sick").addEventListener("click", () => toggle(cfg.sick));
+      $("btn-vac").addEventListener("click", () => toggle(cfg.vac));
+
+      // ─────────────────────────────────────────────────────────
+      //  SETTINGS MODAL
+      // ─────────────────────────────────────────────────────────
+      const FIELD_MAP = {
+        haUrl: "cfg-haurl",
+        token: "cfg-token",
+        clLeft: "cfg-cl-left",
+        clRight: "cfg-cl-right",
+        presLeft: "cfg-pres-left",
+        presRight: "cfg-pres-right",
+        light: "cfg-light",
+        alarm: "cfg-alarm",
+        boost: "cfg-boost",
+        sick: "cfg-sick",
+        vac: "cfg-vac",
+      };
+
+      function openSettings() {
+        Object.entries(FIELD_MAP).forEach(([key, id]) => {
+          $(id).value = cfg[key] || "";
+        });
+        $("modal").classList.add("show");
+      }
+      function closeSettings() {
+        $("modal").classList.remove("show");
+      }
+      $("btn-set").addEventListener("click", openSettings);
+      $("cfg-cancel").addEventListener("click", closeSettings);
+      $("cfg-save").addEventListener("click", () => {
+        const next = {};
+        Object.entries(FIELD_MAP).forEach(([key, id]) => {
+          next[key] = $(id).value.trim();
+        });
+        // strip trailing slash from URL
+        if (next.haUrl) next.haUrl = next.haUrl.replace(/\/+$/, "");
+        cfg = next;
+        saveCfg(cfg);
+        closeSettings();
+        refresh();
+      });
+      $("modal").addEventListener("click", (e) => {
+        if (e.target.id === "modal") closeSettings();
+      });
+
+      // ─────────────────────────────────────────────────────────
+      //  BOOT
+      // ─────────────────────────────────────────────────────────
+      updateClock();
+      refresh();
+      setInterval(updateClock, 1000);
+      setInterval(refresh, 15000);
     </script>
   </body>
 </html>
