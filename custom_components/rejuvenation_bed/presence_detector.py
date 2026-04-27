@@ -1,32 +1,40 @@
 """
-Presence-Detector v8 für das Rejuvenation Bed.
+Presence-Detector v9 für das Rejuvenation Bed.
 
-CSV-validiert auf echten Nacht-Daten (April 2026): 95% Accuracy mit nur
-einem Wasser-Sensor. v7 hatte False Positives während Heiz- und Cool-Down-
-Phasen, weil reines detrended σ zwischen "Person ruhig im stabilen Bett"
-und "leeres Bett kühlt langsam aus" nicht unterscheiden konnte (beide
-zeigen σ_d ≈ 0.030 °C).
+v9 vereint die zwei Welten:
+  • v1.0 nutzte das HEIZ-VERHÄLTNIS als Hauptsignal: Person im Bett senkt
+    den Heizbedarf — Körperwärme ersetzt Heizleistung. Sehr robust, weil
+    physikalisch direkt.
+  • v8 nutzt detrended σ + Slope + Chaos-Lock auf der Wassertemperatur.
+    Validiert auf echten Nacht-Daten, aber blind für das Heizverhalten.
+
+v9 kreuzt beide Signale, sodass Fehler eines Signals durch das andere
+korrigiert werden.
 
 DREI BETT-PHASEN AUS DEN ECHTEN DATEN:
-  1) Heizung an, Bett leer  → Temperatur steigt LINEAR (slope > +0.20°C/h)
-  2) Person im Bett         → Temperatur stabil oder mit kleinem σ
-                              (slope ≈ 0, Heizung kann Körperwärme nicht überheizen)
-  3) Person raus            → Temperatur fällt LANGSAM (slope < -0.10°C/h)
+  1) Heizung an, Bett leer  → Temperatur steigt LINEAR (slope > +0.20°C/h),
+                              Heiz-Ratio hoch (oft 100%)
+  2) Person im Bett         → Temperatur stabil oder mit kleinem σ,
+                              Heiz-Ratio fällt deutlich (Körper heizt mit)
+  3) Person raus            → Temperatur fällt (slope < -0.10°C/h),
+                              Heiz-Ratio steigt wieder
 
 ENTSCHEIDUNGS-LOGIK (Priorität von oben nach unten):
-  • σ_d kurz > 0.10 °C            → CHAOS = Person + Lock 60 min ON
-  • Chaos-Lock noch aktiv         → halte ON (slope nach Burst verzerrt)
-  • slope > +0.20 °C/h            → leeres Bett heizt auf → OFF
-  • slope < -0.10 °C/h            → Person raus, kühlt aus → OFF
-  • slope ≈ 0 UND prev_slope > 0.15 → Aufheizen→Stabil = Einstieg → ON
-  • sonst                         → halte bisherigen Status
+  • σ_d kurz > 0.10 °C                → CHAOS = Person + Lock 30 min ON
+  • Chaos-Lock noch aktiv             → halte ON (slope nach Burst verzerrt)
+  • Heiz-Ratio < 0.25 (60 min)        → Heizbedarf eingebrochen → ON
+  • Heiz-Ratio > 0.70 UND slope > 0   → klar aufheizendes Leerbett → OFF
+  • slope > +0.20 °C/h                → leeres Bett heizt auf → OFF
+  • slope < -0.10 °C/h                → Person raus, kühlt aus → OFF
+  • slope ≈ 0 UND prev_slope > 0.15   → Aufheizen→Stabil = Einstieg → ON
+  • sonst                             → halte bisherigen Status
 
 CHAOS-LOCK:
   Nach Erkennung eines Chaos-Bursts (Einstieg, Bewegung, Decke verrücken)
-  bleibt der Sensor 60 min ON, egal was der Slope sagt. Grund: direkt
-  nach einem Burst zeigen Slope-Berechnungen Echo-Effekte. Ein längeres
-  σ_d-Fenster (60 min) > 0.06 °C frischt den Lock auf, sodass aktive
-  Schläfer den Lock kontinuierlich verlängern.
+  bleibt der Sensor 30 min ON. v8 hatte 60 min — zu lang bei Fehl-Triggern.
+  Ein längeres σ_d-Fenster > 0.06 °C ODER ein eingebrochener Heiz-Bedarf
+  frischt den Lock auf, sodass aktive Schläfer ihn kontinuierlich
+  verlängern.
 
 HYSTERESE (asymmetrisch, wie v3):
   Einsteigen: 5 min konstant "da"  → schnelle Reaktion
@@ -102,12 +110,18 @@ class PresenceThresholds:
 
     # v8: Slope-basierte Erkennung (CSV-validiert auf echten Daten)
     chaos_threshold: float = 0.10  # σ_d > X über kurzes Fenster → ON sofort
-    chaos_lock_minutes: int = 60  # Nach Chaos: ON-Lock für N Minuten
+    chaos_lock_minutes: int = 30  # Nach Chaos: ON-Lock für N Minuten (v8: 60 → v9: 30)
     chaos_refresh_threshold: float = 0.06  # σ_d_60 > X frischt Lock auf
     slope_heating_threshold: float = 0.20  # °C/h darüber = leeres Bett heizt auf
     slope_cooling_threshold: float = -0.10  # °C/h darunter = leeres Bett kühlt aus
     slope_stable_band: float = 0.10  # |slope| < X → stabile Phase
     slope_rise_threshold: float = 0.15  # prev_slope > X UND jetzt stabil = Einstieg
+
+    # v9: Heiz-Ratio (zurück aus v1) — Person reduziert Heizbedarf
+    heat_ratio_window_minutes: int = 60  # Fenster für Heizverhältnis
+    heat_ratio_min_samples: int = 10  # Erst ab so vielen Samples auswerten
+    heat_ratio_present_threshold: float = 0.25  # Ratio darunter → Person (Körperwärme spart Heizen)
+    heat_ratio_empty_threshold: float = 0.70  # Ratio darüber + steigend → Bett leer
 
 
 class PresenceDetector:
@@ -124,6 +138,7 @@ class PresenceDetector:
         self._water_temps: dict[int, deque] = {}
         self._air_temps: dict[int, deque] = {}
         self._humidity: dict[int, deque] = {}
+        self._heater_states: dict[int, deque] = {}  # v9: heater_active history
         self._max_buffer = 600  # ~5h bei 30s Updates
 
         # Zustand pro Zone
@@ -146,6 +161,7 @@ class PresenceDetector:
         self._last_confidence: dict[int, float] = {}
         self._last_reason: dict[int, str] = {}
         self._last_significant_changes: dict[int, int] = {}  # NEU: Debug
+        self._last_heat_ratio: dict[int, Optional[float]] = {}  # v9: Diagnose
 
     # ═══════════════════════════════════════════════════════════════════════
     # HAUPTFUNKTION
@@ -171,8 +187,9 @@ class PresenceDetector:
         """
         now = datetime.now()
 
-        # Daten speichern
+        # Daten speichern (inkl. heater_active für v9 Heat-Ratio)
         self._store(zone_index, water_temp, air_temp, humidity, now)
+        self._store_heater(zone_index, heater_active, now)
 
         # ─────────────────────────────────────────────────────────────
         # Priorität 1: Dedizierter Präsenz-Sensor überschreibt alles
@@ -511,14 +528,24 @@ class PresenceDetector:
         +) Chaos (σ_d > 0.10) übersteuert immer → Person + lockt 60 min ON
         """
         t = self.thresholds
+
+        # v9: Heiz-Ratio (kann None sein wenn nicht genug Heater-History)
+        heat_ratio = self._heating_ratio(zone_index, now)
+        self._last_heat_ratio[zone_index] = heat_ratio
+
         reasons = [
             f"σd={detrended_std:.3f}",
             f"σd60={detrended_std_long:.3f}",
             f"slope={slope if slope is not None else 0:+.2f}/h",
         ]
+        if heat_ratio is not None:
+            reasons.append(f"heat={heat_ratio:.0%}")
 
         # ─── Chaos-Lock auffrischen wenn längeres Fenster aktiv aussieht ──
         if detrended_std_long > t.chaos_refresh_threshold:
+            self._last_chaos_time[zone_index] = now
+        # v9: Eingebrochener Heizbedarf frischt Lock ebenfalls auf
+        if heat_ratio is not None and heat_ratio < t.heat_ratio_present_threshold:
             self._last_chaos_time[zone_index] = now
 
         # ─── 1) Chaos-Burst: sofort ON ────────────────────────────────────
@@ -536,6 +563,27 @@ class PresenceDetector:
             if elapsed_min < t.chaos_lock_minutes:
                 reasons.append(f"→lock({elapsed_min:.0f}/{t.chaos_lock_minutes}min)")
                 return self._apply_overrides(True, 0.85, reasons, air_std, water_temp, surface_temp)
+
+        # ─── 2b) v9: Heiz-Ratio sehr niedrig → Person reduziert Heizbedarf ──
+        # Robustes physikalisches Signal aus v1.0: Körperwärme spart Heizen.
+        # Greift nur wenn genug Heater-History (sonst None) und Bett nicht aktiv kühlt.
+        if (
+            heat_ratio is not None
+            and heat_ratio < t.heat_ratio_present_threshold
+            and (slope is None or slope > t.slope_cooling_threshold)
+        ):
+            reasons.append("→heat-low(körperwärme)")
+            return self._apply_overrides(True, 0.85, reasons, air_std, water_temp, surface_temp)
+
+        # ─── 2c) v9: Heiz-Ratio hoch UND Bett heizt → klar leer ───────────
+        if (
+            heat_ratio is not None
+            and heat_ratio > t.heat_ratio_empty_threshold
+            and slope is not None
+            and slope > 0
+        ):
+            reasons.append("→heat-high(empty)")
+            return self._apply_overrides(False, 0.10, reasons, air_std, water_temp, surface_temp)
 
         # ─── 3) Slope-basierte Phasen (nur wenn genug Daten) ──────────────
         if slope is None:
@@ -804,6 +852,31 @@ class PresenceDetector:
         if humidity is not None:
             self._humidity[zone_index].append((now, humidity))
 
+    def _store_heater(self, zone_index: int, heater_active: bool, now: datetime):
+        """v9: Speichert heater_active-Verlauf für Heat-Ratio-Berechnung."""
+        if zone_index not in self._heater_states:
+            self._heater_states[zone_index] = deque(maxlen=self._max_buffer)
+        self._heater_states[zone_index].append((now, bool(heater_active)))
+
+    def _heating_ratio(self, zone_index: int, now: datetime) -> Optional[float]:
+        """
+        v9: Anteil der Zeit, in der die Heizung im Fenster aktiv war.
+
+        Person im Bett senkt den Heizbedarf — wenig Heizen + stabile Temp
+        = Körperwärme deckt den Verlust. Sehr robustes Signal aus v1.0.
+
+        Returns:
+            None falls zu wenig History, sonst Anteil [0.0..1.0].
+        """
+        history = self._heater_states.get(zone_index)
+        if not history:
+            return None
+        cutoff = now - timedelta(minutes=self.thresholds.heat_ratio_window_minutes)
+        samples = [active for ts, active in history if ts > cutoff]
+        if len(samples) < self.thresholds.heat_ratio_min_samples:
+            return None
+        return sum(1 for s in samples if s) / len(samples)
+
     def _set_state(
         self,
         zone_index: int,
@@ -865,6 +938,11 @@ class PresenceDetector:
             "air_temp_std": round(a_std, 4),
             "slope_per_hour": round(slope, 3) if slope is not None else None,
             "chaos_lock_remaining_min": round(chaos_lock_remaining, 1),
+            "heat_ratio": (
+                round(self._last_heat_ratio.get(zone_index), 3)
+                if self._last_heat_ratio.get(zone_index) is not None
+                else None
+            ),
             "noise_threshold": SENSOR_NOISE_THRESHOLD,
             "thresholds": {
                 "variance_low": self.thresholds.variance_low,
