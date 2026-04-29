@@ -1,11 +1,11 @@
 """
-Bed-Intelligence v2 für das Rejuvenation Bed.
+Bed-Intelligence v3 für das Rejuvenation Bed.
 
-FIX (Apr 2026): 
-  - _heater_heating wird jetzt korrekt gesetzt via set_heater_status()
-  - Automatische Heizungserkennung als Fallback
+FIX (Apr 2026):
+  - Isolations-Erkennung sensor-agnostisch (Auflagen- ODER Raumluft-Sensor)
+  - Verwendet Auto-Kalibrierungs-Schwellen statt hardcoded Werten
   - Glättung gegen Sensor-Rauschen
-  - Robustere Isolation-Erkennung
+  - Hysterese-Band um den gelernten Threshold
 
 Drei Features die das System von "Heizung" zu "Schlaf-KI" heben:
 
@@ -13,9 +13,15 @@ Drei Features die das System von "Heizung" zu "Schlaf-KI" heben:
    - Lernt in den ersten 3-5 Tagen automatisch die Schwellwerte
 
 2. ISOLATIONS-ERKENNUNG (Decken-Check)
-   - Benötigt: DS18B20 (unten) + SHT41 (oben) = zwei Temperaturpunkte
-   - Bett zugedeckt: Δ(Wasser - Luft) < 2°C (Decke isoliert)
-   - Bett offen: Δ(Wasser - Luft) > 5°C (Wärme verpufft)
+   - Benötigt: zwei Temperaturpunkte (Wasser unten + Sensor oben).
+   - Funktioniert mit beiden Konfigurationen:
+     • SHT41 in Raumluft  → air < water, Decke schließt Wärme ein
+                            → |Δ| sinkt unter Decke (covered_mean < uncovered_mean)
+     • Auflagen-Sensor    → air > water (Auflage liegt warm auf dem Wasserkern),
+                            Decke fängt Wärmeabstrahlung ab
+                            → |Δ| steigt unter Decke (covered_mean > uncovered_mean)
+   - Wir nutzen |water - air| und lernen die Richtung aus der Auto-Kalibrierung.
+   - Defaults sind auf Auflagen-Sensor-Werte gestimmt (offen ≈ 1.5°K, zu ≈ 2.0°K).
 
 3. SCHWITZ-ALGORITHMUS 2.0 (Kreuzkorrelation)
    - Temp↑ UND Feucht↑ = Schwitzen
@@ -44,6 +50,7 @@ SENSOR_NOISE_THRESHOLD = 0.07
 # KALIBRIERUNGSDATEN
 # ═══════════════════════════════════════════════════════════════════════════════
 
+
 @dataclass
 class CalibrationData:
     """Gelernte Schwellwerte aus der Kalibrierungsphase."""
@@ -61,10 +68,12 @@ class CalibrationData:
     water_std_occupied_min: float = 0.050
     water_std_threshold: float = 0.040
 
-    # Gelernte Werte: Isolations-Check (Δ Wasser-Luft)
-    delta_covered_mean: float = 0.5
-    delta_uncovered_mean: float = 3.0
-    delta_isolation_threshold: float = 2.0
+    # Gelernte Werte: Isolations-Check (|Δ Wasser-Luft|, sensor-agnostisch)
+    # Defaults für Auflagen-Sensor-Setup (CSV April 2026: offen ≈ 1.5°K, zu ≈ 2.0°K).
+    # Bei Raumluft-Sensor liefert die Auto-Kalibrierung andere Werte (covered < uncovered).
+    delta_covered_mean: float = 2.0
+    delta_uncovered_mean: float = 1.5
+    delta_isolation_threshold: float = 1.75
 
     # Gelernte Werte: Feuchtigkeit
     humidity_baseline: float = 40.0
@@ -122,9 +131,11 @@ class CalibrationData:
 # ISOLATIONS-STATUS
 # ═══════════════════════════════════════════════════════════════════════════════
 
+
 @dataclass
 class IsolationStatus:
     """Aktueller Isolations-Zustand des Betts."""
+
     is_covered: bool = True
     delta_water_air: float = 0.0
     delta_smoothed: float = 0.0  # NEU: Geglättetes Delta
@@ -139,9 +150,11 @@ class IsolationStatus:
 # SCHWITZ-STATUS 2.0
 # ═══════════════════════════════════════════════════════════════════════════════
 
+
 @dataclass
 class SweatStatus:
     """Detaillierter Schwitz-Status mit Kreuzkorrelation."""
+
     is_sweating: bool = False
     is_moist: bool = False
     humidity_level: str = "unbekannt"
@@ -155,20 +168,18 @@ class SweatStatus:
 # HAUPT-KLASSE
 # ═══════════════════════════════════════════════════════════════════════════════
 
+
 class BedIntelligence:
     """
     Zentrale Intelligenz-Engine für das Rejuvenation Bed.
-    
+
     v2: Mit korrekter Heizungserkennung und Rausch-Immunität!
     """
 
     def __init__(self, hass, config_entry):
         self.hass = hass
         self.config_entry = config_entry
-        self._store = Store(
-            hass, STORAGE_VERSION,
-            f"{STORAGE_KEY}_{config_entry.entry_id}"
-        )
+        self._store = Store(hass, STORAGE_VERSION, f"{STORAGE_KEY}_{config_entry.entry_id}")
 
         # Kalibrierungsdaten
         self.calibration = CalibrationData()
@@ -204,47 +215,45 @@ class BedIntelligence:
     def set_heater_status(self, zone_index: int, is_heating: bool):
         """
         Setzt den Heizungsstatus für eine Zone.
-        
+
         MUSS vom Coordinator aufgerufen werden wenn sich der Heizungsstatus ändert!
         Ohne diesen Aufruf funktioniert die Isolation-Erkennung nicht korrekt.
         """
         old_status = self._heater_heating.get(zone_index, False)
         self._heater_heating[zone_index] = is_heating
-        
+
         if old_status != is_heating:
-            _LOGGER.debug(
-                f"Zone {zone_index}: Heizungsstatus → {'AN' if is_heating else 'AUS'}"
-            )
+            _LOGGER.debug(f"Zone {zone_index}: Heizungsstatus → {'AN' if is_heating else 'AUS'}")
 
     def _detect_heater_automatically(self, zone_index: int) -> bool:
         """
         Erkennt automatisch ob die Heizung aktiv ist.
-        
+
         Methode: Wenn Wassertemperatur in den letzten 10 Minuten
         um >0.3°C gestiegen ist, läuft wahrscheinlich die Heizung.
-        
+
         FALLBACK wenn set_heater_status() nicht aufgerufen wird!
         """
         buffer = self._last_water_temps.get(zone_index)
         if buffer is None or len(buffer) < 5:
             return False
-        
+
         # Ältester und neuester Wert
         oldest_temp = buffer[0][1]
         newest_temp = buffer[-1][1]
-        
+
         # Zeit-Differenz
         oldest_time = buffer[0][0]
         newest_time = buffer[-1][0]
         minutes_diff = (newest_time - oldest_time).total_seconds() / 60
-        
+
         if minutes_diff < 5:
             return False
-        
+
         # Temperatur-Anstieg pro 10 Minuten
         temp_rise = newest_temp - oldest_temp
         rise_per_10min = temp_rise * (10 / minutes_diff)
-        
+
         # Heizung erkannt wenn Anstieg > 0.3°C pro 10 Min
         return rise_per_10min > 0.3
 
@@ -268,9 +277,7 @@ class BedIntelligence:
                 )
             if data and "bedtime_history" in data:
                 self._bedtime_history = data["bedtime_history"]
-                self._bedtime_history = {
-                    int(k): v for k, v in self._bedtime_history.items()
-                }
+                self._bedtime_history = {int(k): v for k, v in self._bedtime_history.items()}
                 total = sum(len(v) for v in self._bedtime_history.values())
                 _LOGGER.info(f"Bedtime-Learning geladen: {total} Nächte")
             else:
@@ -287,9 +294,9 @@ class BedIntelligence:
             save_data = {
                 "calibration": self.calibration.to_dict(),
             }
-            if hasattr(self, '_bedtime_history') and self._bedtime_history:
+            if hasattr(self, "_bedtime_history") and self._bedtime_history:
                 save_data["bedtime_history"] = self._bedtime_history
-            
+
             await self._store.async_save(save_data)
         except Exception as e:
             _LOGGER.error(f"BedIntelligence Save-Fehler: {e}")
@@ -317,18 +324,14 @@ class BedIntelligence:
             self._has_air_temp[zone_index] = True
         else:
             if self._has_air_temp.get(zone_index, False):
-                _LOGGER.info(
-                    f"Zone {zone_index}: Luft-Sensor nicht mehr verfügbar"
-                )
+                _LOGGER.info(f"Zone {zone_index}: Luft-Sensor nicht mehr verfügbar")
             self._has_air_temp[zone_index] = False
-            
+
         if humidity is not None:
             self._has_humidity[zone_index] = True
         else:
             if self._has_humidity.get(zone_index, False):
-                _LOGGER.info(
-                    f"Zone {zone_index}: Feuchte-Sensor nicht mehr verfügbar"
-                )
+                _LOGGER.info(f"Zone {zone_index}: Feuchte-Sensor nicht mehr verfügbar")
             self._has_humidity[zone_index] = False
 
         # Daten speichern
@@ -342,11 +345,9 @@ class BedIntelligence:
 
         # 1. Auto-Kalibrierung
         if not self.calibration.is_calibrated:
-            self._update_calibration(zone_index, water_temp, air_temp,
-                                     humidity, is_present, water_std, now)
+            self._update_calibration(zone_index, water_temp, air_temp, humidity, is_present, water_std, now)
         else:
-            self._update_drift_correction(zone_index, water_temp, air_temp,
-                                          humidity, is_present, water_std, now)
+            self._update_drift_correction(zone_index, water_temp, air_temp, humidity, is_present, water_std, now)
 
         # 2. Isolations-Erkennung
         if self._has_air_temp.get(zone_index, False) and water_temp is not None and air_temp is not None:
@@ -379,7 +380,7 @@ class BedIntelligence:
 
         if water_std <= 0 or water_temp is None:
             return
-        
+
         # Ausreißer-Filter
         if not (15.0 <= water_temp <= 40.0):
             return
@@ -397,14 +398,13 @@ class BedIntelligence:
             cal._empty_humidities.append(humidity)
 
         if air_temp is not None and water_temp is not None:
-            delta = water_temp - air_temp
+            delta = abs(water_temp - air_temp)
             if is_present:
                 cal._covered_deltas.append(delta)
             else:
                 cal._empty_deltas.append(delta)
 
-        if (len(cal._empty_water_stds) >= 200
-                and len(cal._occupied_water_stds) >= 100):
+        if len(cal._empty_water_stds) >= 200 and len(cal._occupied_water_stds) >= 100:
             self._finalize_calibration(now)
         elif cal.samples_collected % 50 == 0:
             if self.hass:
@@ -420,7 +420,7 @@ class BedIntelligence:
         cal.water_std_empty_mean = sum(empty_stds) / len(empty_stds)
         cal.water_std_empty_max = empty_stds[int(len(empty_stds) * 0.95)]
         cal.water_std_occupied_min = occupied_stds[int(len(occupied_stds) * 0.10)]
-        
+
         gap = cal.water_std_occupied_min - cal.water_std_empty_max
         if gap > 0.005:
             cal.water_std_threshold = cal.water_std_empty_max + gap * 0.4
@@ -448,10 +448,7 @@ class BedIntelligence:
         cal._covered_deltas = []
         cal._empty_humidities = []
 
-        _LOGGER.info(
-            f"✅ Auto-Kalibrierung abgeschlossen nach "
-            f"{cal.samples_collected} Samples!"
-        )
+        _LOGGER.info(f"✅ Auto-Kalibrierung abgeschlossen nach " f"{cal.samples_collected} Samples!")
 
         if self.hass:
             self.hass.async_create_task(self.async_save())
@@ -468,7 +465,7 @@ class BedIntelligence:
     ):
         """Nachkalibrierung für saisonale Änderungen."""
         cal = self.calibration
-        
+
         if water_temp is not None and not (15.0 <= water_temp <= 40.0):
             return
         if air_temp is not None and not (10.0 <= air_temp <= 45.0):
@@ -478,13 +475,13 @@ class BedIntelligence:
         if water_std <= 0 or water_temp is None:
             return
 
-        if not hasattr(cal, '_drift_counter'):
+        if not hasattr(cal, "_drift_counter"):
             cal._drift_counter = 0
             cal._drift_empty_stds = []
             cal._drift_occupied_stds = []
-        
+
         cal._drift_counter += 1
-        
+
         if is_present:
             cal._drift_occupied_stds.append(water_std)
             if len(cal._drift_occupied_stds) > 200:
@@ -493,32 +490,29 @@ class BedIntelligence:
             cal._drift_empty_stds.append(water_std)
             if len(cal._drift_empty_stds) > 200:
                 cal._drift_empty_stds = cal._drift_empty_stds[-200:]
-        
+
         if cal._drift_counter >= 500:
             cal._drift_counter = 0
             alpha = 0.15
-            
+
             if len(cal._drift_empty_stds) >= 50 and len(cal._drift_occupied_stds) >= 30:
                 new_empty = sorted(cal._drift_empty_stds)
                 new_occupied = sorted(cal._drift_occupied_stds)
-                
+
                 new_empty_max = new_empty[int(len(new_empty) * 0.95)]
                 new_occupied_min = new_occupied[int(len(new_occupied) * 0.10)]
                 new_threshold = (new_empty_max + new_occupied_min) / 2
-                
+
                 old_threshold = cal.water_std_threshold
                 cal.water_std_threshold = (1 - alpha) * old_threshold + alpha * new_threshold
-                
-                _LOGGER.info(
-                    f"🔄 Drift-Korrektur: Schwelle {old_threshold:.4f} → "
-                    f"{cal.water_std_threshold:.4f}"
-                )
-                
+
+                _LOGGER.info(f"🔄 Drift-Korrektur: Schwelle {old_threshold:.4f} → " f"{cal.water_std_threshold:.4f}")
+
                 if self.hass:
                     self.hass.async_create_task(self.async_save())
 
     # ═══════════════════════════════════════════════════════════════════════
-    # 2. ISOLATIONS-ERKENNUNG (REPARIERT!)
+    # 2. ISOLATIONS-ERKENNUNG (sensor-agnostisch, kalibrations-basiert)
     # ═══════════════════════════════════════════════════════════════════════
 
     def _update_isolation(
@@ -531,79 +525,81 @@ class BedIntelligence:
     ):
         """
         Prüft ob das Bett gut isoliert (zugedeckt) ist.
-        
-        v2 FIX: Jetzt mit korrekter Heizungserkennung!
+
+        Funktioniert für beide Sensor-Konfigurationen:
+          • SHT41 in Raumluft  → air_temp < water_temp, Decke schließt Wärme ein
+                                 → |Δ| sinkt unter Decke
+          • Auflagen-Sensor    → air_temp > water_temp (Auflage liegt direkt
+                                 auf dem Wasserkern, oben warm), Decke fängt
+                                 die Wärmeabstrahlung ab → |Δ| steigt unter Decke
+
+        Wir benutzen |water - air| und unterscheiden die Richtung anhand der
+        gelernten Mittelwerte: ist `delta_covered_mean > delta_uncovered_mean`,
+        gilt „höheres Δ = zugedeckt" (Auflagen-Setup); sonst umgekehrt.
+
+        Schwellen kommen aus der Auto-Kalibrierung; vor Kalibrierung greifen
+        Defaults, die auf typische Auflagen-Sensor-Werte angepasst sind
+        (CSV April 2026: offen ≈ 1.5°K, zu ≈ 2.0°K).
         """
         if air_temp is None or water_temp is None:
             return
-            
+
         if zone_index not in self._isolation:
             self._isolation[zone_index] = IsolationStatus()
 
         iso = self._isolation[zone_index]
-        delta = water_temp - air_temp
+        delta = abs(water_temp - air_temp)
         iso.delta_water_air = round(delta, 2)
 
-        # ═══ HEIZUNGS-STATUS ERMITTELN ═══
-        # Priorität 1: Explizit gesetzter Status
-        heater_active = self._heater_heating.get(zone_index, None)
-        
-        # Priorität 2: Automatische Erkennung als Fallback
-        if heater_active is None:
-            heater_active = self._detect_heater_automatically(zone_index)
-            iso.heater_detected = heater_active
-        else:
-            iso.heater_detected = False  # Wurde explizit gesetzt
-        
-        heater_correction = 0.4 if heater_active else 0.0
-        corrected_delta = delta - heater_correction
-
-        # ═══ DELTA-GLÄTTUNG (gegen Sensor-Rauschen) ═══
+        # Glättung über 30 min gegen Sensor-Rauschen und Heizungsbursts
         if zone_index not in self._delta_history:
-            self._delta_history[zone_index] = deque(maxlen=60)  # 30 Min bei 30s
-        
-        self._delta_history[zone_index].append((now, corrected_delta))
-        
-        # Nur Werte der letzten 30 Minuten
+            self._delta_history[zone_index] = deque(maxlen=60)
+        self._delta_history[zone_index].append((now, delta))
         cutoff = now - timedelta(minutes=30)
-        recent_deltas = [v for t, v in self._delta_history[zone_index] if t > cutoff]
+        recent = [v for t, v in self._delta_history[zone_index] if t > cutoff]
+        avg = sum(recent) / len(recent) if len(recent) >= 5 else delta
+        iso.delta_smoothed = round(avg, 3)
 
-        if len(recent_deltas) >= 5:
-            # Moving Average für Stabilität
-            avg_delta = sum(recent_deltas) / len(recent_deltas)
-            iso.delta_smoothed = round(avg_delta, 3)
+        # Schwellen aus Kalibrierung — Defaults greifen vor erstem Lernen
+        cal = self.calibration
+        cov_mean = cal.delta_covered_mean
+        unc_mean = cal.delta_uncovered_mean
+        threshold = (cov_mean + unc_mean) / 2
+        spread = abs(cov_mean - unc_mean)
+        # Hysterese-Band: 25 % des Spreads, mindestens 0.1°K
+        band = max(spread * 0.25, 0.1)
+
+        # Richtung: ist „covered" = höheres oder niedrigeres |Δ|?
+        covered_is_higher = cov_mean > unc_mean
+
+        # Hysterese: wenn schon covered, braucht es weniger zum Bleiben
+        if covered_is_higher:
+            cross = threshold - band if iso.is_covered else threshold + band
+            new_covered = avg >= cross
         else:
-            avg_delta = corrected_delta
-            iso.delta_smoothed = round(avg_delta, 3)
+            cross = threshold + band if iso.is_covered else threshold - band
+            new_covered = avg <= cross
 
-        # ═══ ENTSCHEIDUNG mit Hysterese ═══
-        # Schwellen angepasst für bessere Stabilität
-        THRESHOLD_GUT = 0.15
-        THRESHOLD_MAESSIG = 0.30
-        THRESHOLD_OFFEN = 0.50
-        
-        # Hysterese: Unterschiedliche Schwellen für Wechsel nach "offen" vs "zu"
-        if iso.is_covered:
-            # Aktuell zugedeckt → braucht höhere Schwelle um auf "offen" zu wechseln
-            open_threshold = THRESHOLD_OFFEN
+        iso.is_covered = new_covered
+
+        # Level-Klassifikation (nur Anzeige)
+        good_cutoff = threshold + spread * 0.3 if covered_is_higher else threshold - spread * 0.3
+        if covered_is_higher:
+            if avg >= good_cutoff:
+                iso.level = "gut"
+            elif iso.is_covered:
+                iso.level = "mäßig"
+            else:
+                iso.level = "offen"
         else:
-            # Aktuell offen → braucht niedrigere Schwelle um auf "zu" zu wechseln
-            open_threshold = THRESHOLD_MAESSIG
+            if avg <= good_cutoff:
+                iso.level = "gut"
+            elif iso.is_covered:
+                iso.level = "mäßig"
+            else:
+                iso.level = "offen"
 
-        if avg_delta < THRESHOLD_GUT:
-            iso.level = "gut"
-            iso.is_covered = True
-        elif avg_delta < THRESHOLD_MAESSIG:
-            iso.level = "mäßig"
-            iso.is_covered = True
-        elif avg_delta < open_threshold:
-            # In der Hysterese-Zone: Status beibehalten
-            iso.level = "mäßig" if iso.is_covered else "schlecht"
-        else:
-            iso.level = "offen"
-            iso.is_covered = False
-
-        # Timer für offenes Bett
+        # Timer + Energie-Warnung
         if not iso.is_covered:
             if iso.uncovered_since is None:
                 iso.uncovered_since = now
@@ -633,7 +629,7 @@ class BedIntelligence:
         """Schwitz-Erkennung mit Kreuzkorrelation."""
         if humidity is None:
             return
-            
+
         if zone_index not in self._sweat:
             self._sweat[zone_index] = SweatStatus()
 
@@ -743,9 +739,7 @@ class BedIntelligence:
 
         empty_count = len(cal._empty_water_stds)
         occupied_count = len(cal._occupied_water_stds)
-        progress = min(100, int(
-            (min(empty_count, 200) + min(occupied_count, 100)) / 3
-        ))
+        progress = min(100, int((min(empty_count, 200) + min(occupied_count, 100)) / 3))
 
         return {
             "status": "lernphase",
@@ -797,55 +791,55 @@ class BedIntelligence:
     # ═══════════════════════════════════════════════════════════════════════
     # BEDTIME LEARNING
     # ═══════════════════════════════════════════════════════════════════════
-    
+
     _BEDTIME_HISTORY_DAYS = 28
     _MIN_SAMPLES_FOR_PREDICTION = 3
 
     def record_bedtime(self, zone_index: int, bedtime: datetime):
         """Speichert eine Einschlafzeit für das Lernmodell."""
-        if not hasattr(self, '_bedtime_history'):
+        if not hasattr(self, "_bedtime_history"):
             self._bedtime_history = {}
-        
+
         history = self._bedtime_history.setdefault(zone_index, [])
-        
+
         minutes = bedtime.hour * 60 + bedtime.minute
         if minutes < 720:
             minutes += 1440
-        
+
         session_date = bedtime.date()
         if bedtime.hour < 12:
             session_date = session_date - timedelta(days=1)
-        
+
         session_key = session_date.strftime("%Y-%m-%d")
-        
+
         entry = {
             "date": session_key,
             "weekday": session_date.weekday(),
             "minutes": minutes,
             "time_str": bedtime.strftime("%H:%M"),
         }
-        
+
         history = [h for h in history if h["date"] != session_key]
         history.append(entry)
-        
+
         cutoff = local_now() - timedelta(days=self._BEDTIME_HISTORY_DAYS)
         cutoff_str = cutoff.strftime("%Y-%m-%d")
         history = [h for h in history if h["date"] >= cutoff_str]
-        
+
         self._bedtime_history[zone_index] = history
-        
+
         _LOGGER.info(
             f"Zone {zone_index}: Einschlafzeit gelernt: {entry['time_str']} "
             f"({'Wochenende' if session_date.weekday() >= 4 else 'Wochentag'}) "
             f"[{len(history)} Nächte gespeichert]"
         )
-        
-        if self.hass and hasattr(self.hass, 'async_create_task'):
+
+        if self.hass and hasattr(self.hass, "async_create_task"):
             self.hass.async_create_task(self.async_save())
 
     def predict_bedtime(self, zone_index: int) -> Optional[dict]:
         """Sagt die wahrscheinliche Einschlafzeit vorher."""
-        if not hasattr(self, '_bedtime_history'):
+        if not hasattr(self, "_bedtime_history"):
             return None
 
         history = self._bedtime_history.get(zone_index, [])
@@ -903,6 +897,7 @@ class BedIntelligence:
             confidence = "niedrig"
 
         from datetime import time as dt_time
+
         return {
             "predicted_time": dt_time(pred_hour, pred_minute),
             "predicted_str": f"{pred_hour:02d}:{pred_minute:02d}",
@@ -916,62 +911,56 @@ class BedIntelligence:
         }
 
     def get_predicted_preheat_start(
-        self,
-        zone_index: int,
-        preheat_hours: float = 3.0,
-        configured_warm_from: Optional[str] = None
+        self, zone_index: int, preheat_hours: float = 3.0, configured_warm_from: Optional[str] = None
     ) -> Optional[str]:
         """Berechnet den optimalen Vorheiz-Start."""
         prediction = self.predict_bedtime(zone_index)
         if prediction is None or prediction["confidence"] == "niedrig":
             return None
-        
+
         pred_time = prediction["predicted_time"]
         pred_minutes = pred_time.hour * 60 + pred_time.minute
-        
+
         preheat_start_min = pred_minutes - int(preheat_hours * 60) - 30
-        
+
         if configured_warm_from:
             parts = configured_warm_from.split(":")
             config_min = int(parts[0]) * 60 + (int(parts[1]) if len(parts) > 1 else 0)
             preheat_start_min = min(preheat_start_min, config_min)
-        
+
         preheat_start_min = preheat_start_min % 1440
         start_h = preheat_start_min // 60
         start_m = preheat_start_min % 60
-        
+
         return f"{start_h:02d}:{start_m:02d}"
 
     def get_bedtime_diagnostics(self, zone_index: int) -> dict:
         """Debug-Info für Bedtime Learning."""
-        if not hasattr(self, '_bedtime_history'):
+        if not hasattr(self, "_bedtime_history"):
             return {"status": "Keine Daten", "nights_recorded": 0}
-        
+
         history = self._bedtime_history.get(zone_index, [])
         prediction = self.predict_bedtime(zone_index)
-        
+
         result = {
             "nights_recorded": len(history),
             "min_required": self._MIN_SAMPLES_FOR_PREDICTION,
         }
-        
+
         if history:
             recent = history[-5:]
-            result["recent_bedtimes"] = [
-                f"{h['time_str']} ({'WE' if h['weekday'] >= 4 else 'WT'})"
-                for h in recent
-            ]
-        
+            result["recent_bedtimes"] = [f"{h['time_str']} ({'WE' if h['weekday'] >= 4 else 'WT'})" for h in recent]
+
         if prediction:
             result["prediction"] = prediction["predicted_str"]
             result["confidence"] = prediction["confidence"]
             result["spread_minutes"] = prediction["spread_minutes"]
             result["basis"] = prediction["basis"]
-            
+
             preheat = self.get_predicted_preheat_start(zone_index)
             if preheat:
                 result["predicted_preheat_start"] = preheat
         else:
             result["prediction"] = "Noch nicht genug Daten"
-        
+
         return result
