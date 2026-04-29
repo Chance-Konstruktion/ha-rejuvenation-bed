@@ -1,29 +1,27 @@
 """
-Presence-Detector v9 für das Rejuvenation Bed.
+Presence-Detector v10 für das Rejuvenation Bed.
 
-v9 vereint die zwei Welten:
-  • v1.0 nutzte das HEIZ-VERHÄLTNIS als Hauptsignal: Person im Bett senkt
-    den Heizbedarf — Körperwärme ersetzt Heizleistung. Sehr robust, weil
-    physikalisch direkt.
-  • v8 nutzt detrended σ + Slope + Chaos-Lock auf der Wassertemperatur.
-    Validiert auf echten Nacht-Daten, aber blind für das Heizverhalten.
+v9 hatte das Heiz-Verhältnis als Trigger eingeführt (heat_ratio < 0.25
+→ Person), was im Halte-Modus eines leeren Bettes regelmäßig
+fälschlich auslöste: nach erreichter Solltemperatur heizt das System
+nur in kurzen Bursts (~10 % der Zeit), die Logik interpretierte das
+als „Körper deckt den Wärmeverlust" und meldete Präsenz. Das setzte
+actual_bedtime zu früh, der Biorhythmus ging in die Tiefschlaf-
+Kühlphase, und das Bett war kalt wenn der Mensch tatsächlich kam.
 
-v9 kreuzt beide Signale, sodass Fehler eines Signals durch das andere
-korrigiert werden.
+v10 kehrt zur v8-Entscheidungslogik zurück (CSV-validiert auf echten
+Nacht-Daten, 95 % Accuracy). heat_ratio bleibt im Buffer und in den
+Diagnostics — als reines Beobachtungs-Signal, nicht als Trigger.
 
 DREI BETT-PHASEN AUS DEN ECHTEN DATEN:
-  1) Heizung an, Bett leer  → Temperatur steigt LINEAR (slope > +0.20°C/h),
-                              Heiz-Ratio hoch (oft 100%)
-  2) Person im Bett         → Temperatur stabil oder mit kleinem σ,
-                              Heiz-Ratio fällt deutlich (Körper heizt mit)
-  3) Person raus            → Temperatur fällt (slope < -0.10°C/h),
-                              Heiz-Ratio steigt wieder
+  1) Heizung an, Bett leer  → Temperatur steigt LINEAR (slope > +0.20°C/h)
+  2) Person im Bett         → Temperatur stabil oder mit kleinem σ
+                              (slope ≈ 0, Heizung kann Körperwärme nicht überheizen)
+  3) Person raus            → Temperatur fällt LANGSAM (slope < -0.10°C/h)
 
 ENTSCHEIDUNGS-LOGIK (Priorität von oben nach unten):
   • σ_d kurz > 0.10 °C                → CHAOS = Person + Lock 30 min ON
   • Chaos-Lock noch aktiv             → halte ON (slope nach Burst verzerrt)
-  • Heiz-Ratio < 0.25 (60 min)        → Heizbedarf eingebrochen → ON
-  • Heiz-Ratio > 0.70 UND slope > 0   → klar aufheizendes Leerbett → OFF
   • slope > +0.20 °C/h                → leeres Bett heizt auf → OFF
   • slope < -0.10 °C/h                → Person raus, kühlt aus → OFF
   • slope ≈ 0 UND prev_slope > 0.15   → Aufheizen→Stabil = Einstieg → ON
@@ -31,8 +29,7 @@ ENTSCHEIDUNGS-LOGIK (Priorität von oben nach unten):
 
 CHAOS-LOCK:
   Nach Erkennung eines Chaos-Bursts (Einstieg, Bewegung, Decke verrücken)
-  bleibt der Sensor 30 min ON. v8 hatte 60 min — zu lang bei Fehl-Triggern.
-  Ein längeres σ_d-Fenster > 0.06 °C ODER ein eingebrochener Heiz-Bedarf
+  bleibt der Sensor 30 min ON. Ein längeres σ_d-Fenster > 0.06 °C
   frischt den Lock auf, sodass aktive Schläfer ihn kontinuierlich
   verlängern.
 
@@ -117,11 +114,9 @@ class PresenceThresholds:
     slope_stable_band: float = 0.10  # |slope| < X → stabile Phase
     slope_rise_threshold: float = 0.15  # prev_slope > X UND jetzt stabil = Einstieg
 
-    # v9: Heiz-Ratio (zurück aus v1) — Person reduziert Heizbedarf
-    heat_ratio_window_minutes: int = 60  # Fenster für Heizverhältnis
-    heat_ratio_min_samples: int = 10  # Erst ab so vielen Samples auswerten
-    heat_ratio_present_threshold: float = 0.25  # Ratio darunter → Person (Körperwärme spart Heizen)
-    heat_ratio_empty_threshold: float = 0.70  # Ratio darüber + steigend → Bett leer
+    # heat_ratio: nur Diagnose, KEIN Trigger (v9 deaktivierte das Bett zu früh)
+    heat_ratio_window_minutes: int = 60  # Fenster für Heizverhältnis-Beobachtung
+    heat_ratio_min_samples: int = 10  # Erst ab so vielen Samples berechnen
 
 
 class PresenceDetector:
@@ -519,17 +514,19 @@ class PresenceDetector:
         now: datetime,
     ) -> Tuple[bool, float, list]:
         """
-        v8: Bett-Zustand aus σ-detrended + Slope + Chaos-Lock.
+        Bett-Zustand aus σ-detrended + Slope + Chaos-Lock (v8-Logik).
 
         Drei klar getrennte Phasen aus den echten Daten (CSV April 2026):
         1) Heizt auf (slope > +0.20 °C/h, σ_d klein)             → leer
         2) Stabil oder leicht steigend (|slope| < 0.10) nach Rise → Person eingestiegen
         3) Kühlt ab (slope < −0.10 °C/h)                          → Person raus
-        +) Chaos (σ_d > 0.10) übersteuert immer → Person + lockt 60 min ON
+        +) Chaos (σ_d > 0.10) übersteuert immer → Person + lockt 30 min ON
         """
         t = self.thresholds
 
-        # v9: Heiz-Ratio (kann None sein wenn nicht genug Heater-History)
+        # heat_ratio nur für Diagnose berechnen — wird NICHT als Trigger benutzt,
+        # weil leere Betten im Halte-Modus heat_ratio < 0.25 zeigen und damit
+        # in v9 fälschlich als „Person" interpretiert wurden.
         heat_ratio = self._heating_ratio(zone_index, now)
         self._last_heat_ratio[zone_index] = heat_ratio
 
@@ -543,9 +540,6 @@ class PresenceDetector:
 
         # ─── Chaos-Lock auffrischen wenn längeres Fenster aktiv aussieht ──
         if detrended_std_long > t.chaos_refresh_threshold:
-            self._last_chaos_time[zone_index] = now
-        # v9: Eingebrochener Heizbedarf frischt Lock ebenfalls auf
-        if heat_ratio is not None and heat_ratio < t.heat_ratio_present_threshold:
             self._last_chaos_time[zone_index] = now
 
         # ─── 1) Chaos-Burst: sofort ON ────────────────────────────────────
@@ -563,27 +557,6 @@ class PresenceDetector:
             if elapsed_min < t.chaos_lock_minutes:
                 reasons.append(f"→lock({elapsed_min:.0f}/{t.chaos_lock_minutes}min)")
                 return self._apply_overrides(True, 0.85, reasons, air_std, water_temp, surface_temp)
-
-        # ─── 2b) v9: Heiz-Ratio sehr niedrig → Person reduziert Heizbedarf ──
-        # Robustes physikalisches Signal aus v1.0: Körperwärme spart Heizen.
-        # Greift nur wenn genug Heater-History (sonst None) und Bett nicht aktiv kühlt.
-        if (
-            heat_ratio is not None
-            and heat_ratio < t.heat_ratio_present_threshold
-            and (slope is None or slope > t.slope_cooling_threshold)
-        ):
-            reasons.append("→heat-low(körperwärme)")
-            return self._apply_overrides(True, 0.85, reasons, air_std, water_temp, surface_temp)
-
-        # ─── 2c) v9: Heiz-Ratio hoch UND Bett heizt → klar leer ───────────
-        if (
-            heat_ratio is not None
-            and heat_ratio > t.heat_ratio_empty_threshold
-            and slope is not None
-            and slope > 0
-        ):
-            reasons.append("→heat-high(empty)")
-            return self._apply_overrides(False, 0.10, reasons, air_std, water_temp, surface_temp)
 
         # ─── 3) Slope-basierte Phasen (nur wenn genug Daten) ──────────────
         if slope is None:
