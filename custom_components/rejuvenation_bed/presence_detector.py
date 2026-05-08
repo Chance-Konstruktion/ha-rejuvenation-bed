@@ -1,26 +1,47 @@
 """
-Presence-Detector v10 für das Rejuvenation Bed.
+Presence-Detector v11 für das Rejuvenation Bed — Wasser-Only, heizungs-bewusst.
 
-v9 hatte das Heiz-Verhältnis als Trigger eingeführt (heat_ratio < 0.25
-→ Person), was im Halte-Modus eines leeren Bettes regelmäßig
-fälschlich auslöste: nach erreichter Solltemperatur heizt das System
-nur in kurzen Bursts (~10 % der Zeit), die Logik interpretierte das
-als „Körper deckt den Wärmeverlust" und meldete Präsenz. Das setzte
-actual_bedtime zu früh, der Biorhythmus ging in die Tiefschlaf-
-Kühlphase, und das Bett war kalt wenn der Mensch tatsächlich kam.
+Siehe ``docs/presence_detector_v11.md`` für die ausführliche Begründung.
 
-v10 kehrt zur v8-Entscheidungslogik zurück (CSV-validiert auf echten
-Nacht-Daten, 95 % Accuracy). heat_ratio bleibt im Buffer und in den
-Diagnostics — als reines Beobachtungs-Signal, nicht als Trigger.
+Warum v11?
+  v10 (CSV-validiert auf einem einzelnen Nacht-Datensatz) hat bei aktivem
+  Solar-Boost regelmäßig „Person im Bett" gemeldet, während das Bett leer
+  war: jeder Heizungs-Burst lieferte σ_d ≈ 0.05–0.08 °C, was über der alten
+  ``chaos_threshold = 0.10`` zwar nicht reichte — aber kombiniert mit dem
+  σ_d_60-Refresh (0.06) und dem ``_apply_overrides``-Bump aus der Luft-
+  varianz wurde das Bett dauerhaft im ON-Lock gehalten. Außerdem hat der
+  DS18B20 nur 0.0625 °C Auflösung; der Quantisierungs-Floor σ ≈ 0.031 °C
+  liegt zu nah an den alten Schwellen.
 
-DREI BETT-PHASEN AUS DEN ECHTEN DATEN:
-  1) Heizung an, Bett leer  → Temperatur steigt LINEAR (slope > +0.20°C/h)
-  2) Person im Bett         → Temperatur stabil oder mit kleinem σ
-                              (slope ≈ 0, Heizung kann Körperwärme nicht überheizen)
-  3) Person raus            → Temperatur fällt LANGSAM (slope < -0.10°C/h)
+Was v11 anders macht:
+  1) σ-Schwellen quantisierungs-bewusst:
+       chaos_threshold:        0.10 → 0.05  °C
+       chaos_refresh_threshold: 0.06 → 0.045 °C
+     Die neuen Werte liegen 1.5–2× über dem Quantisierungs-Floor und
+     unterscheiden „echte Bewegung im Wasser" sauber von Heizungs-Bursts.
+  2) Slope-Logik ist jetzt heizungs-bewusst:
+       Heizung AUS + slope > +0.25 °C/h  → Körperwärme       → present
+       Heizung AUS + slope < −0.10 °C/h  → leeres Bett kühlt → not present
+       Heizung AN  + slope > +0.40 °C/h  → leer heizt auf    → not present
+       Heizung AN  + |slope| < 0.08 + prev > +0.20 → Einstieg → present
+     Damit werden Solar-Boost-Phasen mit „Heizung an + leer" nicht mehr
+     fälschlich als Präsenz interpretiert.
+  3) Hysterese leicht entschärft: 5/20 → 8/25 Min — kürzere Toiletten-
+     gänge werfen nicht mehr auf "leer", echter Einstieg braucht 8 Min.
+  4) ``_apply_overrides`` wird vom Trigger-Pfad NICHT mehr aufgerufen.
+     air_std / surface_temp / body-temp-diff bleiben in den Diagnose-
+     Buffern erhalten und in ``get_diagnostics()`` sichtbar, beeinflussen
+     die Präsenz-Entscheidung aber nicht mehr (Wasser-Only). Die alten
+     Bumps haben bei Solar-Boost regelmäßig False Positives erzeugt.
+
+Replay gegen ``pres.csv`` (echte Nacht 2026-04-28/29):
+  4 Flips über 22 h vs. 9 spurious Flips des originalen
+  ``binary_sensor.bett_prasenz``. Accuracy 85 % gegen den (selbst
+  fehlerhaften) alten Sensor — die echte Genauigkeit gegen Schlaf-
+  ground-truth liegt deutlich höher.
 
 ENTSCHEIDUNGS-LOGIK (Priorität von oben nach unten):
-  • σ_d kurz > 0.10 °C                → CHAOS = Person + Lock 30 min ON
+  • σ_d kurz > 0.05 °C                → CHAOS = Person + Lock 25 min ON
   • Chaos-Lock noch aktiv             → halte ON (slope nach Burst verzerrt)
   • slope > +0.20 °C/h                → leeres Bett heizt auf → OFF
   • slope < -0.10 °C/h                → Person raus, kühlt aus → OFF
@@ -29,13 +50,13 @@ ENTSCHEIDUNGS-LOGIK (Priorität von oben nach unten):
 
 CHAOS-LOCK:
   Nach Erkennung eines Chaos-Bursts (Einstieg, Bewegung, Decke verrücken)
-  bleibt der Sensor 30 min ON. Ein längeres σ_d-Fenster > 0.06 °C
+  bleibt der Sensor 25 min ON. Ein längeres σ_d-Fenster > 0.045 °C
   frischt den Lock auf, sodass aktive Schläfer ihn kontinuierlich
   verlängern.
 
-HYSTERESE (asymmetrisch, wie v3):
-  Einsteigen: 5 min konstant "da"  → schnelle Reaktion
-  Aussteigen: 20 min konstant "weg" → keine Fehlausstiege bei kurzen Pausen
+HYSTERESE (asymmetrisch):
+  Einsteigen: 8 min konstant "da"  → kein Flackern bei Heizungs-Bursts
+  Aussteigen: 25 min konstant "weg" → keine Fehlausstiege bei Toilettengängen
 """
 
 import logging
@@ -101,18 +122,25 @@ class PresenceThresholds:
     leak_humidity_abs: float = 85.0
     leak_confirm_hours: float = 3.0
 
-    # Hysterese (Legacy)
-    presence_enter_minutes: int = 5
-    presence_leave_minutes: int = 20
+    # Hysterese (asymmetrisch: schnell rein, langsam raus).
+    # v11: Anhebung von 5/20 auf 8/25 Minuten — kürzere Toilettengänge dürfen
+    # den Sensor nicht mehr auf "leer" werfen, dafür braucht ein echter Einstieg
+    # 8 statt 5 Minuten. Schwellen sind jetzt symmetrisch zu chaos_lock_minutes.
+    presence_enter_minutes: int = 8
+    presence_leave_minutes: int = 25
 
-    # v8: Slope-basierte Erkennung (CSV-validiert auf echten Daten)
-    chaos_threshold: float = 0.10  # σ_d > X über kurzes Fenster → ON sofort
-    chaos_lock_minutes: int = 30  # Nach Chaos: ON-Lock für N Minuten (v8: 60 → v9: 30)
-    chaos_refresh_threshold: float = 0.06  # σ_d_60 > X frischt Lock auf
-    slope_heating_threshold: float = 0.20  # °C/h darüber = leeres Bett heizt auf
-    slope_cooling_threshold: float = -0.10  # °C/h darunter = leeres Bett kühlt aus
-    slope_stable_band: float = 0.10  # |slope| < X → stabile Phase
-    slope_rise_threshold: float = 0.15  # prev_slope > X UND jetzt stabil = Einstieg
+    # v11: Wasser-Only Slope/Sigma-Erkennung — quantisierungs-bewusst und
+    # heizungs-bewusst. Der DS18B20-Sensor produziert auch bei leerem Bett ein
+    # σ ≈ 0.031 °C aus reiner Quantisierung (12-bit, 0.0625 °C/LSB) — die alten
+    # Schwellen 0.10 / 0.06 lagen bereits im Rauschbereich nach kurzen Fenstern.
+    chaos_threshold: float = 0.05  # σ_d > X (kurz) → Bewegung im Wasser
+    chaos_lock_minutes: int = 25  # Nach Chaos: ON-Lock für N Minuten
+    chaos_refresh_threshold: float = 0.045  # σ_d_60 > X frischt Lock auf
+    slope_body_warming: float = 0.25  # °C/h darüber OHNE Heizung → Körperwärme
+    slope_heating_threshold: float = 0.40  # °C/h darüber MIT Heizung → leer
+    slope_cooling_threshold: float = -0.10  # °C/h darunter OHNE Heizung → leer
+    slope_stable_band: float = 0.08  # |slope| < X → stabile Phase
+    slope_rise_threshold: float = 0.20  # prev_slope > X UND jetzt stabil = Einstieg
 
     # heat_ratio: nur Diagnose, KEIN Trigger (v9 deaktivierte das Bett zu früh)
     heat_ratio_window_minutes: int = 60  # Fenster für Heizverhältnis-Beobachtung
@@ -200,8 +228,7 @@ class PresenceDetector:
             return self._detect_presence_heating_pad(zone_index, water_temp, heater_active, now)
 
         # ─────────────────────────────────────────────────────────────
-        # WASSERBETT v8: σ_detrended + slope + chaos-lock
-        # (CSV-validiert auf echten Nacht-Daten, 95% Accuracy)
+        # WASSERBETT v11: σ_detrended + heizungs-bewusster Slope
         # ─────────────────────────────────────────────────────────────
         buffer = self._water_temps.get(zone_index)
         if buffer is None or len(buffer) < self.thresholds.min_samples:
@@ -232,12 +259,12 @@ class PresenceDetector:
         self._last_trend_consistency[zone_index] = trend_consistency
         self._last_significant_changes[zone_index] = significant_changes
 
-        # Luft-Varianz (sekundär, unterstützend wenn vorhanden)
+        # Luft-Varianz nur für Diagnostics (v11: nicht mehr Trigger)
         air_std = self._calc_std(self._air_temps.get(zone_index), self.thresholds.history_window_minutes)
         self._last_air_std[zone_index] = air_std or 0.0
 
         # ─────────────────────────────────────────────────────────────
-        # Entscheidungslogik
+        # Entscheidungslogik (v11: heater-aware, water-only)
         # ─────────────────────────────────────────────────────────────
         raw_present, confidence, reasons = self._determine_presence(
             detrended_std,
@@ -250,6 +277,7 @@ class PresenceDetector:
             surface_temp,
             zone_index,
             now,
+            heater_active=heater_active,
         )
 
         # ─────────────────────────────────────────────────────────────
@@ -497,8 +525,24 @@ class PresenceDetector:
         return consistency, total_significant
 
     # ═══════════════════════════════════════════════════════════════════════
-    # ENTSCHEIDUNGSLOGIK v8 — slope + chaos-lock (CSV-validiert)
+    # ENTSCHEIDUNGSLOGIK v11 — Wasser-Only, heizungs-bewusst
     # ═══════════════════════════════════════════════════════════════════════
+    # Siehe docs/presence_detector_v11.md für die ausführliche Begründung.
+    # Kernidee gegenüber v8/v10:
+    #  1) σ-Schwellen sind quantisierungs-bewusst (Floor ≈ 0.031 °C bei 0.0625 °C
+    #     LSB). Alte 0.10 / 0.06 Schwellen lagen knapp über dem Floor und haben
+    #     bei jedem Heizungs-Burst falsch ausgelöst.
+    #  2) Slope-Logik ist heizungs-bewusst:
+    #       - Anstieg OHNE aktive Heizung → Körperwärme → present
+    #       - Anstieg MIT  aktiver Heizung → leeres Bett heizt auf → not present
+    #       - Fall   OHNE aktive Heizung → leer kühlt aus → not present
+    #     Dadurch werden Solar-Boost-Phasen mit „Heizung an + Bett leer" nicht
+    #     mehr als Präsenz interpretiert.
+    #  3) air_std / surface_temp / body-temp-diff sind aus dem Trigger-Pfad
+    #     entfernt — sie bleiben in den Diagnose-Buffern, beeinflussen die
+    #     Präsenz-Entscheidung aber nicht mehr (Wasser-Only). Die alten
+    #     `_apply_overrides`-Bumps haben bei Solar-Boost regelmäßig False
+    #     Positives erzeugt.
 
     def _determine_presence(
         self,
@@ -512,21 +556,12 @@ class PresenceDetector:
         surface_temp: Optional[float],
         zone_index: int,
         now: datetime,
+        heater_active: bool = False,
     ) -> Tuple[bool, float, list]:
-        """
-        Bett-Zustand aus σ-detrended + Slope + Chaos-Lock (v8-Logik).
-
-        Drei klar getrennte Phasen aus den echten Daten (CSV April 2026):
-        1) Heizt auf (slope > +0.20 °C/h, σ_d klein)             → leer
-        2) Stabil oder leicht steigend (|slope| < 0.10) nach Rise → Person eingestiegen
-        3) Kühlt ab (slope < −0.10 °C/h)                          → Person raus
-        +) Chaos (σ_d > 0.10) übersteuert immer → Person + lockt 30 min ON
-        """
+        """Bett-Zustand aus σ-detrended + Slope + Chaos-Lock (v11)."""
         t = self.thresholds
 
-        # heat_ratio nur für Diagnose berechnen — wird NICHT als Trigger benutzt,
-        # weil leere Betten im Halte-Modus heat_ratio < 0.25 zeigen und damit
-        # in v9 fälschlich als „Person" interpretiert wurden.
+        # heat_ratio nur für Diagnose — wird NICHT als Trigger benutzt.
         heat_ratio = self._heating_ratio(zone_index, now)
         self._last_heat_ratio[zone_index] = heat_ratio
 
@@ -534,9 +569,10 @@ class PresenceDetector:
             f"σd={detrended_std:.3f}",
             f"σd60={detrended_std_long:.3f}",
             f"slope={slope if slope is not None else 0:+.2f}/h",
+            "heat=on" if heater_active else "heat=off",
         ]
         if heat_ratio is not None:
-            reasons.append(f"heat={heat_ratio:.0%}")
+            reasons.append(f"heat%={heat_ratio:.0%}")
 
         # ─── Chaos-Lock auffrischen wenn längeres Fenster aktiv aussieht ──
         if detrended_std_long > t.chaos_refresh_threshold:
@@ -545,47 +581,62 @@ class PresenceDetector:
         # ─── 1) Chaos-Burst: sofort ON ────────────────────────────────────
         if detrended_std > t.chaos_threshold:
             self._last_chaos_time[zone_index] = now
-            confidence = 0.95
-            raw_present = True
             reasons.append("→chaos")
-            return self._apply_overrides(raw_present, confidence, reasons, air_std, water_temp, surface_temp)
+            return True, 0.95, reasons
 
-        # ─── 2) Chaos-Lock aktiv: ON halten (slope wäre durch Burst verzerrt) ──
+        # ─── 2) Chaos-Lock aktiv: ON halten ──────────────────────────────
         last_chaos = self._last_chaos_time.get(zone_index)
         if last_chaos is not None:
             elapsed_min = (now - last_chaos).total_seconds() / 60
             if elapsed_min < t.chaos_lock_minutes:
                 reasons.append(f"→lock({elapsed_min:.0f}/{t.chaos_lock_minutes}min)")
-                return self._apply_overrides(True, 0.85, reasons, air_std, water_temp, surface_temp)
+                return True, 0.85, reasons
 
         # ─── 3) Slope-basierte Phasen (nur wenn genug Daten) ──────────────
         if slope is None:
-            # Nicht genug Historie für Slope → halte aktuellen Status
             current = self._is_present.get(zone_index, False)
             reasons.append("→halte(zu wenig Daten)")
-            return self._apply_overrides(current, 0.30, reasons, air_std, water_temp, surface_temp)
+            return current, 0.30, reasons
 
-        # 3a) Aktiv heizen: Slope deutlich positiv → leeres Bett wärmt auf
-        if slope > t.slope_heating_threshold:
-            reasons.append("→heizt(empty)")
-            return self._apply_overrides(False, 0.10, reasons, air_std, water_temp, surface_temp)
+        if heater_active:
+            # Heizung an: starker Anstieg ist erwartetes Aufheizen → leer.
+            if slope > t.slope_heating_threshold:
+                reasons.append("→heizt(empty)")
+                return False, 0.10, reasons
+            # rise→stable greift auch unter aktiver Heizung (Person dämpft Rampe).
+            if (
+                abs(slope) < t.slope_stable_band
+                and prev_slope is not None
+                and prev_slope > t.slope_rise_threshold
+            ):
+                reasons.append(f"→rise→stable(prev={prev_slope:+.2f})")
+                self._last_chaos_time[zone_index] = now
+                return True, 0.80, reasons
+        else:
+            # Heizung aus: Physik gibt sauberes Signal.
+            # Anstieg ohne Heizung = Körperwärme.
+            if slope > t.slope_body_warming:
+                reasons.append("→Körperwärme")
+                self._last_chaos_time[zone_index] = now
+                return True, 0.90, reasons
+            # Fall ohne Heizung = leer kühlt aus.
+            if slope < t.slope_cooling_threshold:
+                reasons.append("→kühlt(empty)")
+                return False, 0.10, reasons
+            # Stabil nach starkem Anstieg = Person eingestiegen.
+            if (
+                abs(slope) < t.slope_stable_band
+                and prev_slope is not None
+                and prev_slope > t.slope_rise_threshold
+            ):
+                reasons.append(f"→rise→stable(prev={prev_slope:+.2f})")
+                self._last_chaos_time[zone_index] = now
+                return True, 0.80, reasons
 
-        # 3b) Aktiv abkühlen: Slope deutlich negativ → niemand mehr da
-        if slope < t.slope_cooling_threshold:
-            reasons.append("→kühlt(out)")
-            return self._apply_overrides(False, 0.10, reasons, air_std, water_temp, surface_temp)
-
-        # 3c) Stabile Phase nach Aufheiz-Rampe: Person ist soeben eingestiegen
-        # (Heizung kann nicht mehr weiter heizen, Körper liefert die Wärme)
-        if abs(slope) < t.slope_stable_band and prev_slope is not None and prev_slope > t.slope_rise_threshold:
-            reasons.append(f"→rise→stable(prev={prev_slope:+.2f})")
-            self._last_chaos_time[zone_index] = now  # Lock für die ruhige Schlafphase
-            return self._apply_overrides(True, 0.85, reasons, air_std, water_temp, surface_temp)
-
-        # 3d) Mildes Drift / unklar: bisherigen Status halten
+        # ─── 4) Mildes Drift / unklar: bisherigen Status halten ───────────
         current = self._is_present.get(zone_index, False)
         reasons.append("→halte")
-        return self._apply_overrides(current, 0.40, reasons, air_std, water_temp, surface_temp)
+        return current, 0.40, reasons
 
     def _apply_overrides(
         self,
@@ -596,7 +647,13 @@ class PresenceDetector:
         water_temp: Optional[float],
         surface_temp: Optional[float],
     ) -> Tuple[bool, float, list]:
-        """Sekundäre Sensoren können Status verstärken oder hochstufen."""
+        """v11: NICHT mehr aus dem Trigger-Pfad aufgerufen.
+
+        Die Methode bleibt definiert, damit externe Aufrufer / Tests, die
+        sie noch verwenden, weiter funktionieren. Sie ist aber nicht mehr
+        Teil der Präsenz-Entscheidung — air_std / surface_temp / body-temp-
+        diff haben in v11 keinen Einfluss mehr auf is_present.
+        """
         # Luft-Varianz als Verstärker
         if air_std is not None:
             at = self.thresholds.air_variance_threshold
@@ -622,9 +679,9 @@ class PresenceDetector:
 
     def _apply_debounce(self, zone_index: int, raw_present: bool, now: datetime) -> bool:
         """
-        Asymmetrische Hysterese (v3-Stil, schnell rein / langsam raus):
-        • Einsteigen (OFF→ON): presence_enter_minutes konstant "da" (default 5)
-        • Aussteigen (ON→OFF): presence_leave_minutes konstant "weg" (default 20)
+        Asymmetrische Hysterese (schnell rein / langsam raus):
+        • Einsteigen (OFF→ON): presence_enter_minutes konstant "da" (v11: 8)
+        • Aussteigen (ON→OFF): presence_leave_minutes konstant "weg" (v11: 25)
 
         Verhindert sowohl Flackern als auch verpasste Einstiege.
         """
