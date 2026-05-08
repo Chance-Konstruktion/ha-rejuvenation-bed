@@ -255,7 +255,7 @@ PRESENCE_BODY_TEMP_DIFF = 1.5  # °C Differenz Auflage-Wasser für Körperkontak
 
 # Device Info
 MANUFACTURER = "Rejuvenation Bed"
-SW_VERSION = "0.7.0"
+SW_VERSION = "0.7.1"
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # ZEIT-HELPER
