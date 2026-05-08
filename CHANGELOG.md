@@ -2,6 +2,44 @@
 
 Alle Änderungen am Rejuvenation Bed Projekt.
 
+## [0.7.1] - 2026-05-08
+
+### Bugfixes
+- **Präsenz-Detector v11 (Wasser-Only, heizungs-bewusst)** – Der bisherige
+  Detector v10 hat bei aktivem Solar-Boost regelmäßig „Person im Bett"
+  gemeldet, weil drei Probleme zusammenkamen:
+  - σ-Schwellen lagen knapp über dem Quantisierungs-Floor des DS18B20
+    (0.0625 °C/LSB → σ ≈ 0.031 °C auch bei leerem Bett),
+  - eine positive Slope wurde uniform als „leer heizt auf" interpretiert,
+    obwohl sie ohne Heizung das eindeutige Signal für Körperwärme ist,
+  - `_apply_overrides` hat den Luft-Sensor als Hard-Trigger genutzt
+    (`air_std > 2 × threshold` setzte `raw_present = True`).
+
+  v11 fixt alle drei: σ-Schwellen sind quantisierungs-bewusst (chaos
+  0.10 → 0.05, refresh 0.06 → 0.045), die Slope-Logik unterscheidet jetzt
+  `heater_active=True/False`, und `_apply_overrides` ist aus dem Trigger-
+  Pfad entfernt (bleibt für Backward-Compat existierend, wird aber nicht
+  mehr aus `_determine_presence` aufgerufen). Hysterese leicht entschärft
+  (5/20 → 8/25 Min) gegen Flackern bei Heizungs-Bursts und Toilettengängen.
+
+  Replay gegen den echten Nacht-Datensatz `pres.csv`: 4 Flips über 22 h
+  vs. 9 spurious Flips des originalen `binary_sensor.bett_prasenz`,
+  insbesondere null Fehlauslösungen mehr in der Solar-Boost-Phase
+  12:50–15:50.
+
+  **Keine Breaking Changes** — `detect_presence()` und `get_diagnostics()`
+  haben die identische Signatur und Felder wie v10.
+
+### Dokumentation
+- **`docs/presence_detector_v11.md`** – Ausführliche Begründung der
+  Threshold-Änderungen, Entscheidungsbaum, Validierungs-Tabelle und
+  Tuning-Hinweise.
+
+### Test-Sandbox
+- Standalone Test-Fassung der reduzierten Wasser-Only-Logik liegt unter
+  [`openclawde/rejuvenation-bed-presence-test/`](https://github.com/Chance-Konstruktion/openclawde/tree/main/rejuvenation-bed-presence-test)
+  inklusive CSV-Replay-Script (Wide-Format und HA Long-Export).
+
 ## [0.7.0] - 2026-03-30
 
 ### Code & Architektur
