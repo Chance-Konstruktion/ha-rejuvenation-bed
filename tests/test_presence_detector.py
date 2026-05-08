@@ -183,9 +183,7 @@ class TestHeatingVsPresence:
             t = now - timedelta(seconds=(len(heating_temps) - i) * 20)
             fast_detector._store(0, temp, None, None, t)
 
-        is_present, conf, reason = fast_detector.detect_presence(
-            zone_index=0, water_temp=27.9375, heater_active=True
-        )
+        is_present, conf, reason = fast_detector.detect_presence(zone_index=0, water_temp=27.9375, heater_active=True)
         assert is_present is False, f"Echtes Heizungsmuster darf NICHT als Präsenz erkannt werden! reason={reason}"
 
     def test_sudden_person_entry(self, fast_detector):
@@ -279,9 +277,7 @@ class TestSingleSensorPresence:
             temp = _quantize_ds18b20(27.5 + (i / 30) * 0.5)
             fast_detector._store(0, temp, None, None, t)
 
-        is_present, conf, reason = fast_detector.detect_presence(
-            zone_index=0, water_temp=28.0, heater_active=True
-        )
+        is_present, conf, reason = fast_detector.detect_presence(zone_index=0, water_temp=28.0, heater_active=True)
         assert is_present is False, f"Reine Heiz-Rampe darf NICHT als Präsenz erkannt werden! reason={reason}"
 
     def test_detrended_std_separates_heating_from_person(self, fast_detector):
@@ -337,9 +333,7 @@ class TestSlopeBasedDetection:
             t = now - timedelta(seconds=(90 - i) * 60)
             long_window_detector._store(0, 28.0 + i * 0.4 / 60, None, None, t)
 
-        is_p, conf, reason = long_window_detector.detect_presence(
-            0, water_temp=28.6, heater_active=True
-        )
+        is_p, conf, reason = long_window_detector.detect_presence(0, water_temp=28.6, heater_active=True)
         assert is_p is False, f"Aufheizphase muss OFF sein! reason={reason}"
 
     def test_cooling_phase_marks_empty(self, long_window_detector):
