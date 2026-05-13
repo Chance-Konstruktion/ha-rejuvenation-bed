@@ -4,6 +4,18 @@ Alle Änderungen am Rejuvenation Bed Projekt.
 
 ## [0.7.1] - 2026-05-08
 
+### ⚠️ Bekannte Probleme
+- **Präsenz-Sensor** (`binary_sensor.bett_prasenz`) liefert in der Praxis
+  weiterhin nicht zuverlässig korrekte Werte. Die v11-Heuristik ist gegen
+  den Replay-Datensatz validiert, aber nicht final feldgetestet.
+- **Isolations-Sensor** (`binary_sensor.bett_isolation`) arbeitet noch
+  nicht stabil. Die gelernten Schwellen aus dem v0.7.0-Fix greifen nicht
+  in allen Setups.
+
+Fixes für beide Sensoren werden in den kommenden Tagen in einem Folge-
+Release nachgereicht. Bis dahin: Werte dieser beiden Binary-Sensoren
+mit Vorsicht in Automationen verwenden.
+
 ### Bugfixes
 - **Präsenz-Detector v11 (Wasser-Only, heizungs-bewusst)** – Der bisherige
   Detector v10 hat bei aktivem Solar-Boost regelmäßig „Person im Bett"
