@@ -2,6 +2,27 @@
 
 Alle Änderungen am Rejuvenation Bed Projekt.
 
+## [0.7.2] - 2026-05-15
+
+### Bugfixes
+- **Isolations-Sensor: Kalibrierung verwirft schwache Spreads** – Der
+  Auto-Kalibrierungs-Pfad in `bed_intelligence._update_calibration` hat
+  Samples bisher mit `is_present` als Proxy für „Decke drauf" gelabelt.
+  Bei Nutzern, die ihre Decke auch tagsüber auf dem leeren Bett liegen
+  lassen, landen die bedeckten Samples damit in `_empty_deltas`,
+  `cov_mean` und `unc_mean` rücken zusammen, der Threshold rutscht über
+  das tatsächliche Covered-Delta — Folge: Sensor meldet dauerhaft
+  `on` / „Problem", obwohl die Decke auf dem Bett liegt (siehe Log
+  vom 15.05.: |Δ| stabil ~2,1 °K, Defaults würden „covered" liefern,
+  gelernte Werte aber „uncovered").
+
+  Fix: gelernte `delta_covered_mean`/`delta_uncovered_mean` werden nur
+  übernommen, wenn `|cov - unc| ≥ 0.4 °K`. Sonst bleiben die Defaults
+  (cov=2.0, unc=1.5, threshold=1.75) aktiv. Beim Laden aus dem Storage
+  werden bereits „verbrannte" Kalibrierungen mit zu kleinem Spread
+  automatisch auf die Defaults zurückgesetzt — bestehende Installationen
+  müssen also nichts manuell löschen.
+
 ## [0.7.1] - 2026-05-08
 
 ### ⚠️ Bekannte Probleme
