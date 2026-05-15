@@ -275,6 +275,18 @@ class BedIntelligence:
                     f"{'kalibriert' if self.calibration.is_calibrated else 'Lernphase'}, "
                     f"{self.calibration.samples_collected} Samples"
                 )
+                # Gelernte Delta-Schwellen verwerfen, wenn cov/unc zu nah beieinander
+                # liegen (Nutzer mit Tagesdecke → is_present-Label unbrauchbar).
+                cov = self.calibration.delta_covered_mean
+                unc = self.calibration.delta_uncovered_mean
+                if abs(cov - unc) < 0.4:
+                    _LOGGER.warning(
+                        "Isolation-Kalibrierung unzuverlässig (cov=%.2f, unc=%.2f) — "
+                        "setze auf Defaults zurück.", cov, unc,
+                    )
+                    self.calibration.delta_covered_mean = 2.0
+                    self.calibration.delta_uncovered_mean = 1.5
+                    self.calibration.delta_isolation_threshold = 1.75
             if data and "bedtime_history" in data:
                 self._bedtime_history = data["bedtime_history"]
                 self._bedtime_history = {int(k): v for k, v in self._bedtime_history.items()}
@@ -427,12 +439,25 @@ class BedIntelligence:
         else:
             cal.water_std_threshold = (cal.water_std_empty_max + cal.water_std_occupied_min) / 2
 
-        # Delta-Werte
-        if cal._covered_deltas:
-            cal.delta_covered_mean = sum(cal._covered_deltas) / len(cal._covered_deltas)
-        if cal._empty_deltas:
-            cal.delta_uncovered_mean = sum(cal._empty_deltas) / len(cal._empty_deltas)
-        cal.delta_isolation_threshold = (cal.delta_covered_mean + cal.delta_uncovered_mean) / 2
+        # Delta-Werte — nur übernehmen, wenn die beiden Klassen sich deutlich
+        # unterscheiden. `is_present` ist nur ein schwacher Proxy für „Decke
+        # drauf" (Nutzer mit Tagesdecke verfälschen die Verteilung), deshalb
+        # behalten wir die Defaults, wenn der Spread klein ist.
+        MIN_DELTA_SPREAD = 0.4  # °K
+        if cal._covered_deltas and cal._empty_deltas:
+            cov = sum(cal._covered_deltas) / len(cal._covered_deltas)
+            unc = sum(cal._empty_deltas) / len(cal._empty_deltas)
+            if abs(cov - unc) >= MIN_DELTA_SPREAD:
+                cal.delta_covered_mean = cov
+                cal.delta_uncovered_mean = unc
+                cal.delta_isolation_threshold = (cov + unc) / 2
+            else:
+                _LOGGER.info(
+                    "Isolation-Kalibrierung verworfen: Spread |%.2f - %.2f| < %.2f — "
+                    "behalte Defaults (cov=%.2f, unc=%.2f).",
+                    cov, unc, MIN_DELTA_SPREAD,
+                    cal.delta_covered_mean, cal.delta_uncovered_mean,
+                )
 
         # Feuchtigkeit
         if cal._empty_humidities:
