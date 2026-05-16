@@ -8,7 +8,7 @@
 
 🇬🇧 [English Version](README.md)
 
-Verwandelt jede Bett-Heizung in eine selbstlernende "Schlaf-KI". Biorhythmus-basierte Temperaturkurve, Solar-Nutzung als thermische Batterie, Präsenz-Erkennung und Auto-Kalibrierung. Funktioniert mit Wasserbetten, Heizmatten und beheizbaren Matratzenauflagen.
+Verwandelt jede Bett-Heizung in eine selbstlernende Schlafautomation. Biorhythmus-basierte Temperaturkurve, Solar-Nutzung als thermische Batterie, Präsenz-Erkennung und Auto-Kalibrierung. Funktioniert mit Wasserbetten, Heizmatten und beheizbaren Matratzenauflagen.
 
 ---
 
