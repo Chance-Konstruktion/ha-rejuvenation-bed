@@ -239,6 +239,20 @@ DEFAULT_COMFORT_OFFSET = 0.5  # +0.5°C beim Ausschlafen
 BOOST_MAX_TEMP = 34.0  # Absolute Obergrenze Boost (Hardware-Thermostat = Backup)
 
 # ═══════════════════════════════════════════════════════════════════════════════
+# PV-PRIORITÄTS-KASKADE (Solar-Boost Gating)
+# ═══════════════════════════════════════════════════════════════════════════════
+# Solar-Boost fürs Bett ist die LANGSAMSTE Senke (große thermische Masse).
+# Wenn Hausakku-SoC und/oder PV-Forecast-Sensor konfiguriert sind, gilt:
+# Boost nur wenn (SoC >= Schwelle) ODER (Forecast Rest-Tag >= Schwelle).
+# Hintergedanke: Akku/Boiler haben höhere Priorität auf den PV-Überschuss.
+# Ohne diese Sensoren bleibt das Verhalten klassisch (kein Gating).
+
+DEFAULT_BED_BOOST_SOC_THRESHOLD = 90.0   # %SoC ab dem Bett-Boost OK ist
+DEFAULT_BED_BOOST_MIN_FORECAST_KWH = 3.0  # kWh Rest-Tag ab denen Boost OK ist
+BED_BOOST_SOC_HYSTERESIS = 5.0            # %SoC Hysterese (an: 90%, aus: 85%)
+BED_BOOST_FORECAST_HYSTERESIS_KWH = 1.0   # kWh Hysterese (an: 3, aus: 2)
+
+# ═══════════════════════════════════════════════════════════════════════════════
 # PRÄSENZ-ERKENNUNG (Varianz-basiert, kalibriert Apr 2026)
 # ═══════════════════════════════════════════════════════════════════════════════
 # Kern-Erkenntnis: Heizung allein → gleichmäßiger Anstieg (niedrige Varianz)

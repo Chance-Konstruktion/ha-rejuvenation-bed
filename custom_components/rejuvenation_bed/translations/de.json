@@ -234,20 +234,28 @@
       },
       "global_sensors": {
         "title": "📊 Sensoren & Strompreis",
-        "description": "Strompreis und optionale Sensoren für Energieoptimierung und Schlafqualität.\n\n**Strompreis** — Dein aktueller Tarif in ct/kWh. Wird für die Ersparnis-Berechnung und als Fallback verwendet, wenn kein dynamischer Preis-Sensor vorhanden ist.\n\n**Preis-Sensor** — Dynamischer Strompreis von Tibber, aWATTar oder ENTSO-E. Überschreibt den festen Tarif und schaltet den Eco-Modus bei hohem Preis.\n\n**Solar-Sensor** — PV-Leistung in Watt (z.B. Fronius, SMA, Huawei). Bei Überschuss über der eingestellten Schwelle nutzt Solar-Boost den Gratis-Strom.\n\n**Solar-Schwelle** — Ab wie viel Watt Überschuss der Boost startet. Richtwert: mindestens so hoch wie die Heizleistung des Betts (z.B. 300 W für Einzelbett, 600 W für Doppelbett).\n\n**CO₂-Sensor** — CO₂ im Schlafzimmer (z.B. Netatmo, SCD40, SCD41). Fließt mit 25% in den Schlaf-Score ein.",
+        "description": "Strompreis und optionale Sensoren für Energieoptimierung und Schlafqualität.\n\n**Strompreis** — Dein aktueller Tarif in ct/kWh. Wird für die Ersparnis-Berechnung und als Fallback verwendet, wenn kein dynamischer Preis-Sensor vorhanden ist.\n\n**Preis-Sensor** — Dynamischer Strompreis von Tibber, aWATTar oder ENTSO-E. Überschreibt den festen Tarif und schaltet den Eco-Modus bei hohem Preis.\n\n**Solar-Sensor** — PV-Leistung in Watt (z.B. Fronius, SMA, Huawei). Bei Überschuss über der eingestellten Schwelle nutzt Solar-Boost den Gratis-Strom.\n\n**Solar-Schwelle** — Ab wie viel Watt Überschuss der Boost startet. Richtwert: mindestens so hoch wie die Heizleistung des Betts (z.B. 300 W für Einzelbett, 600 W für Doppelbett).\n\n**PV-Prioritäts-Kaskade (optional)** — Wenn du einen Hausakku und/oder eine PV-Prognose (z.B. Solcast) hast, startet der Bett-Boost erst wenn der Akku (fast) voll ist *oder* die Rest-Tags-Prognose üppig genug ist. So bekommen Akku und Boiler Vorrang auf den PV-Überschuss. Ohne diese Sensoren gilt das klassische Verhalten.\n\n**CO₂-Sensor** — CO₂ im Schlafzimmer (z.B. Netatmo, SCD40, SCD41). Fließt mit 25% in den Schlaf-Score ein.",
         "data": {
           "electricity_price": "Strompreis (Festtarif)",
           "price_sensor": "Dynamischer Preis-Sensor",
           "solar_sensor": "Solar-Sensor",
           "co2_sensor": "CO₂-Sensor",
-          "solar_boost_threshold": "Solar-Schwelle"
+          "solar_boost_threshold": "Solar-Schwelle",
+          "battery_soc_sensor": "Hausakku-SoC-Sensor",
+          "bed_boost_soc_threshold": "Akku-Schwelle für Bett-Boost",
+          "forecast_sensor": "PV-Forecast-Sensor (Rest-Tag, kWh)",
+          "bed_boost_min_forecast_kwh": "Forecast-Schwelle für Bett-Boost"
         },
         "data_description": {
           "electricity_price": "Dein aktueller Stromtarif. Wird für die Ersparnis-Berechnung und als Fallback ohne Preis-Sensor verwendet.",
           "price_sensor": "Überschreibt den Festpreis mit Echtzeit-Daten und schaltet den Eco-Modus.",
           "solar_sensor": "PV-Leistung in Watt. Solar-Boost aktiviert ab 500 W Überschuss.",
           "co2_sensor": "CO₂ im Schlafzimmer für den Schlaf-Score.",
-          "solar_boost_threshold": "Ab wie viel Watt PV-Überschuss der Solar-Boost aktiviert wird. Bei einem Doppelbett mit 600 W Heizleistung auf 600 W oder höher einstellen."
+          "solar_boost_threshold": "Ab wie viel Watt PV-Überschuss der Solar-Boost aktiviert wird. Bei einem Doppelbett mit 600 W Heizleistung auf 600 W oder höher einstellen.",
+          "battery_soc_sensor": "Ladezustand deines Hausakkus in Prozent. Wenn gesetzt, wartet der Bett-Boost bis der Akku (fast) voll ist.",
+          "bed_boost_soc_threshold": "Mindest-SoC ab dem Bett-Boost erlaubt ist. Default 90%. 5% Hysterese (Boost geht erst unter 85% wieder aus).",
+          "forecast_sensor": "PV-Prognose in kWh für den Rest des Tages (z.B. sensor.solcast_pv_forecast_forecast_remaining_today).",
+          "bed_boost_min_forecast_kwh": "Mindest-Restprognose ab der Bett-Boost erlaubt ist. Default 3 kWh. 1 kWh Hysterese."
         }
       }
     },
