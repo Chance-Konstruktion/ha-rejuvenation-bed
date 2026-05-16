@@ -35,6 +35,8 @@ from .const import (
     DEFAULT_SUMMER_TEMP,
     DEFAULT_BOOST_OFFSET,
     DEFAULT_COMFORT_OFFSET,
+    DEFAULT_BED_BOOST_SOC_THRESHOLD,
+    DEFAULT_BED_BOOST_MIN_FORECAST_KWH,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -132,7 +134,13 @@ class RejuvenationBedOptionsFlow(config_entries.OptionsFlow):
         """Sensoren und Strompreis."""
         if user_input is not None:
             new_options = dict(self._config_entry.options)
-            optional_sensors = {"solar_sensor", "price_sensor", "co2_sensor"}
+            optional_sensors = {
+                "solar_sensor",
+                "price_sensor",
+                "co2_sensor",
+                "battery_soc_sensor",
+                "forecast_sensor",
+            }
             for key, value in user_input.items():
                 if key in optional_sensors and (value is None or value == ""):
                     new_options.pop(key, None)
@@ -187,6 +195,54 @@ class RejuvenationBedOptionsFlow(config_entries.OptionsFlow):
                     selector.NumberSelectorConfig(
                         min=100, max=2000, step=50,
                         unit_of_measurement="W",
+                        mode=selector.NumberSelectorMode.SLIDER
+                    )
+                ),
+
+                # ─── PV-Prioritäts-Kaskade (optional) ─────────────
+                # Hausakku + PV-Forecast geben dem Bett-Boost niedrigere
+                # Priorität als Akku/Boiler. Ohne diese Sensoren bleibt
+                # das klassische Verhalten erhalten.
+                vol.Optional(
+                    "battery_soc_sensor",
+                    description={"suggested_value": _val("battery_soc_sensor")}
+                ): selector.EntitySelector(
+                    selector.EntitySelectorConfig(
+                        domain="sensor", device_class="battery"
+                    )
+                ),
+
+                vol.Optional(
+                    "bed_boost_soc_threshold",
+                    default=_val(
+                        "bed_boost_soc_threshold",
+                        DEFAULT_BED_BOOST_SOC_THRESHOLD,
+                    )
+                ): selector.NumberSelector(
+                    selector.NumberSelectorConfig(
+                        min=50, max=100, step=1,
+                        unit_of_measurement="%",
+                        mode=selector.NumberSelectorMode.SLIDER
+                    )
+                ),
+
+                vol.Optional(
+                    "forecast_sensor",
+                    description={"suggested_value": _val("forecast_sensor")}
+                ): selector.EntitySelector(
+                    selector.EntitySelectorConfig(domain="sensor")
+                ),
+
+                vol.Optional(
+                    "bed_boost_min_forecast_kwh",
+                    default=_val(
+                        "bed_boost_min_forecast_kwh",
+                        DEFAULT_BED_BOOST_MIN_FORECAST_KWH,
+                    )
+                ): selector.NumberSelector(
+                    selector.NumberSelectorConfig(
+                        min=0.5, max=20.0, step=0.5,
+                        unit_of_measurement="kWh",
                         mode=selector.NumberSelectorMode.SLIDER
                     )
                 ),
