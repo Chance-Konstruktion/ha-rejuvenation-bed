@@ -2,6 +2,38 @@
 
 Alle Änderungen am Rejuvenation Bed Projekt.
 
+## [Unreleased]
+
+### Features
+- **PV-Prioritäts-Kaskade für Solar-Boost** — Der Bett-Boost ist die
+  langsamste Senke im Haushalt (große thermische Masse, ~0.3 °C/h). Bisher
+  hat er los gefeuert, sobald `solar_power >= solar_boost_threshold` —
+  unabhängig davon, ob der Hausakku gerade noch Kapazität für die nächste
+  Lastspitze brauchen würde oder nicht.
+
+  Neu: zwei optionale Sensoren in `📊 Sensoren & Strompreis`:
+  - **`battery_soc_sensor`** — Hausakku-SoC (%). Default-Schwelle 90%.
+  - **`forecast_sensor`** — PV-Prognose Rest-Tag in kWh (z.B. Solcast
+    `sensor.solcast_pv_forecast_forecast_remaining_today`). Default 3 kWh.
+
+  Logik (ODER): wenn mindestens einer der beiden Sensoren konfiguriert ist,
+  startet der Bett-Boost nur wenn der Akku (fast) voll **oder** die
+  Rest-Prognose üppig genug ist. Beispiel: Akku 85% bei wolkigem Forecast
+  → Boost wartet (Strom geht in den Akku). Akku 85% bei "noch 6 kWh
+  erwartet" → Boost startet (Akku wird ohnehin voll). Ohne diese Sensoren
+  bleibt das klassische Verhalten unverändert (backwards compatible).
+
+  Hysterese eingebaut, damit der Boost nicht flattert: 5 %SoC bzw.
+  1 kWh Forecast — wer mit SoC 92% gestartet hat, bleibt bis 85% im Boost.
+
+  Der Strompreis-Pfad ("günstiger Netzstrom < 15 ct/kWh = Boost") ist
+  bewusst nicht von der Kaskade gegated: das ist Netzstrom, nicht
+  PV-Überschuss; da konkurriert der Hausakku nicht mit dem Bett.
+
+  Sichtbar in `state["reason"]`: aktiv → "☀️ Solar-Boost aktiv (1234W
+  Überschuss) — Akku 92% · Forecast 5.2 kWh"; blockiert → "⏸ Boost
+  wartet — Akku 73% < 90% · Forecast 1.4 < 3.0 kWh".
+
 ## [0.7.2] - 2026-05-15
 
 ### Bugfixes
