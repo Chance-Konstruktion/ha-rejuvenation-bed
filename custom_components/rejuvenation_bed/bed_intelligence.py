@@ -7,7 +7,7 @@ FIX (Apr 2026):
   - Glättung gegen Sensor-Rauschen
   - Hysterese-Band um den gelernten Threshold
 
-Drei Features die das System von "Heizung" zu "Schlaf-KI" heben:
+Drei Features die das System von "Heizung" zu "selbstlernender Schlafautomation" heben:
 
 1. AUTO-KALIBRIERUNG
    - Lernt in den ersten 3-5 Tagen automatisch die Schwellwerte
