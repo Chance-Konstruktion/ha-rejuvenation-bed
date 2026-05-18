@@ -6,7 +6,6 @@ from homeassistant.components.binary_sensor import (
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from .const import DOMAIN, BED_TYPE_WATERBED
 from .device_info import (
-    get_device_info,
     get_zone_device_info,
     get_sleep_device_info,
 )

@@ -31,7 +31,7 @@ from homeassistant.const import (
 )
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from .const import DOMAIN, ABSOLUTE_MAX_TEMP
-from .device_info import get_device_info, get_zone_device_info
+from .device_info import get_zone_device_info
 
 _LOGGER = logging.getLogger(__name__)
 
