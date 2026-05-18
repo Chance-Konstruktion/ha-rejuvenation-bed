@@ -165,22 +165,6 @@ class SleepScoreCalculator:
         night.temp_readings.append(current_temp)
         night.target_temps.append(target_temp)
     
-    def record_heating_cycle(self, zone_index: int, duration_minutes: float):
-        """Zeichnet einen Heizzyklus auf."""
-        if zone_index not in self._current_night:
-            return
-        
-        night = self._current_night[zone_index]
-        night.heating_cycles += 1
-        night.total_heating_minutes += duration_minutes
-    
-    def record_short_cycle_prevented(self, zone_index: int):
-        """Zeichnet auf, dass ein Short-Cycle verhindert wurde."""
-        if zone_index not in self._current_night:
-            return
-        
-        self._current_night[zone_index].short_cycles_prevented += 1
-
     def record_interruption(self, zone_index: int, duration_minutes: float):
         """
         Zeichnet eine Schlaf-Unterbrechung auf (Toilette, Kind, etc.).
@@ -211,15 +195,6 @@ class SleepScoreCalculator:
             return
         
         self._current_night[zone_index].bed_was_warm_at_bedtime = was_warm
-    
-    def record_nadir(self, zone_index: int, actual_time: datetime, expected_time: datetime):
-        """Zeichnet den Nadir-Zeitpunkt auf."""
-        if zone_index not in self._current_night:
-            return
-        
-        night = self._current_night[zone_index]
-        night.nadir_time_actual = actual_time
-        night.nadir_time_expected = expected_time
     
     def end_night_tracking(self, zone_index: int) -> Optional[SleepScore]:
         """
