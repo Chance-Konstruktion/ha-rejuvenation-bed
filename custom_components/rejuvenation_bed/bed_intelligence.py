@@ -225,38 +225,6 @@ class BedIntelligence:
         if old_status != is_heating:
             _LOGGER.debug(f"Zone {zone_index}: Heizungsstatus → {'AN' if is_heating else 'AUS'}")
 
-    def _detect_heater_automatically(self, zone_index: int) -> bool:
-        """
-        Erkennt automatisch ob die Heizung aktiv ist.
-
-        Methode: Wenn Wassertemperatur in den letzten 10 Minuten
-        um >0.3°C gestiegen ist, läuft wahrscheinlich die Heizung.
-
-        FALLBACK wenn set_heater_status() nicht aufgerufen wird!
-        """
-        buffer = self._last_water_temps.get(zone_index)
-        if buffer is None or len(buffer) < 5:
-            return False
-
-        # Ältester und neuester Wert
-        oldest_temp = buffer[0][1]
-        newest_temp = buffer[-1][1]
-
-        # Zeit-Differenz
-        oldest_time = buffer[0][0]
-        newest_time = buffer[-1][0]
-        minutes_diff = (newest_time - oldest_time).total_seconds() / 60
-
-        if minutes_diff < 5:
-            return False
-
-        # Temperatur-Anstieg pro 10 Minuten
-        temp_rise = newest_temp - oldest_temp
-        rise_per_10min = temp_rise * (10 / minutes_diff)
-
-        # Heizung erkannt wenn Anstieg > 0.3°C pro 10 Min
-        return rise_per_10min > 0.3
-
     # ═══════════════════════════════════════════════════════════════════════
     # STORAGE
     # ═══════════════════════════════════════════════════════════════════════

@@ -4,7 +4,7 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, ServiceCall
 from homeassistant.helpers import config_validation as cv, device_registry as dr
 import voluptuous as vol
-from .const import DOMAIN, SW_VERSION, local_now
+from .const import DOMAIN, MANUFACTURER, SW_VERSION, local_now
 from .coordinator import RejuvenationBedCoordinator
 
 _LOGGER = logging.getLogger(__name__)
@@ -12,8 +12,6 @@ _LOGGER = logging.getLogger(__name__)
 # Diese Plattformen müssen als .py Dateien im Ordner existieren
 PLATFORMS: list[str] = ["climate", "sensor", "binary_sensor", "switch"]
 
-# Device Info für alle Entities
-MANUFACTURER = "Rejuvenation Bed"
 MODEL_WASSERBETT = "Smart Wasserbett Controller"
 MODEL_HEIZMATTE = "Smart Heizmatte Controller"
 
