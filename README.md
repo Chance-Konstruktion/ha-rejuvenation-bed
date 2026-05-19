@@ -17,6 +17,10 @@ Biorhythm-based temperature curve, learned bedtime prediction, solar surplus sto
 
 </div>
 
+> ### 🌒 → [**Open the editorial reading room**](https://chance-konstruktion.github.io/ha-rejuvenation-bed/)
+> The full dark editorial site with animated biorhythm curve — the whole story.
+> *(Source: [`docs/index.html`](docs/index.html))*
+
 ---
 
 ## ✦ Why this exists
