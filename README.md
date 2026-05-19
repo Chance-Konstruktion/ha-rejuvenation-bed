@@ -1,175 +1,356 @@
+<div align="center">
+
+<img src="assets/banner.svg" alt="Rejuvenation Bed" width="100%">
+
 # 🛏️ Rejuvenation Bed
 
-**Intelligent bed heating controller for Home Assistant**
+**A self-learning sleep AI for any heated bed.**
 
-[![HACS Badge](https://img.shields.io/badge/HACS-Default-orange.svg)](https://github.com/hacs/integration)
-[![Version](https://img.shields.io/badge/version-0.7.1-blue.svg)](https://github.com/Chance-Konstruktion/ha-rejuvenation-bed/releases)
-[![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
+Biorhythm-based temperature curve, learned bedtime prediction, solar surplus stored as heat, presence detection without extra sensors, and a fail-safe that survives every sensor it depends on. Works with waterbeds, heating pads and heated mattress toppers.
 
-> ### → [**View the rendered editorial README**](https://chance-konstruktion.github.io/ha-rejuvenation-bed/)
-> Animated biorhythm curve, dark editorial layout, the whole story.
-> *(Source: [`docs/index.html`](docs/index.html))*
+[![HACS](https://img.shields.io/badge/HACS-Default-E8A33D.svg?style=flat-square)](https://github.com/hacs/integration)
+[![Version](https://img.shields.io/badge/version-0.7.2-B47326.svg?style=flat-square)](https://github.com/Chance-Konstruktion/ha-rejuvenation-bed/releases)
+[![License](https://img.shields.io/badge/license-MIT-7BA968.svg?style=flat-square)](LICENSE)
+[![Home Assistant](https://img.shields.io/badge/Home%20Assistant-2024.6+-41BDF5.svg?style=flat-square)](https://www.home-assistant.io/)
 
-🇩🇪 [Deutsche Version](README_DE.md)
+[Quick Start](#-quick-start) · [Highlights](#-highlights) · [Architecture](#-architecture) · [Entities](#-entities--services) · [FAQ](#-faq) · [🇩🇪 Deutsch](README_DE.md)
 
-Transforms any bed heater into a self-learning sleep system. Biorhythm-based temperature curve, bedtime prediction, solar energy as thermal battery, presence detection and auto-calibration. Works with waterbeds, heating pads and heated mattress toppers.
-
----
-
-## What does it do?
-
-Instead of heating to a fixed temperature, Rejuvenation Bed adjusts the temperature throughout the night based on your sleep rhythm:
-
-- **Falling asleep** – Slightly elevated temperature for comfort
-- **Deep sleep** – 1–2°C reduction for optimal recovery
-- **Waking up** – Gentle warming before your alarm
-- **Daytime** – Standby, solar surplus stored as heat
-
-The system automatically learns your bedtime and the optimal thresholds for your specific bed.
+</div>
 
 ---
 
-## Features
+## ✦ Why this exists
 
-**Core functions** – Biorhythm curve with chronotype adjustment (early bird/normal/night owl), alarm integration (phone alarm, fixed time or hybrid), seasonal adjustment via outdoor temperature, dual-zone for partners.
+> Your bed has one job at night — and most heaters do it like a 1980s radiator: a single number, on or off, all night long.
 
-**Energy management** – Solar boost uses PV surplus as thermal battery. Dynamic electricity prices (Tibber, Octopus, ENTSO-E). Energy tracking with kWh, heating hours and savings calculation. Thermal battery as percentage sensor.
+A human body doesn't sleep at a constant temperature. It cools 1–2 °C on the way into deep sleep, warms again before the alarm, and reacts to season, partner, illness and a hundred small signals. A waterbed has the inertia of a thermal flywheel; a heating pad reacts in seconds. The same target temperature is wrong for both, and wrong for any one of them across a whole night.
 
-**Intelligence** – Presence detection through water temperature variance (no extra sensor needed). Auto-calibration in 3–5 days. Insulation detection (blanket on/off). Sweat detection via cross-correlation. Sleep score 0–100. Learning-based preheating.
+<table>
+<tr>
+<td width="33%" valign="top">
 
-**Safety** – Overheat protection (max 36°C), fail-safe on sensor failure, startup grace period, anti-short-cycle, outlier filter, leak alarm. Optional sensors can fail at any time without affecting core functionality.
+### 🌙 Follows the rhythm
+A chronotype-aware curve that warms for falling asleep, dips for deep sleep, and rises again before the alarm — instead of holding a fixed setpoint.
 
----
+</td>
+<td width="33%" valign="top">
 
-## Hardware Levels
+### ☀️ Charges with the sun
+PV surplus is parked in the water body as a thermal battery. The night you've already paid for in daylight is the night you sleep through.
 
-| Level | Hardware | Features |
-|-------|----------|----------|
-| **A** | Smart plug | Timer, boost, vacation |
-| **B** | + Temperature sensor | + Biorhythm, presence, sleep score |
-| **C** | + Power sensor | + Energy tracking, better presence |
-| **D** | + SHT41 (air/humidity) | + Insulation check, sweat detection, leak alarm |
+</td>
+<td width="33%" valign="top">
 
-Minimum: A smart plug that switches the heater.
+### 🛡️ Degrades gracefully
+Every optional sensor — humidity, surface temp, power — can fail without taking the heater with it. Overheat protection, anti-short-cycle and leak alarm are non-negotiable.
 
----
-
-## Installation
-
-### HACS (recommended)
-
-1. HACS → Integrations → ⋮ → Custom Repositories
-2. URL: `https://github.com/Chance-Konstruktion/ha-rejuvenation-bed`
-3. Category: Integration
-4. Install → Restart Home Assistant
-
-### Manual
-
-Copy `custom_components/rejuvenation_bed/` to `config/custom_components/`, restart HA, add integration.
+</td>
+</tr>
+</table>
 
 ---
 
-## Configuration
+## ⌁ Highlights
 
-The setup wizard guides through all steps. Afterwards, four areas are accessible via options flow:
+<table>
+<tr>
+<td width="50%" valign="top">
 
-**🌐 Global Settings** – Split into Times & Temperature (warm window, summer threshold, offset, bed volume) and Sensors & Electricity Price (solar, price sensor, fixed tariff, CO₂).
+**🕯️ Biorhythm curve** — Chronotype-aware sleep phase model (early bird / normal / night owl) with seasonal adjustment from outdoor temperature.
 
-**📡 Zone Sensors** – Hardware per zone: heater switch (required), temperature, power, presence, humidity, surface temperature.
+</td>
+<td width="50%" valign="top">
 
-**🌡️ Sleep Profile** – Per zone: alarm entity, weekend sleep-in, sleep temperatures (empty = seasonal automatic), wearable sensor.
+**⏰ Alarm-aware wake** — Phone alarm, fixed time or hybrid. The bed warms _toward_ your wake time, not _at_ it.
 
-**🎛️ Special Modes** – Sick (temperature, duration), boost (offset), vacation (holding temperature), comfort (sleep-in offset).
+</td>
+</tr>
+<tr>
+<td valign="top">
 
----
+**🌗 Dual-zone for partners** — Two sleep profiles, two curves, one bed. Different chronotypes welcome.
 
-## Devices & Entities
+</td>
+<td valign="top">
 
-The integration creates three devices in Home Assistant:
+**🪫 Thermal battery** — Solar surplus is stored as heat. Tracked as a 0–100 % charge sensor.
 
-### 🛏️ Rejuvenation Bed (main device)
+</td>
+</tr>
+<tr>
+<td valign="top">
 
-| Entity | Description |
-|--------|------------|
-| `climate.rejuvenation_bed` | Thermostat with target temperature and HVAC mode |
-| `sensor.bett_zieltemperatur` | Calculated target temperature |
-| `sensor.bett_status` | Current mode and decision reason |
-| `sensor.bett_thermal_summary` | Temperature calculation breakdown |
-| `binary_sensor.bett_prasenz` | Person in bed |
-| `binary_sensor.bett_isolation` | Bed covered (requires SHT41) |
-| `switch.bett_boost` | Quick heat |
-| `switch.bett_krank_modus` | Sick mode |
-| `switch.bett_tarifmodus` | Tariff mode (reduce temperature during expensive rates) |
+**💶 Dynamic tariffs** — Tibber, Octopus, ENTSO-E or a fixed rate. Auto-reduces during expensive hours.
 
-### ⚡ Bed Energy
+</td>
+<td valign="top">
 
-| Entity | Description |
-|--------|------------|
-| `sensor.bett_leistung` | Current power per zone (W) |
-| `sensor.bett_gesamtleistung` | Total power all zones (W) |
-| `sensor.bett_thermische_batterie` | Thermal storage charge level (%) |
-| `sensor.bett_energie_heute` | Consumption today (kWh) |
-| `sensor.bett_heizstunden` | Heating hours today |
-| `sensor.bett_ersparnis` | Estimated savings (€) |
-| `sensor.bett_solar_prozent` | Solar share of consumption |
-| `sensor.bett_strompreis_status` | Current tariff mode |
-| `switch.bett_solar_batterie` | Thermal battery |
-| `switch.bett_urlaub_modus` | Vacation mode |
+**👤 Sensor-less presence** — Detects you in bed via water temperature variance. No PIR, no mattress sensor.
 
-### 😴 Bed Sleep/Analysis
+</td>
+</tr>
+<tr>
+<td valign="top">
 
-| Entity | Description |
-|--------|------------|
-| `sensor.bett_schlaf_score` | Last night (0–100) |
-| `sensor.bett_schlaf_score_woche` | Weekly average |
-| `sensor.bett_rampe` | Heat-up ramp status |
-| `sensor.bett_intelligence` | Calibration and learning status |
-| `binary_sensor.bett_degraded_mode` | Degraded mode (sensor failure) |
-| `binary_sensor.bett_kondensationsrisiko` | Condensation risk (< 24°C) |
-| `binary_sensor.bett_leckage_verdacht` | Leak suspicion |
-| `binary_sensor.bett_schwitzen` | Sweat/moisture alarm |
-| `binary_sensor.bett_system_status` | System health |
+**🎯 Auto-calibration** — Learns your bed and your bedtime in 3–5 days. No manual offset tuning.
+
+</td>
+<td valign="top">
+
+**📊 Sleep score 0–100** — Per night, per week. Cross-correlation catches sweat, condensation and leak suspicion.
+
+</td>
+</tr>
+</table>
 
 ---
 
-## Services
+## ☾ Architecture
 
-| Service | Description |
-|---------|------------|
-| `rejuvenation_bed.set_boost` | Activate quick heat (duration configurable) |
-| `rejuvenation_bed.set_sick_mode` | Sick mode (temperature + days) |
-| `rejuvenation_bed.set_vacation_mode` | Vacation mode with optional temperature and end date |
+```
+                        coordinator.py
+                        60-second loop
+                              │
+        ┌─────────────────────┼─────────────────────┐
+        │                     │                     │
+   safety_manager     temperature_calculator   energy_state_resolver
+   overheat · grace      biorhythm curve        solar · tariff · normal
+   fail-safe · cycle           │
+                               │
+                ┌──────────────┼──────────────┐
+                │              │              │
+        biorhythmus_curve  wake_time_     sleep_stage_
+        chronotype model    resolver        resolver
+                            (alarm /        (wearable)
+                             fixed /
+                             hybrid)
+
+   presence_detector  ←  bed_intelligence  →  diagnostics_manager
+   variance-based         calibration ·         energy budget ·
+                          insulation ·          thermal summary
+                          sweat · bedtime
+                          learning
+
+        ramp_controller     anti_short_cycle     sleep_score
+        vinyl protection    relay protection     0–100 rating
+```
+
+<details>
+<summary><b>22 modules · ~10,650 lines of Python · bilingual (DE/EN) · HACS-compatible</b></summary>
+
+The coordinator is the only thing that talks to Home Assistant; every module below it is pure logic, unit-testable in isolation. Sensors are advisory — the safety manager has the final word on the heater switch.
+
+</details>
+
+---
+
+## ⚙ Quick Start
+
+### 1 · Install via HACS
+
+```
+HACS → Integrations → ⋮ → Custom Repositories
+URL:      https://github.com/Chance-Konstruktion/ha-rejuvenation-bed
+Category: Integration
+```
+
+Then **Install → Restart Home Assistant**.
+
+### 2 · Add the integration
+
+```
+Settings → Devices & Services → Add Integration → Rejuvenation Bed
+```
+
+The setup wizard asks for your heater switch first. Everything else is optional — you can come back later via the options flow.
+
+### 3 · Pick a hardware level
+
+| Level | What you have                       | What you get |
+| :---: | :---------------------------------- | :----------- |
+| **A** | A smart plug                        | Timer · boost · vacation |
+| **B** | + water/pad temperature sensor      | + biorhythm · presence · sleep score |
+| **C** | + power sensor                      | + energy tracking · sharper presence |
+| **D** | + SHT41 (air/humidity)              | + insulation check · sweat detection · leak alarm |
+
+> 💡 **Not technical?** Level A is one smart plug and one screen. The integration upgrades itself as you add sensors — nothing to reconfigure.
+
+---
+
+## ✦ Configuration
+
+The options flow is split into four panes — each one a single page, no nesting.
+
+<details>
+<summary><b>🌐 Global Settings</b> — times, temperatures, sensors, electricity price</summary>
+
+<br>
+
+Split into two cards:
+
+- **Times & Temperature** — warm window, summer threshold, manual offset, bed water volume in litres.
+- **Sensors & Electricity Price** — solar production sensor, dynamic price sensor or fixed tariff (ct/kWh), grid CO₂ intensity.
+
+</details>
+
+<details>
+<summary><b>📡 Zone Sensors</b> — hardware per zone</summary>
+
+<br>
+
+Per zone (one zone for single beds, two for dual-core waterbeds):
+
+| Field             | Required | Notes |
+| :---------------- | :------: | :--- |
+| Heater switch     |    ✓     | Any `switch` or `input_boolean` |
+| Temperature       |          | DS18B20 in the water, or a thermistor on the pad |
+| Power             |          | Smart plug with energy metering |
+| Presence override |          | Falls back to variance-based detection if missing |
+| Humidity          |          | SHT41 — enables sweat / leak / insulation logic |
+| Surface temp      |          | SHT41 — enables condensation alarm |
+
+</details>
+
+<details>
+<summary><b>🌡️ Sleep Profile</b> — per zone</summary>
+
+<br>
+
+- Alarm entity (phone or HA `input_datetime`)
+- Weekend sleep-in offset
+- Sleep temperatures — leave empty for seasonal automatic
+- Wearable sensor (optional sleep stage feed)
+
+</details>
+
+<details>
+<summary><b>🎛️ Special Modes</b> — sick, boost, vacation, comfort</summary>
+
+<br>
+
+- **Sick** — constant temperature for N days
+- **Boost** — target + offset for 60 min
+- **Vacation** — minimal 24 °C holding (frost / condensation protection)
+- **Comfort** — sleep-in offset for weekends and off-days
+
+</details>
+
+---
+
+## ⚡ Entities & Services
+
+<details>
+<summary><b>🛏️ Rejuvenation Bed</b> — main device</summary>
+
+<br>
+
+| Entity                              | Description |
+| :---------------------------------- | :--- |
+| `climate.rejuvenation_bed`          | Thermostat with target temperature and HVAC mode |
+| `sensor.bett_zieltemperatur`        | Calculated target temperature |
+| `sensor.bett_status`                | Current mode and decision reason |
+| `sensor.bett_thermal_summary`       | Temperature calculation breakdown |
+| `binary_sensor.bett_prasenz`        | Person in bed |
+| `binary_sensor.bett_isolation`      | Bed covered (requires SHT41) |
+| `switch.bett_boost`                 | Quick heat |
+| `switch.bett_krank_modus`           | Sick mode |
+| `switch.bett_tarifmodus`            | Tariff mode (reduces during expensive rates) |
+
+</details>
+
+<details>
+<summary><b>⚡ Bed Energy</b></summary>
+
+<br>
+
+| Entity                              | Description |
+| :---------------------------------- | :--- |
+| `sensor.bett_leistung`              | Current power per zone (W) |
+| `sensor.bett_gesamtleistung`        | Total power all zones (W) |
+| `sensor.bett_thermische_batterie`   | Thermal storage charge level (%) |
+| `sensor.bett_energie_heute`         | Consumption today (kWh) |
+| `sensor.bett_heizstunden`           | Heating hours today |
+| `sensor.bett_ersparnis`             | Estimated savings (€) |
+| `sensor.bett_solar_prozent`         | Solar share of consumption |
+| `sensor.bett_strompreis_status`     | Current tariff mode |
+| `switch.bett_solar_batterie`        | Thermal battery |
+| `switch.bett_urlaub_modus`          | Vacation mode |
+
+</details>
+
+<details>
+<summary><b>😴 Bed Sleep / Analysis</b></summary>
+
+<br>
+
+| Entity                                 | Description |
+| :------------------------------------- | :--- |
+| `sensor.bett_schlaf_score`             | Last night (0–100) |
+| `sensor.bett_schlaf_score_woche`       | Weekly average |
+| `sensor.bett_rampe`                    | Heat-up ramp status |
+| `sensor.bett_intelligence`             | Calibration and learning status |
+| `binary_sensor.bett_degraded_mode`     | Degraded mode (sensor failure) |
+| `binary_sensor.bett_kondensationsrisiko` | Condensation risk (< 24 °C) |
+| `binary_sensor.bett_leckage_verdacht`  | Leak suspicion |
+| `binary_sensor.bett_schwitzen`         | Sweat / moisture alarm |
+| `binary_sensor.bett_system_status`     | System health |
+
+</details>
+
+<details>
+<summary><b>🛠 Services</b></summary>
+
+<br>
+
+| Service                                | Description |
+| :------------------------------------- | :--- |
+| `rejuvenation_bed.set_boost`           | Activate quick heat (duration configurable) |
+| `rejuvenation_bed.set_sick_mode`       | Sick mode (temperature + days) |
+| `rejuvenation_bed.set_vacation_mode`   | Vacation mode (temperature + end date) |
 | `rejuvenation_bed.cancel_special_mode` | Cancel all special modes |
-| `rejuvenation_bed.preheat_bed` | Preheat bed (temperature + duration) |
+| `rejuvenation_bed.preheat_bed`         | Preheat bed (temperature + duration) |
 | `rejuvenation_bed.reset_energy_budget` | Reset energy statistics |
 
+</details>
+
+<details>
+<summary><b>🎚 Special Modes</b> — activation cheat-sheet</summary>
+
+<br>
+
+| Mode         | Activation                                      | Effect |
+| :----------- | :---------------------------------------------- | :--- |
+| **Boost**    | `switch.bett_boost`                             | Target + offset for 60 min |
+| **Sick**     | `switch.bett_krank_modus`                       | Constant temperature for N days |
+| **Vacation** | `switch.bett_urlaub_modus` or service           | Minimal 24 °C holding temperature |
+| **Solar**    | `switch.bett_solar_batterie`                    | Store PV surplus as heat |
+| **Tariff**   | `switch.bett_tarifmodus`                        | Reduce during expensive rates |
+
+</details>
+
 ---
 
-## Special Modes
+## 🌒 Dashboards
 
-| Mode | Activation | Effect |
-|------|-----------|--------|
-| **Boost** | `switch.bett_boost` | Quick heat: target temperature + offset for 60 min |
-| **Sick** | `switch.bett_krank_modus` | Constant temperature for configurable days |
-| **Vacation** | `switch.bett_urlaub_modus` or service | Minimal 24°C holding temperature (with optional temperature) |
-| **Solar** | `switch.bett_solar_batterie` | Store PV surplus as heat |
-| **Tariff** | `switch.bett_tarifmodus` | Reduce temperature during expensive rates |
+Two ready-made templates live in `dashboards/`.
 
----
+<details>
+<summary><b>Lovelace YAML — Nightstand Cockpit</b></summary>
 
-## Dashboard Templates
+<br>
 
-Two ready-made dashboard templates in the `dashboards/` folder:
+`dashboards/rejuvenation_bed_nightstand_cockpit.yaml` — mobile/tablet-friendly Lovelace template. Adjust the entity IDs to your installation.
 
-### Lovelace YAML (Nightstand Cockpit)
+</details>
 
-`dashboards/rejuvenation_bed_nightstand_cockpit.yaml` — Mobile/tablet-friendly Lovelace template. Adjust entity IDs to your installation.
+<details>
+<summary><b>Standalone HTML — Premium Dashboard</b></summary>
 
-### Standalone HTML (Premium Dashboard)
+<br>
 
-`dashboards/premium_nightstand_dashboard.html` — Standalone React/HTML dashboard with mini view (< 800px).
+`dashboards/premium_nightstand_dashboard.html` — standalone React/HTML dashboard with mini view below 800 px.
 
-**Embed as panel:**
+Embed as a panel:
 
 ```yaml
 panel_iframe:
@@ -179,7 +360,7 @@ panel_iframe:
     url: /local/rejuvenation_bed/premium_nightstand_dashboard.html
 ```
 
-**Or as iframe card:**
+Or as an iframe card:
 
 ```yaml
 type: iframe
@@ -187,55 +368,73 @@ url: /local/rejuvenation_bed/premium_nightstand_dashboard.html
 aspect_ratio: 100%
 ```
 
-Copy file to `/config/www/rejuvenation_bed/`.
+Copy the file to `/config/www/rejuvenation_bed/`.
+
+</details>
 
 ---
 
-## Architecture
+## ❓ FAQ
 
-```
-coordinator.py ─── Central 60s loop
- ├── safety_manager.py ──────── Overheat protection, fail-safe
- ├── temperature_calculator.py ─ Biorhythm curve, target temperature
- │   ├── biorhythmus_curve.py ── Sleep phase curve (chronotype)
- │   ├── wake_time_resolver.py ─ Alarm / fixed / hybrid
- │   └── sleep_stage_resolver.py Wearable integration
- ├── energy_state_resolver.py ── Solar / tariff / normal mode
- ├── presence_detector.py ────── Variance-based presence
- ├── bed_intelligence.py ─────── Calibration, insulation, sweat, bedtime learning
- ├── diagnostics_manager.py ──── Energy budget, thermal summary
- ├── ramp_controller.py ──────── Heat-up ramp (vinyl protection)
- ├── anti_short_cycle_manager.py Relay protection
- └── sleep_score_calculator.py ─ Sleep rating 0–100
-```
+<details>
+<summary><b>Does this only work with waterbeds?</b></summary>
 
-22 modules · ~10,650 lines Python · Bilingual (DE/EN) · HACS compatible
+<br>
+
+No. Any electric bed heater works — waterbed, heating pad, heated mattress topper. The biorhythm principle is universal; only the presence-detection strategy differs.
+
+</details>
+
+<details>
+<summary><b>Do I need a temperature sensor?</b></summary>
+
+<br>
+
+Recommended. Without one, the system runs as an intelligent timer (Level A). With one, the full biorhythm curve and presence detection unlock.
+
+</details>
+
+<details>
+<summary><b>What happens if a sensor fails?</b></summary>
+
+<br>
+
+The integration degrades automatically. The SHT41 can fail without affecting heating. Even the water temperature sensor has a fail-safe — a 30 % duty cycle fallback that keeps the bed warm but safe.
+
+</details>
+
+<details>
+<summary><b>How does presence detection work on a heating pad?</b></summary>
+
+<br>
+
+Waterbeds use variance analysis inside the water body. Heating pads use the **temperature trend**: if the heater is off and the surface keeps rising, a body is on it. This needs a pad-mounted thermistor. Without a sensor, presence detection is disabled and the system runs as a Level-A timer. After a ~3-minute settling time, detection is reliable, if a touch less precise than on a waterbed.
+
+</details>
+
+<details>
+<summary><b>Which temperature sensors do you recommend?</b></summary>
+
+<br>
+
+DS18B20 waterproof — in the water — plus an optional SHT41 on top of the core for humidity / surface temperature / leak detection.
+
+</details>
 
 ---
 
-## FAQ
+## 🤝 Contributing
 
-**Does this only work with waterbeds?**
-No. Any electric bed heater works: waterbed, heating pad, heated mattress topper. The biorhythm principle is universal.
+Issues and PRs are welcome. The Python core is fully unit-tested; please run `pytest` before opening a PR. Bilingual contributions (DE/EN) are appreciated but not required.
 
-**Do I need a temperature sensor?**
-Recommended. Without a sensor, the system runs as an intelligent timer (Level A). With a sensor: full biorhythm curve and presence detection.
+## 📄 License
 
-**What happens if a sensor fails?**
-The integration degrades automatically. The SHT41 can fail without affecting heating. Even the water temperature sensor has a fail-safe (30% duty cycle).
-
-**How does presence detection work with heating pads?**
-Unlike waterbeds (variance analysis in the water body), heating pad detection uses the **temperature trend**: if the heater is off and the temperature still rises, someone is lying on it (body heat). This requires a temperature sensor on the pad. Without a sensor, presence detection is not available — the system runs as a timer (Level A). Detection is less precise than with waterbeds but works reliably after a short settling time (~3 min).
-
-**Which temperature sensor?**
-DS18B20 waterproof (IN the water) + optional SHT41 (ON TOP of the core).
+[MIT](LICENSE) — do what you like, attribution appreciated.
 
 ---
 
-## License
+<div align="center">
 
-MIT License — see [LICENSE](LICENSE)
+<sub>Built with real sensor data from a 2 × 2 m dual-core waterbed.<br>Calibrated on 126,771 data points · slept on every night since.</sub>
 
----
-
-*Built for people who want to sleep through the night — and wake up, not jolt up.*
+</div>
