@@ -6,6 +6,10 @@
 [![Version](https://img.shields.io/badge/version-0.7.1-blue.svg)](https://github.com/Chance-Konstruktion/ha-rejuvenation-bed/releases)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
+> ### → [**Zur gerenderten Editorial-README**](https://chance-konstruktion.github.io/ha-rejuvenation-bed/)
+> Animierte Biorhythmus-Kurve, dunkles Editorial-Layout, die ganze Geschichte.
+> *(Quelle: [`docs/index.html`](docs/index.html))*
+
 🇬🇧 [English Version](README.md)
 
 Verwandelt jede Bett-Heizung in eine selbstlernende Schlafautomation. Biorhythmus-basierte Temperaturkurve, Solar-Nutzung als thermische Batterie, Präsenz-Erkennung und Auto-Kalibrierung. Funktioniert mit Wasserbetten, Heizmatten und beheizbaren Matratzenauflagen.
@@ -234,4 +238,4 @@ MIT License – siehe [LICENSE](LICENSE)
 
 ---
 
-*Gebaut mit echten Sensordaten aus einem 2×2m Dual-Kern Wasserbett. Kalibriert auf 126.771 Datenpunkte.*
+*Gebaut für Menschen, die nachts schlafen wollen — und morgens aufwachen, nicht hochschrecken.*
