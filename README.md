@@ -140,7 +140,7 @@ Every optional sensor — humidity, surface temp, power — can fail without tak
 ```
 
 <details>
-<summary><b>22 modules · ~10,650 lines of Python · bilingual (DE/EN) · HACS-compatible</b></summary>
+<summary><b>22 modules · bilingual (DE/EN) · HACS-compatible</b></summary>
 
 The coordinator is the only thing that talks to Home Assistant; every module below it is pure logic, unit-testable in isolation. Sensors are advisory — the safety manager has the final word on the heater switch.
 
