@@ -1,0 +1,1706 @@
+<!doctype html>
+<html lang="de">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Rejuvenation Bed — README</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Geist:wght@300;400;500;600;700&family=Geist+Mono:wght@400;500;600&display=swap" rel="stylesheet" />
+<style>
+  :root {
+    --bg:        #0a0b10;
+    --bg-soft:   #11131c;
+    --surface:   #161927;
+    --surface-2: #1d2233;
+    --line:      rgba(255,255,255,0.08);
+    --line-2:    rgba(255,255,255,0.14);
+    --ink:       #f1ebe0;        /* warm cream */
+    --ink-soft:  #c9c2b3;
+    --ink-mute:  #8a8676;
+    --ink-dim:   #5b5849;
+    --heat:      #ff7849;        /* warm coral / heat */
+    --heat-2:    #ffb070;
+    --cool:      #7fd1e6;        /* ice / deep sleep */
+    --cool-2:    #5a8fb0;
+    --rest:      #b59cff;        /* night / dream */
+    --solar:     #f5c542;        /* sun / energy */
+    --ok:        #7be0a7;
+    --danger:    #ff5e5e;
+
+    --serif: "Instrument Serif", "Times New Roman", serif;
+    --sans:  "Geist", system-ui, -apple-system, "Segoe UI", sans-serif;
+    --mono:  "Geist Mono", ui-monospace, "JetBrains Mono", Menlo, monospace;
+  }
+
+  * { box-sizing: border-box; }
+  html, body { background: var(--bg); color: var(--ink); }
+  body {
+    margin: 0;
+    font-family: var(--sans);
+    font-weight: 400;
+    font-size: 16px;
+    line-height: 1.55;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+    background:
+      radial-gradient(1200px 700px at 80% -10%, rgba(255,120,73,0.10), transparent 60%),
+      radial-gradient(900px 600px at 0% 20%, rgba(127,209,230,0.06), transparent 60%),
+      radial-gradient(800px 800px at 100% 110%, rgba(181,156,255,0.06), transparent 60%),
+      var(--bg);
+    overflow-x: hidden;
+  }
+  ::selection { background: var(--heat); color: #0a0b10; }
+
+  /* ——— Layout ——— */
+  .wrap { max-width: 1280px; margin: 0 auto; padding: 0 40px; }
+  @media (max-width: 720px) { .wrap { padding: 0 22px; } }
+
+  .row { display: grid; gap: 32px; }
+  .cols-2 { grid-template-columns: 1fr 1fr; }
+  .cols-3 { grid-template-columns: repeat(3, 1fr); }
+  .cols-4 { grid-template-columns: repeat(4, 1fr); }
+  @media (max-width: 980px) {
+    .cols-2, .cols-3, .cols-4 { grid-template-columns: 1fr; }
+  }
+
+  hr.rule {
+    border: 0;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, var(--line-2), transparent);
+    margin: 0;
+  }
+
+  /* ——— Type ——— */
+  .display {
+    font-family: var(--serif);
+    font-weight: 400;
+    letter-spacing: -0.02em;
+    line-height: 0.92;
+  }
+  .italic { font-style: italic; }
+  .eyebrow {
+    font-family: var(--mono);
+    font-size: 11px;
+    font-weight: 500;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--ink-mute);
+  }
+  .eyebrow .dot {
+    display: inline-block; width: 6px; height: 6px; border-radius: 999px;
+    background: var(--heat); vertical-align: middle; margin-right: 10px;
+    box-shadow: 0 0 0 4px rgba(255,120,73,0.18);
+    animation: pulse 2.4s ease-in-out infinite;
+  }
+  @keyframes pulse {
+    0%, 100% { box-shadow: 0 0 0 4px rgba(255,120,73,0.18); transform: scale(1); }
+    50%      { box-shadow: 0 0 0 8px rgba(255,120,73,0.02); transform: scale(1.18); }
+  }
+
+  h2.section {
+    font-family: var(--serif);
+    font-size: clamp(40px, 5vw, 68px);
+    font-weight: 400;
+    line-height: 0.95;
+    letter-spacing: -0.02em;
+    margin: 0 0 8px 0;
+  }
+  h2.section em { color: var(--heat); font-style: italic; }
+  h2.section .cool { color: var(--cool); font-style: italic; }
+  h2.section .rest { color: var(--rest); font-style: italic; }
+
+  .lede {
+    font-family: var(--serif);
+    font-style: italic;
+    font-size: clamp(22px, 2.2vw, 28px);
+    line-height: 1.3;
+    color: var(--ink-soft);
+    max-width: 720px;
+  }
+
+  p { color: var(--ink-soft); }
+  p strong { color: var(--ink); font-weight: 500; }
+
+  code, .mono { font-family: var(--mono); font-size: 0.9em; }
+  code.inline {
+    padding: 2px 6px;
+    background: var(--surface);
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    color: var(--ink);
+    font-size: 0.85em;
+  }
+
+  /* ——— Section frame ——— */
+  section { padding: 120px 0; position: relative; }
+  section.tight { padding: 80px 0; }
+  .section-head { display: flex; align-items: flex-end; justify-content: space-between; gap: 40px; margin-bottom: 56px; flex-wrap: wrap; }
+  .section-head .num {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--ink-dim);
+    letter-spacing: 0.12em;
+  }
+
+  /* ——————————————————————— TOP STRIP ——————————————————————— */
+  .topstrip {
+    border-bottom: 1px solid var(--line);
+    padding: 18px 0;
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--ink-mute);
+    letter-spacing: 0.04em;
+    background: rgba(10,11,16,0.6);
+    backdrop-filter: blur(8px);
+    position: sticky; top: 0; z-index: 50;
+  }
+  .topstrip .wrap { display: flex; justify-content: space-between; align-items: center; gap: 24px; flex-wrap: wrap; }
+  .topstrip .left { display: flex; gap: 28px; align-items: center; }
+  .topstrip .mark {
+    color: var(--ink);
+    letter-spacing: 0.18em;
+    font-weight: 500;
+  }
+  .topstrip a { color: var(--ink-mute); text-decoration: none; transition: color .15s; }
+  .topstrip a:hover { color: var(--ink); }
+  .topstrip .right { display: flex; gap: 8px; }
+  .badge {
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 5px 10px;
+    border: 1px solid var(--line);
+    border-radius: 4px;
+    background: var(--surface);
+    color: var(--ink-soft);
+    font-size: 11px;
+  }
+  .badge .swatch { width: 8px; height: 8px; border-radius: 2px; }
+
+  /* ——————————————————————— HERO ——————————————————————— */
+  .hero {
+    position: relative;
+    padding: 80px 0 60px;
+    overflow: hidden;
+  }
+  .hero-grid {
+    display: grid;
+    grid-template-columns: 1.05fr 1fr;
+    gap: 60px;
+    align-items: center;
+  }
+  @media (max-width: 980px) { .hero-grid { grid-template-columns: 1fr; gap: 40px; } }
+
+  .hero h1 {
+    font-family: var(--serif);
+    font-weight: 400;
+    font-size: clamp(64px, 9.5vw, 148px);
+    line-height: 0.88;
+    letter-spacing: -0.035em;
+    margin: 18px 0 28px;
+    color: var(--ink);
+  }
+  .hero h1 .it { font-style: italic; color: var(--heat); }
+  .hero h1 .cool-it { font-style: italic; color: var(--cool); }
+  .hero h1 .small { display: block; font-size: 0.36em; letter-spacing: 0.04em; color: var(--ink-mute); font-style: italic; line-height: 1.2; margin-top: 14px; }
+
+  .hero-sub {
+    font-family: var(--serif);
+    font-style: italic;
+    font-size: clamp(20px, 2vw, 26px);
+    line-height: 1.35;
+    color: var(--ink-soft);
+    max-width: 560px;
+    margin: 0 0 36px;
+  }
+  .hero-sub b { color: var(--ink); font-weight: 500; font-style: normal; font-family: var(--sans); }
+
+  .hero-meta { display: flex; flex-wrap: wrap; gap: 18px 28px; align-items: center; }
+  .hero-meta .pill {
+    display: inline-flex; align-items: center; gap: 10px;
+    padding: 8px 14px;
+    border: 1px solid var(--line-2);
+    border-radius: 999px;
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--ink-soft);
+    background: rgba(255,255,255,0.02);
+  }
+  .hero-meta .pill .lt { color: var(--ink); font-weight: 500; }
+
+  .hero-cta { margin-top: 40px; display: flex; gap: 14px; flex-wrap: wrap; }
+  .btn {
+    display: inline-flex; align-items: center; gap: 10px;
+    padding: 14px 22px;
+    border-radius: 8px;
+    font-family: var(--sans);
+    font-size: 14px;
+    font-weight: 500;
+    letter-spacing: 0.01em;
+    text-decoration: none;
+    border: 1px solid var(--line-2);
+    transition: all .18s ease;
+  }
+  .btn.primary { background: var(--ink); color: #0a0b10; border-color: var(--ink); }
+  .btn.primary:hover { background: var(--heat); border-color: var(--heat); color: #0a0b10; }
+  .btn.ghost { background: transparent; color: var(--ink); }
+  .btn.ghost:hover { background: var(--surface); }
+  .btn .arrow { transition: transform .2s; }
+  .btn:hover .arrow { transform: translateX(3px); }
+
+  /* —— Hero biorhythm panel —— */
+  .biopanel {
+    position: relative;
+    border: 1px solid var(--line);
+    border-radius: 18px;
+    background: linear-gradient(180deg, var(--surface) 0%, var(--bg-soft) 100%);
+    padding: 28px 28px 22px;
+    overflow: hidden;
+    box-shadow:
+      0 30px 80px rgba(0,0,0,0.4),
+      inset 0 1px 0 rgba(255,255,255,0.04);
+  }
+  .biopanel::before {
+    content: "";
+    position: absolute; inset: 0;
+    background:
+      radial-gradient(400px 200px at 30% 0%, rgba(255,120,73,0.10), transparent 70%),
+      radial-gradient(500px 240px at 70% 100%, rgba(127,209,230,0.08), transparent 70%);
+    pointer-events: none;
+  }
+  .biopanel-head {
+    display: flex; justify-content: space-between; align-items: center;
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.14em;
+    color: var(--ink-mute);
+    text-transform: uppercase;
+    margin-bottom: 18px;
+    position: relative;
+  }
+  .biopanel-head .live { display: flex; align-items: center; gap: 8px; color: var(--ok); }
+  .biopanel-head .live::before { content: ""; width: 7px; height: 7px; border-radius: 999px; background: var(--ok); box-shadow: 0 0 12px var(--ok); animation: livedot 1.6s infinite; }
+  @keyframes livedot { 0%,100% { opacity: 1; } 50% { opacity: .35; } }
+
+  .biopanel-readout {
+    display: flex; justify-content: space-between; align-items: flex-end;
+    margin-bottom: 12px;
+    position: relative;
+  }
+  .biopanel-readout .now {
+    font-family: var(--serif);
+    font-size: 56px;
+    line-height: 1;
+    color: var(--ink);
+  }
+  .biopanel-readout .now .unit { font-size: 22px; color: var(--ink-mute); margin-left: 4px; font-style: italic; }
+  .biopanel-readout .meta {
+    text-align: right;
+    font-family: var(--mono);
+    font-size: 11px;
+    line-height: 1.5;
+    color: var(--ink-mute);
+    letter-spacing: 0.08em;
+  }
+  .biopanel-readout .meta .phase { color: var(--heat); font-weight: 500; text-transform: uppercase; }
+
+  .biosvg-wrap { position: relative; }
+  .biosvg-wrap svg { display: block; width: 100%; height: auto; }
+
+  .bioaxis {
+    display: flex; justify-content: space-between;
+    font-family: var(--mono);
+    font-size: 10px;
+    color: var(--ink-dim);
+    letter-spacing: 0.1em;
+    margin-top: 6px;
+    padding: 0 2px;
+  }
+
+  /* ——————————————————————— THE NIGHT ——————————————————————— */
+  .night {
+    background: linear-gradient(180deg, transparent, rgba(127,209,230,0.03) 30%, transparent);
+    border-top: 1px solid var(--line);
+    border-bottom: 1px solid var(--line);
+  }
+  .night-stage {
+    position: relative;
+    border: 1px solid var(--line);
+    background:
+      radial-gradient(700px 300px at 30% 0%, rgba(255,120,73,0.08), transparent 70%),
+      radial-gradient(700px 300px at 70% 100%, rgba(127,209,230,0.06), transparent 70%),
+      var(--bg-soft);
+    border-radius: 22px;
+    padding: 50px 40px 30px;
+  }
+  .night-stage svg { display: block; width: 100%; height: auto; }
+  .night-axis {
+    display: flex; justify-content: space-between;
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--ink-dim);
+    letter-spacing: 0.08em;
+    margin-top: 12px;
+  }
+  .phases {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 0;
+    margin-top: 36px;
+    border-top: 1px solid var(--line);
+  }
+  @media (max-width: 820px) { .phases { grid-template-columns: 1fr 1fr; } }
+  .phase {
+    padding: 28px 24px 26px;
+    border-right: 1px solid var(--line);
+    position: relative;
+  }
+  .phase:last-child { border-right: 0; }
+  @media (max-width: 820px) {
+    .phase:nth-child(2n) { border-right: 0; }
+    .phase:nth-child(1), .phase:nth-child(2) { border-bottom: 1px solid var(--line); }
+  }
+  .phase .ico {
+    width: 28px; height: 28px;
+    display: grid; place-items: center;
+    margin-bottom: 18px;
+  }
+  .phase h4 {
+    font-family: var(--serif);
+    font-style: italic;
+    font-size: 28px;
+    font-weight: 400;
+    margin: 0 0 4px 0;
+    color: var(--ink);
+  }
+  .phase .temp {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.12em;
+    color: var(--heat);
+    text-transform: uppercase;
+    margin-bottom: 14px;
+  }
+  .phase.cool .temp { color: var(--cool); }
+  .phase.rest .temp { color: var(--rest); }
+  .phase.solar .temp { color: var(--solar); }
+  .phase p { margin: 0; color: var(--ink-mute); font-size: 14px; line-height: 1.55; }
+
+  /* ——————————————————————— FEATURES ——————————————————————— */
+  .feature-card {
+    border: 1px solid var(--line);
+    background: linear-gradient(180deg, var(--surface) 0%, var(--bg-soft) 100%);
+    border-radius: 16px;
+    padding: 32px 28px;
+    position: relative;
+    overflow: hidden;
+    transition: border-color .2s, transform .2s;
+  }
+  .feature-card:hover { border-color: var(--line-2); transform: translateY(-2px); }
+  .feature-card .head {
+    display: flex; justify-content: space-between; align-items: flex-start;
+    margin-bottom: 24px;
+  }
+  .feature-card .tag {
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.16em;
+    color: var(--ink-dim);
+    text-transform: uppercase;
+  }
+  .feature-card h3 {
+    font-family: var(--serif);
+    font-style: italic;
+    font-size: 36px;
+    line-height: 1;
+    font-weight: 400;
+    margin: 0 0 20px 0;
+    letter-spacing: -0.01em;
+  }
+  .feature-card .body { color: var(--ink-soft); font-size: 14.5px; line-height: 1.6; }
+  .feature-card .body b { color: var(--ink); font-weight: 500; }
+  .feature-card .accent {
+    position: absolute; top: 0; left: 0; right: 0; height: 2px;
+    background: linear-gradient(90deg, transparent, var(--heat), transparent);
+    opacity: 0.6;
+  }
+  .feature-card.cool .accent { background: linear-gradient(90deg, transparent, var(--cool), transparent); }
+  .feature-card.rest .accent { background: linear-gradient(90deg, transparent, var(--rest), transparent); }
+  .feature-card.solar .accent { background: linear-gradient(90deg, transparent, var(--solar), transparent); }
+
+  .feature-list { list-style: none; padding: 0; margin: 18px 0 0; display: grid; gap: 10px; }
+  .feature-list li {
+    display: grid; grid-template-columns: 14px 1fr; gap: 12px;
+    font-size: 13.5px;
+    color: var(--ink-soft);
+    padding-bottom: 10px;
+    border-bottom: 1px dashed var(--line);
+  }
+  .feature-list li:last-child { border-bottom: 0; padding-bottom: 0; }
+  .feature-list li::before {
+    content: "";
+    width: 6px; height: 6px; border-radius: 999px;
+    background: var(--heat);
+    margin-top: 7px;
+  }
+  .feature-card.cool .feature-list li::before { background: var(--cool); }
+  .feature-card.rest .feature-list li::before { background: var(--rest); }
+  .feature-card.solar .feature-list li::before { background: var(--solar); }
+
+  /* ——————————————————————— HARDWARE LEVELS ——————————————————————— */
+  .hw-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 16px;
+  }
+  @media (max-width: 980px) { .hw-grid { grid-template-columns: 1fr 1fr; } }
+  @media (max-width: 560px) { .hw-grid { grid-template-columns: 1fr; } }
+  .hw {
+    border: 1px solid var(--line);
+    border-radius: 14px;
+    padding: 24px 22px;
+    background: var(--surface);
+    position: relative;
+    overflow: hidden;
+  }
+  .hw .lvl {
+    font-family: var(--serif);
+    font-size: 96px;
+    line-height: 0.8;
+    color: var(--ink-dim);
+    letter-spacing: -0.04em;
+    margin-bottom: 8px;
+  }
+  .hw.active .lvl { color: var(--heat); }
+  .hw .label { font-family: var(--mono); font-size: 10px; letter-spacing: 0.18em; color: var(--ink-mute); text-transform: uppercase; margin-bottom: 18px; }
+  .hw h5 { font-size: 15px; font-weight: 500; margin: 0 0 6px 0; color: var(--ink); }
+  .hw p { margin: 0 0 18px 0; font-size: 13px; color: var(--ink-mute); }
+  .hw .feats { list-style: none; padding: 0; margin: 0; display: grid; gap: 6px; }
+  .hw .feats li { font-size: 12px; color: var(--ink-soft); display: flex; align-items: center; gap: 8px; }
+  .hw .feats li::before { content: "＋"; color: var(--ink-dim); font-family: var(--mono); }
+  .hw .feats li:first-child::before { content: "→"; color: var(--heat); }
+
+  /* ——————————————————————— TABLE ——————————————————————— */
+  .device-card {
+    border: 1px solid var(--line);
+    background: var(--surface);
+    border-radius: 16px;
+    overflow: hidden;
+  }
+  .device-card .dh {
+    padding: 22px 26px 18px;
+    display: flex; justify-content: space-between; align-items: center;
+    border-bottom: 1px solid var(--line);
+    background: linear-gradient(180deg, rgba(255,255,255,0.02), transparent);
+  }
+  .device-card .dh h4 {
+    font-family: var(--serif); font-style: italic; font-size: 26px; margin: 0; font-weight: 400;
+  }
+  .device-card .dh .icon-pill {
+    width: 40px; height: 40px; border-radius: 10px;
+    display: grid; place-items: center;
+    background: var(--surface-2); border: 1px solid var(--line);
+  }
+  .ent {
+    display: grid;
+    grid-template-columns: 1.1fr 1fr;
+    gap: 18px;
+    padding: 14px 26px;
+    border-bottom: 1px solid var(--line);
+    align-items: center;
+  }
+  .ent:last-child { border-bottom: 0; }
+  .ent .id {
+    font-family: var(--mono);
+    font-size: 12px;
+    color: var(--ink);
+    word-break: break-all;
+  }
+  .ent .id .pre { color: var(--ink-dim); }
+  .ent .desc { font-size: 13px; color: var(--ink-mute); }
+
+  /* ——————————————————————— SERVICES / MODES ——————————————————————— */
+  .table-row {
+    display: grid;
+    grid-template-columns: 240px 1fr;
+    gap: 24px;
+    padding: 20px 0;
+    border-bottom: 1px solid var(--line);
+    align-items: baseline;
+  }
+  @media (max-width: 720px) { .table-row { grid-template-columns: 1fr; gap: 6px; } }
+  .table-row:last-child { border-bottom: 0; }
+  .table-row .k { font-family: var(--mono); font-size: 13px; color: var(--ink); }
+  .table-row .v { color: var(--ink-soft); font-size: 14.5px; }
+
+  .modes-grid { display: grid; grid-template-columns: repeat(5, 1fr); gap: 14px; }
+  @media (max-width: 980px) { .modes-grid { grid-template-columns: 1fr 1fr; } }
+  @media (max-width: 540px) { .modes-grid { grid-template-columns: 1fr; } }
+  .mode {
+    border: 1px solid var(--line);
+    background: var(--surface);
+    border-radius: 12px;
+    padding: 22px 20px;
+    position: relative;
+  }
+  .mode .glyph {
+    width: 36px; height: 36px;
+    border-radius: 8px;
+    display: grid; place-items: center;
+    background: var(--surface-2);
+    margin-bottom: 18px;
+  }
+  .mode h5 { font-family: var(--serif); font-style: italic; font-size: 22px; margin: 0 0 6px 0; font-weight: 400; }
+  .mode .activator { font-family: var(--mono); font-size: 10px; letter-spacing: 0.08em; color: var(--ink-dim); margin-bottom: 12px; word-break: break-all; }
+  .mode p { font-size: 13px; color: var(--ink-mute); margin: 0; line-height: 1.5; }
+
+  /* ——————————————————————— INSTALL ——————————————————————— */
+  .install-card {
+    border: 1px solid var(--line);
+    background: var(--surface);
+    border-radius: 16px;
+    padding: 32px 32px;
+  }
+  .install-card h4 { font-family: var(--serif); font-style: italic; font-weight: 400; font-size: 30px; margin: 0 0 8px 0; }
+  .install-card .recommend {
+    display: inline-block;
+    font-family: var(--mono); font-size: 10px; letter-spacing: 0.16em;
+    background: var(--heat); color: #0a0b10;
+    padding: 3px 8px; border-radius: 3px; text-transform: uppercase;
+    margin-left: 10px; vertical-align: middle;
+  }
+  ol.steps { padding-left: 0; list-style: none; counter-reset: step; margin: 22px 0 0; }
+  ol.steps li {
+    counter-increment: step;
+    display: grid; grid-template-columns: 36px 1fr; gap: 14px;
+    align-items: baseline;
+    padding: 14px 0;
+    border-bottom: 1px solid var(--line);
+    color: var(--ink-soft);
+    font-size: 14.5px;
+  }
+  ol.steps li:last-child { border-bottom: 0; }
+  ol.steps li::before {
+    content: counter(step);
+    font-family: var(--serif); font-style: italic; font-size: 28px;
+    color: var(--heat);
+    line-height: 1;
+  }
+
+  pre.code {
+    background: #0e1018;
+    border: 1px solid var(--line);
+    border-radius: 10px;
+    padding: 18px 20px;
+    margin: 18px 0 0;
+    overflow-x: auto;
+    font-family: var(--mono);
+    font-size: 12.5px;
+    color: var(--ink-soft);
+    line-height: 1.65;
+  }
+  pre.code .k { color: var(--cool); }
+  pre.code .s { color: var(--heat-2); }
+  pre.code .c { color: var(--ink-dim); }
+
+  /* ——————————————————————— ARCHITECTURE ——————————————————————— */
+  .arch {
+    border: 1px solid var(--line);
+    border-radius: 16px;
+    background: #0d0f17;
+    padding: 36px 40px;
+    position: relative;
+    overflow: hidden;
+  }
+  .arch::before {
+    content: ""; position: absolute; inset: 0;
+    background: radial-gradient(600px 300px at 20% 0%, rgba(255,120,73,0.08), transparent 70%);
+    pointer-events: none;
+  }
+  .tree {
+    font-family: var(--mono);
+    font-size: 13.5px;
+    line-height: 1.85;
+    color: var(--ink-soft);
+    position: relative;
+  }
+  .tree .root { color: var(--heat); font-weight: 500; }
+  .tree .mod { color: var(--ink); }
+  .tree .branch { color: var(--ink-dim); }
+  .tree .desc { color: var(--ink-mute); }
+  .tree .line { display: block; white-space: pre; }
+
+  .arch-stats {
+    display: grid; grid-template-columns: repeat(4, 1fr);
+    gap: 30px;
+    margin-top: 36px;
+    padding-top: 30px;
+    border-top: 1px solid var(--line);
+  }
+  @media (max-width: 720px) { .arch-stats { grid-template-columns: 1fr 1fr; } }
+  .arch-stats .s .n { font-family: var(--serif); font-size: 42px; line-height: 1; color: var(--ink); }
+  .arch-stats .s .l { font-family: var(--mono); font-size: 10px; letter-spacing: 0.16em; color: var(--ink-mute); text-transform: uppercase; margin-top: 8px; }
+
+  /* ——————————————————————— FAQ ——————————————————————— */
+  .faq-item {
+    border-bottom: 1px solid var(--line);
+    padding: 26px 0;
+    display: grid; grid-template-columns: 1.2fr 2fr; gap: 36px;
+  }
+  @media (max-width: 820px) { .faq-item { grid-template-columns: 1fr; gap: 10px; } }
+  .faq-item q {
+    font-family: var(--serif); font-style: italic;
+    font-size: 22px; line-height: 1.25; color: var(--ink);
+    quotes: "„" "“";
+  }
+  .faq-item p { margin: 0; color: var(--ink-soft); font-size: 14.5px; line-height: 1.65; }
+
+  /* ——————————————————————— MANIFESTO ——————————————————————— */
+  .manifesto {
+    background: linear-gradient(180deg, transparent, rgba(255,120,73,0.05), transparent);
+    text-align: center;
+    padding: 140px 0;
+    border-top: 1px solid var(--line);
+    border-bottom: 1px solid var(--line);
+  }
+  .manifesto .big {
+    font-family: var(--serif);
+    font-size: clamp(56px, 9vw, 156px);
+    line-height: 0.92;
+    letter-spacing: -0.035em;
+    max-width: 1100px;
+    margin: 0 auto;
+  }
+  .manifesto .big em { color: var(--heat); font-style: italic; }
+  .manifesto .big .cool { color: var(--cool); font-style: italic; }
+
+  /* ——————————————————————— NUMBERS ——————————————————————— */
+  .numbers {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    border-top: 1px solid var(--line);
+    border-bottom: 1px solid var(--line);
+  }
+  @media (max-width: 820px) { .numbers { grid-template-columns: 1fr 1fr; } }
+  .numbers .n {
+    padding: 60px 30px;
+    border-right: 1px solid var(--line);
+    text-align: center;
+  }
+  .numbers .n:last-child { border-right: 0; }
+  @media (max-width: 820px) {
+    .numbers .n:nth-child(2) { border-right: 0; }
+    .numbers .n:nth-child(1), .numbers .n:nth-child(2) { border-bottom: 1px solid var(--line); }
+  }
+  .numbers .big {
+    font-family: var(--serif);
+    font-size: clamp(56px, 7vw, 92px);
+    line-height: 1;
+    color: var(--ink);
+    letter-spacing: -0.02em;
+  }
+  .numbers .big em { color: var(--heat); font-style: italic; }
+  .numbers .lbl {
+    font-family: var(--mono);
+    font-size: 11px;
+    letter-spacing: 0.16em;
+    color: var(--ink-mute);
+    text-transform: uppercase;
+    margin-top: 14px;
+  }
+
+  /* ——————————————————————— FOOTER ——————————————————————— */
+  footer {
+    padding: 80px 0 50px;
+    border-top: 1px solid var(--line);
+  }
+  footer .ftgrid {
+    display: grid; grid-template-columns: 2fr 1fr 1fr;
+    gap: 40px;
+    align-items: start;
+  }
+  @media (max-width: 820px) { footer .ftgrid { grid-template-columns: 1fr; gap: 30px; } }
+  footer h5 { font-family: var(--mono); font-size: 11px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--ink-mute); margin: 0 0 14px; }
+  footer ul { list-style: none; padding: 0; margin: 0; display: grid; gap: 8px; }
+  footer ul a { color: var(--ink-soft); text-decoration: none; font-size: 14px; }
+  footer ul a:hover { color: var(--heat); }
+  footer .credit {
+    margin-top: 60px;
+    padding-top: 24px;
+    border-top: 1px solid var(--line);
+    font-family: var(--mono);
+    font-size: 11px;
+    color: var(--ink-dim);
+    letter-spacing: 0.04em;
+    display: flex; justify-content: space-between; gap: 20px; flex-wrap: wrap;
+  }
+  footer .quote {
+    font-family: var(--serif); font-style: italic; font-size: 19px;
+    color: var(--ink-soft); max-width: 520px; line-height: 1.5;
+  }
+
+  /* ——————————————————————— UTIL ——————————————————————— */
+  .stack-sm > * + * { margin-top: 12px; }
+  .stack > * + * { margin-top: 18px; }
+  .stack-lg > * + * { margin-top: 28px; }
+  .center { text-align: center; }
+  .muted { color: var(--ink-mute); }
+  .tag-row { display: flex; gap: 8px; flex-wrap: wrap; }
+  .tag-row .tg {
+    font-family: var(--mono); font-size: 10px; letter-spacing: 0.14em;
+    text-transform: uppercase;
+    padding: 4px 9px;
+    border: 1px solid var(--line); border-radius: 4px;
+    color: var(--ink-mute);
+  }
+
+</style>
+<template id="__bundler_thumbnail" data-bg-color="#0a0b10">
+  <svg viewBox="0 0 1200 800" xmlns="http://www.w3.org/2000/svg">
+    <defs>
+      <linearGradient id="tStroke" x1="0" x2="1" y1="0" y2="0">
+        <stop offset="0%" stop-color="#ff7849"/>
+        <stop offset="50%" stop-color="#7fd1e6"/>
+        <stop offset="100%" stop-color="#b59cff"/>
+      </linearGradient>
+      <linearGradient id="tFill" x1="0" x2="0" y1="0" y2="1">
+        <stop offset="0%" stop-color="#ff7849" stop-opacity="0.35"/>
+        <stop offset="100%" stop-color="#7fd1e6" stop-opacity="0"/>
+      </linearGradient>
+    </defs>
+    <rect width="1200" height="800" fill="#0a0b10"/>
+    <path d="M 100 350 C 250 280, 380 220, 500 320 C 620 420, 720 600, 880 580 C 1000 565, 1080 380, 1150 300 L 1150 700 L 100 700 Z" fill="url(#tFill)"/>
+    <path d="M 100 350 C 250 280, 380 220, 500 320 C 620 420, 720 600, 880 580 C 1000 565, 1080 380, 1150 300" fill="none" stroke="url(#tStroke)" stroke-width="8" stroke-linecap="round"/>
+    <circle cx="500" cy="320" r="14" fill="#ff7849"/>
+    <circle cx="880" cy="580" r="14" fill="#7fd1e6"/>
+    <text x="600" y="500" text-anchor="middle" font-family="serif" font-style="italic" font-size="110" fill="#f1ebe0">Rejuvenation Bed</text>
+  </svg>
+</template>
+
+</head>
+<body>
+
+<!-- ─────────────────────────── TOP STRIP ─────────────────────────── -->
+<div class="topstrip">
+  <div class="wrap">
+    <div class="left">
+      <span class="mark">REJUVENATION&nbsp;BED</span>
+      <span>v0.7.2</span>
+      <a href="#features">Features</a>
+      <a href="#hardware">Hardware</a>
+      <a href="#install">Install</a>
+      <a href="#entities">Entities</a>
+      <a href="#arch">Architecture</a>
+    </div>
+    <div class="right">
+      <span class="badge"><span class="swatch" style="background:var(--solar)"></span>HACS Default</span>
+      <span class="badge"><span class="swatch" style="background:var(--cool)"></span>MIT</span>
+      <span class="badge"><span class="swatch" style="background:var(--heat)"></span>DE&nbsp;·&nbsp;EN</span>
+    </div>
+  </div>
+</div>
+
+<!-- ─────────────────────────── HERO ─────────────────────────── -->
+<section class="hero">
+  <div class="wrap">
+    <div class="hero-grid">
+      <div>
+        <div class="eyebrow"><span class="dot"></span>Home Assistant · Custom Integration</div>
+        <h1>
+          Sleep is a<br/>
+          <span class="it">frequency.</span><br/>
+          <span class="cool-it">Tune it.</span>
+          <span class="small">— Rejuvenation Bed for Home Assistant</span>
+        </h1>
+        <p class="hero-sub">
+          Verwandelt jede beheizbare Schlafstätte — Wasserbett, Heizdecke, Topper — in ein <b>selbstlernendes Schlafsystem</b>. Biorhythmus-Temperaturkurve, Weckzeit-Prognose, Sonnenstrom als Wärmebatterie.
+        </p>
+
+        <div class="hero-meta">
+          <span class="pill"><span class="lt">22</span> Module</span>
+          <span class="pill"><span class="lt">~10.650</span> Zeilen Python</span>
+          <span class="pill"><span class="lt">4</span> Hardware-Levels</span>
+          <span class="pill"><span class="lt">DE / EN</span></span>
+        </div>
+
+        <div class="hero-cta">
+          <a class="btn primary" href="#install">
+            Installieren via HACS
+            <svg class="arrow" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 12h14M13 5l7 7-7 7"/></svg>
+          </a>
+          <a class="btn ghost" href="#what">Wie es funktioniert</a>
+        </div>
+      </div>
+
+      <!-- ░░░░░░░ Biorhythm Live Panel ░░░░░░░ -->
+      <div class="biopanel">
+        <div class="biopanel-head">
+          <span>Biorhythmus · Zone 1</span>
+          <span class="live">LIVE</span>
+        </div>
+
+        <div class="biopanel-readout">
+          <div class="now" id="now-temp">28.4<span class="unit">°C</span></div>
+          <div class="meta">
+            <div class="phase" id="now-phase">DEEP&nbsp;SLEEP</div>
+            <div id="now-time">02:47 · Mittwoch</div>
+            <div>Target&nbsp;<span style="color:var(--cool)">−1.2°C</span> · Δ<span style="color:var(--ok)">0.03°</span></div>
+          </div>
+        </div>
+
+        <div class="biosvg-wrap">
+          <svg viewBox="0 0 600 220" preserveAspectRatio="none" aria-hidden="true">
+            <defs>
+              <linearGradient id="curveFill" x1="0" x2="0" y1="0" y2="1">
+                <stop offset="0%"  stop-color="#ff7849" stop-opacity="0.35"/>
+                <stop offset="55%" stop-color="#7fd1e6" stop-opacity="0.18"/>
+                <stop offset="100%" stop-color="#7fd1e6" stop-opacity="0"/>
+              </linearGradient>
+              <linearGradient id="curveStroke" x1="0" x2="1" y1="0" y2="0">
+                <stop offset="0%"   stop-color="#ff7849"/>
+                <stop offset="25%"  stop-color="#ffb070"/>
+                <stop offset="55%"  stop-color="#7fd1e6"/>
+                <stop offset="80%"  stop-color="#b59cff"/>
+                <stop offset="100%" stop-color="#ff7849"/>
+              </linearGradient>
+              <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
+                <feGaussianBlur stdDeviation="3" result="b"/>
+                <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+              </filter>
+            </defs>
+
+            <!-- Grid -->
+            <g stroke="rgba(255,255,255,0.06)" stroke-width="1">
+              <line x1="0" y1="55"  x2="600" y2="55"/>
+              <line x1="0" y1="110" x2="600" y2="110"/>
+              <line x1="0" y1="165" x2="600" y2="165"/>
+            </g>
+
+            <!-- Curve fill -->
+            <path d="M 0 70
+                     C 60 55, 110 40, 160 60
+                     C 210 80, 240 140, 300 160
+                     C 360 180, 400 165, 450 130
+                     C 490 100, 520 60, 580 50
+                     L 600 50 L 600 220 L 0 220 Z"
+                  fill="url(#curveFill)"/>
+
+            <!-- Curve stroke -->
+            <path id="bioPath"
+                  d="M 0 70
+                     C 60 55, 110 40, 160 60
+                     C 210 80, 240 140, 300 160
+                     C 360 180, 400 165, 450 130
+                     C 490 100, 520 60, 580 50
+                     L 600 50"
+                  fill="none" stroke="url(#curveStroke)" stroke-width="2.2"
+                  filter="url(#glow)"/>
+
+            <!-- Phase markers -->
+            <g font-family="Geist Mono, monospace" font-size="10" fill="#8a8676" letter-spacing="1">
+              <text x="60"  y="20">EINSCHLAFEN</text>
+              <text x="245" y="20">TIEFSCHLAF</text>
+              <text x="430" y="20">RAMPE</text>
+              <text x="540" y="20" fill="#ff7849">WACH</text>
+            </g>
+
+            <!-- Vertical phase separators -->
+            <g stroke="rgba(255,255,255,0.08)" stroke-dasharray="2 4">
+              <line x1="200" y1="0" x2="200" y2="200"/>
+              <line x1="400" y1="0" x2="400" y2="200"/>
+              <line x1="520" y1="0" x2="520" y2="200"/>
+            </g>
+
+            <!-- Live cursor (animated via JS) -->
+            <g id="cursor">
+              <line id="cursor-line" x1="0" x2="0" y1="0" y2="200" stroke="#ff7849" stroke-width="1" stroke-dasharray="3 4" opacity="0.7"/>
+              <circle id="cursor-dot" cx="0" cy="0" r="6" fill="#ff7849" stroke="#0a0b10" stroke-width="2.5"/>
+              <circle id="cursor-halo" cx="0" cy="0" r="14" fill="none" stroke="#ff7849" stroke-opacity="0.4"/>
+            </g>
+          </svg>
+        </div>
+
+        <div class="bioaxis">
+          <span>22:00</span><span>00:00</span><span>02:00</span><span>04:00</span><span>06:00</span><span>07:30</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ─────────────────────────── MANIFESTO ─────────────────────────── -->
+<section class="manifesto" id="what">
+  <div class="wrap">
+    <div class="big">
+      Festtemperatur ist <em>Geschichte.</em><br/>
+      Dein Körper schläft in <span class="cool">Wellen</span>.<br/>
+      Dein Bett sollte es <em>auch.</em>
+    </div>
+  </div>
+</section>
+
+<!-- ─────────────────────────── THE NIGHT ─────────────────────────── -->
+<section id="night" class="night">
+  <div class="wrap">
+    <div class="section-head">
+      <div>
+        <div class="eyebrow"><span class="dot"></span>Die Nacht · vier Phasen</div>
+        <h2 class="section">Eine Kurve,<br/>statt einer <em>Zahl.</em></h2>
+      </div>
+      <p class="lede" style="max-width:440px">
+        Statt auf eine Festtemperatur zu heizen, passt Rejuvenation Bed die Wärme an deinen Schlafzyklus an — über die ganze Nacht.
+      </p>
+    </div>
+
+    <div class="night-stage">
+      <svg viewBox="0 0 1200 360" preserveAspectRatio="none">
+        <defs>
+          <linearGradient id="nightFill" x1="0" x2="0" y1="0" y2="1">
+            <stop offset="0%"  stop-color="#ff7849" stop-opacity="0.30"/>
+            <stop offset="50%" stop-color="#7fd1e6" stop-opacity="0.18"/>
+            <stop offset="100%" stop-color="#0a0b10" stop-opacity="0"/>
+          </linearGradient>
+          <linearGradient id="nightStroke" x1="0" x2="1" y1="0" y2="0">
+            <stop offset="0%"   stop-color="#ff7849"/>
+            <stop offset="20%"  stop-color="#ffb070"/>
+            <stop offset="50%"  stop-color="#7fd1e6"/>
+            <stop offset="80%"  stop-color="#b59cff"/>
+            <stop offset="100%" stop-color="#ff7849"/>
+          </linearGradient>
+          <filter id="nGlow" x="-50%" y="-50%" width="200%" height="200%">
+            <feGaussianBlur stdDeviation="5"/>
+          </filter>
+        </defs>
+
+        <!-- Grid + degree labels -->
+        <g stroke="rgba(255,255,255,0.05)">
+          <line x1="0" y1="60"  x2="1200" y2="60"/>
+          <line x1="0" y1="140" x2="1200" y2="140"/>
+          <line x1="0" y1="220" x2="1200" y2="220"/>
+          <line x1="0" y1="300" x2="1200" y2="300"/>
+        </g>
+        <g font-family="Geist Mono, monospace" font-size="11" fill="#5b5849">
+          <text x="6" y="56">30°C</text>
+          <text x="6" y="136">29°C</text>
+          <text x="6" y="216">28°C</text>
+          <text x="6" y="296">27°C</text>
+        </g>
+
+        <!-- Phase backgrounds -->
+        <g opacity="0.06">
+          <rect x="0"    y="0" width="300" height="360" fill="#ff7849"/>
+          <rect x="300"  y="0" width="500" height="360" fill="#7fd1e6"/>
+          <rect x="800"  y="0" width="280" height="360" fill="#b59cff"/>
+          <rect x="1080" y="0" width="120" height="360" fill="#f5c542"/>
+        </g>
+
+        <!-- Vertical separators -->
+        <g stroke="rgba(255,255,255,0.10)" stroke-dasharray="2 5">
+          <line x1="300"  y1="0" x2="300"  y2="360"/>
+          <line x1="800"  y1="0" x2="800"  y2="360"/>
+          <line x1="1080" y1="0" x2="1080" y2="360"/>
+        </g>
+
+        <!-- Glow under curve -->
+        <path d="M 0 130 C 100 100, 200 80, 300 110
+                 C 400 140, 500 240, 700 280
+                 C 800 300, 880 270, 950 220
+                 C 1020 170, 1080 110, 1140 90
+                 C 1170 80, 1200 95, 1200 95"
+              fill="none" stroke="url(#nightStroke)" stroke-width="6"
+              opacity="0.45" filter="url(#nGlow)"/>
+
+        <!-- Filled curve -->
+        <path d="M 0 130 C 100 100, 200 80, 300 110
+                 C 400 140, 500 240, 700 280
+                 C 800 300, 880 270, 950 220
+                 C 1020 170, 1080 110, 1140 90
+                 C 1170 80, 1200 95, 1200 95
+                 L 1200 360 L 0 360 Z"
+              fill="url(#nightFill)"/>
+        <path d="M 0 130 C 100 100, 200 80, 300 110
+                 C 400 140, 500 240, 700 280
+                 C 800 300, 880 270, 950 220
+                 C 1020 170, 1080 110, 1140 90
+                 C 1170 80, 1200 95, 1200 95"
+              fill="none" stroke="url(#nightStroke)" stroke-width="2.5"/>
+
+        <!-- Phase dots -->
+        <g>
+          <circle cx="150"  cy="92"  r="5" fill="#ff7849"/>
+          <circle cx="550"  cy="260" r="5" fill="#7fd1e6"/>
+          <circle cx="950"  cy="220" r="5" fill="#b59cff"/>
+          <circle cx="1140" cy="90"  r="5" fill="#f5c542"/>
+        </g>
+
+        <!-- Phase labels -->
+        <g font-family="Geist Mono, monospace" font-size="11" fill="#c9c2b3" letter-spacing="1.6">
+          <text x="40"   y="30" fill="#ff7849">01 · EINSCHLAFEN</text>
+          <text x="340"  y="30" fill="#7fd1e6">02 · TIEFSCHLAF</text>
+          <text x="830"  y="30" fill="#b59cff">03 · AUFWACH-RAMPE</text>
+          <text x="1010" y="350" fill="#f5c542">04 · STANDBY</text>
+        </g>
+
+        <!-- temp annotations -->
+        <g font-family="Instrument Serif, serif" font-style="italic" font-size="22" fill="#f1ebe0">
+          <text x="150" y="80" text-anchor="middle">+0.5°</text>
+          <text x="550" y="252" text-anchor="middle">−1.5°</text>
+          <text x="950" y="212" text-anchor="middle">+0.8°</text>
+        </g>
+      </svg>
+
+      <div class="night-axis">
+        <span>22:00 · Schlafenszeit</span>
+        <span>00:30</span>
+        <span>03:00 · Tiefstwert</span>
+        <span>05:30</span>
+        <span>07:00 · Weckzeit</span>
+        <span>Tag</span>
+      </div>
+    </div>
+
+    <div class="phases">
+      <div class="phase">
+        <div class="ico">
+          <!-- moon rising -->
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#ff7849" stroke-width="1.6"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>
+        </div>
+        <div class="temp">22:00 → 00:30 · +0.5°C</div>
+        <h4>Einschlafen</h4>
+        <p>Leicht erhöhte Temperatur. Der Körper findet schneller in den Schlaf, wenn die Oberfläche warm ist und die Kerntemperatur absinken kann.</p>
+      </div>
+      <div class="phase cool">
+        <div class="ico">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#7fd1e6" stroke-width="1.6"><path d="M12 2v20M2 12h20M5 5l14 14M19 5L5 19"/></svg>
+        </div>
+        <div class="temp">00:30 → 05:30 · −1.5°C</div>
+        <h4>Tiefschlaf</h4>
+        <p>Absenkung um 1–2 °C. Optimale Regeneration, weniger Schwitzen, tieferer REM. Das Bett wird zur Höhle.</p>
+      </div>
+      <div class="phase rest">
+        <div class="ico">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#b59cff" stroke-width="1.6"><path d="M5 12h14M12 5v14M12 5l4 4M12 5l-4 4"/></svg>
+        </div>
+        <div class="temp">05:30 → 07:00 · +0.8°C</div>
+        <h4>Aufwach-Rampe</h4>
+        <p>Sanftes Vorwärmen, bevor der Wecker klingelt. Der Körper erwacht aus Wärme — nicht aus Schock.</p>
+      </div>
+      <div class="phase solar">
+        <div class="ico">
+          <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#f5c542" stroke-width="1.6"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4 12H2M22 12h-2M5 5l1.5 1.5M17.5 17.5L19 19M19 5l-1.5 1.5M6.5 17.5L5 19"/></svg>
+        </div>
+        <div class="temp">Tagsüber · Solar</div>
+        <h4>Standby</h4>
+        <p>Solar­überschuss wird als Wärme gespeichert. Das Bett wird zur thermischen Batterie für die Nacht.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ─────────────────────────── FEATURES ─────────────────────────── -->
+<section id="features">
+  <div class="wrap">
+    <div class="section-head">
+      <div>
+        <span class="section-head .num eyebrow">// 02 · WAS DRIN IST</span>
+        <h2 class="section">Vier <em>Säulen.</em><br/>Ein <span class="cool">System.</span></h2>
+      </div>
+      <p class="lede" style="max-width:440px">
+        Kern, Energie, Intelligenz, Sicherheit. Jede Säule für sich überlegt, im Zusammenspiel ein Schlaforganismus.
+      </p>
+    </div>
+
+    <div class="row cols-2">
+
+      <div class="feature-card">
+        <div class="accent"></div>
+        <div class="head">
+          <span class="tag">01 · CORE</span>
+          <span class="tag" style="color:var(--heat)">Biorhythmus</span>
+        </div>
+        <h3>Kernfunktionen</h3>
+        <p class="body">
+          Biorhythmus-Kurve mit Chronotyp-Anpassung — <b>Lerche, Normaltyp oder Eule</b>. Wecker-Integration: Telefon-Alarm, feste Zeit oder Hybrid. Saisonale Anpassung über Außentemperatur. Dual-Zone für Partner mit unabhängigen Profilen.
+        </p>
+        <ul class="feature-list">
+          <li>Chronotyp-Curve (early/normal/late)</li>
+          <li>Wecker / Fixzeit / Hybrid</li>
+          <li>Außentemp-basierte Saison-Logik</li>
+          <li>Zwei Zonen, zwei Sleep-Profile</li>
+        </ul>
+      </div>
+
+      <div class="feature-card solar">
+        <div class="accent"></div>
+        <div class="head">
+          <span class="tag">02 · ENERGY</span>
+          <span class="tag" style="color:var(--solar)">PV · Tibber · Octopus</span>
+        </div>
+        <h3>Energie-Management</h3>
+        <p class="body">
+          <b>Solar-Boost</b> nutzt PV-Überschuss als thermische Batterie. Dynamische Stromtarife (Tibber, Octopus, ENTSO-E). Energie-Tracking mit kWh, Heizstunden und konkreter Ersparnis. Thermal Battery als Prozent-Sensor.
+        </p>
+        <ul class="feature-list">
+          <li>PV-Überschuss → Wärme­speicher</li>
+          <li>Dynamische Tarife (3 Provider)</li>
+          <li>Solar-Anteil am Verbrauch</li>
+          <li>Ersparnis in € pro Tag</li>
+        </ul>
+      </div>
+
+      <div class="feature-card cool">
+        <div class="accent"></div>
+        <div class="head">
+          <span class="tag">03 · INTELLIGENCE</span>
+          <span class="tag" style="color:var(--cool)">Self-learning</span>
+        </div>
+        <h3>Intelligenz</h3>
+        <p class="body">
+          <b>Anwesenheitserkennung</b> über Temperatur-Varianz im Wasserkörper — kein Extra-Sensor nötig. <b>Auto-Kalibrierung in 3–5 Tagen</b>. Isolations­erkennung (Decke an/aus). Schwitz-Detection per Kreuz­korrelation. Schlaf-Score 0–100.
+        </p>
+        <ul class="feature-list">
+          <li>Varianz-basierte Präsenz</li>
+          <li>3–5 Tage Auto-Calibration</li>
+          <li>Decke / Sweat / Sleep-Score</li>
+          <li>Lernbasiertes Vorheizen</li>
+        </ul>
+      </div>
+
+      <div class="feature-card rest">
+        <div class="accent"></div>
+        <div class="head">
+          <span class="tag">04 · SAFETY</span>
+          <span class="tag" style="color:var(--rest)">Fail-safe</span>
+        </div>
+        <h3>Sicherheit</h3>
+        <p class="body">
+          Überhitzungsschutz bei <b>max. 36°C</b>. Fail-safe bei Sensor-Ausfall. Startup-Grace-Period, Anti-Short-Cycle für Relais, Ausreißer-Filter, Leckage-Alarm. Optionale Sensoren dürfen jederzeit ausfallen — Kern­funktion bleibt.
+        </p>
+        <ul class="feature-list">
+          <li>Hard-cap 36°C</li>
+          <li>Anti-Short-Cycle / Relais-Schutz</li>
+          <li>Leckage-Alarm</li>
+          <li>Graceful Degradation</li>
+        </ul>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<!-- ─────────────────────────── HARDWARE LEVELS ─────────────────────────── -->
+<section id="hardware" class="tight" style="border-top: 1px solid var(--line);">
+  <div class="wrap">
+    <div class="section-head">
+      <div>
+        <span class="eyebrow">// 03 · HARDWARE-LEVELS</span>
+        <h2 class="section">Vom <em>Schalter</em><br/>zum <span class="cool">Schlaflabor.</span></h2>
+      </div>
+      <p class="lede" style="max-width:440px">
+        Vier Ausbaustufen. Du startest mit einer Smart-Plug. Jeder zusätzliche Sensor schaltet neue Fähigkeiten frei.
+      </p>
+    </div>
+
+    <div class="hw-grid">
+      <div class="hw active">
+        <div class="lvl">A</div>
+        <div class="label">Minimum · Start</div>
+        <h5>Smart Plug</h5>
+        <p>Eine einzige steckbare Steckdose, die deine Heizung schaltet. Mehr nicht.</p>
+        <ul class="feats">
+          <li>Smart Plug</li>
+          <li>Timer · Boost · Urlaub</li>
+        </ul>
+      </div>
+
+      <div class="hw">
+        <div class="lvl">B</div>
+        <div class="label">+ Temperatur</div>
+        <h5>+ Temp­sensor</h5>
+        <p>DS18B20 im Wasser, am Kabel oder direkt auf der Heizdecke.</p>
+        <ul class="feats">
+          <li>Temperatursensor</li>
+          <li>Biorhythmus-Kurve</li>
+          <li>Präsenz · Sleep-Score</li>
+        </ul>
+      </div>
+
+      <div class="hw">
+        <div class="lvl">C</div>
+        <div class="label">+ Strom</div>
+        <h5>+ Power-Sensor</h5>
+        <p>Smart Plug mit Energie­messung, oder Shelly EM im Stromkreis.</p>
+        <ul class="feats">
+          <li>Power-Sensor</li>
+          <li>kWh-Tracking · €-Ersparnis</li>
+          <li>Bessere Präsenz</li>
+        </ul>
+      </div>
+
+      <div class="hw">
+        <div class="lvl">D</div>
+        <div class="label">Vollausbau</div>
+        <h5>+ SHT41</h5>
+        <p>Luft / Feuchte direkt über dem Kern. Erkennt Decke, Schweiß und Leck.</p>
+        <ul class="feats">
+          <li>SHT41 (Luft & Humidity)</li>
+          <li>Isolations- & Sweat-Check</li>
+          <li>Leckage-Alarm</li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ─────────────────────────── NUMBERS ─────────────────────────── -->
+<section class="tight" style="padding: 0;">
+  <div class="numbers">
+    <div class="n">
+      <div class="big"><em>4</em></div>
+      <div class="lbl">Schlafphasen pro Nacht</div>
+    </div>
+    <div class="n">
+      <div class="big">22</div>
+      <div class="lbl">Python-Module</div>
+    </div>
+    <div class="n">
+      <div class="big">~10.650</div>
+      <div class="lbl">Zeilen Code</div>
+    </div>
+    <div class="n">
+      <div class="big">60<span style="font-size:0.55em;color:var(--ink-mute)">s</span></div>
+      <div class="lbl">Coordinator-Loop</div>
+    </div>
+  </div>
+</section>
+
+<!-- ─────────────────────────── INSTALL ─────────────────────────── -->
+<section id="install">
+  <div class="wrap">
+    <div class="section-head">
+      <div>
+        <span class="eyebrow">// 04 · INSTALLATION</span>
+        <h2 class="section">Setup in<br/><em>vier</em> Schritten.</h2>
+      </div>
+    </div>
+
+    <div class="row cols-2">
+      <div class="install-card">
+        <h4>HACS<span class="recommend">empfohlen</span></h4>
+        <p class="muted" style="margin:0;font-size:14px">Der einfache Weg. Updates kommen automatisch.</p>
+        <ol class="steps">
+          <li>HACS &rarr; Integrationen &rarr; ⋮ &rarr; <b>Custom Repositories</b></li>
+          <li>URL: <code class="inline">github.com/Chance-Konstruktion/ha-rejuvenation-bed</code></li>
+          <li>Kategorie: <b>Integration</b></li>
+          <li>Installieren &rarr; Home Assistant neu starten</li>
+        </ol>
+      </div>
+
+      <div class="install-card">
+        <h4>Manuell</h4>
+        <p class="muted" style="margin:0;font-size:14px">Für Puristen und HACS-Verweigerer.</p>
+        <pre class="code">
+<span class="c"># In dein Home-Assistant-Config:</span>
+cp -r custom_components/rejuvenation_bed \
+      <span class="s">config/custom_components/</span>
+
+<span class="c"># Dann: Neu starten und Integration hinzufügen.</span>
+<span class="k">$</span> ha core restart</pre>
+        <p class="muted" style="margin-top:18px;font-size:13.5px">Der Einrichtungs-Assistent führt dich danach durch <b>Globale Einstellungen</b>, <b>Zone Sensors</b>, <b>Sleep Profile</b> und <b>Special Modes</b>.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ─────────────────────────── ENTITIES ─────────────────────────── -->
+<section id="entities" style="border-top: 1px solid var(--line);">
+  <div class="wrap">
+    <div class="section-head">
+      <div>
+        <span class="eyebrow">// 05 · GERÄTE & ENTITÄTEN</span>
+        <h2 class="section">Drei Geräte.<br/><em>Eine</em> <span class="cool">Sprache.</span></h2>
+      </div>
+      <p class="lede" style="max-width:480px">
+        Die Integration legt drei Geräte in Home Assistant an — sauber getrennt nach Funktion. Du steuerst das Bett. Die Sensoren erzählen die Geschichte.
+      </p>
+    </div>
+
+    <div class="row cols-3" style="gap:20px">
+
+      <!-- Device 1 -->
+      <div class="device-card">
+        <div class="dh">
+          <h4>Rejuvenation Bed</h4>
+          <div class="icon-pill">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#ff7849" stroke-width="1.7"><path d="M2 17v-5a3 3 0 0 1 3-3h14a3 3 0 0 1 3 3v5M2 17h20M2 17v3M22 17v3M7 9V6a2 2 0 0 1 2-2h6a2 2 0 0 1 2 2v3"/></svg>
+          </div>
+        </div>
+        <div class="ent"><div class="id"><span class="pre">climate.</span>rejuvenation_bed</div><div class="desc">Thermostat · Target + HVAC-Mode</div></div>
+        <div class="ent"><div class="id"><span class="pre">sensor.</span>bett_zieltemperatur</div><div class="desc">Berechnete Soll-Temperatur</div></div>
+        <div class="ent"><div class="id"><span class="pre">sensor.</span>bett_status</div><div class="desc">Aktueller Modus + Begründung</div></div>
+        <div class="ent"><div class="id"><span class="pre">sensor.</span>bett_thermal_summary</div><div class="desc">Aufbau der Temperaturkalkulation</div></div>
+        <div class="ent"><div class="id"><span class="pre">binary_sensor.</span>bett_prasenz</div><div class="desc">Jemand im Bett</div></div>
+        <div class="ent"><div class="id"><span class="pre">binary_sensor.</span>bett_isolation</div><div class="desc">Decke (benötigt SHT41)</div></div>
+        <div class="ent"><div class="id"><span class="pre">switch.</span>bett_boost</div><div class="desc">Quick-Heat</div></div>
+        <div class="ent"><div class="id"><span class="pre">switch.</span>bett_krank_modus</div><div class="desc">Krank-Modus</div></div>
+        <div class="ent"><div class="id"><span class="pre">switch.</span>bett_tarifmodus</div><div class="desc">Strompreis-Modus</div></div>
+      </div>
+
+      <!-- Device 2 -->
+      <div class="device-card">
+        <div class="dh">
+          <h4>Bett · Energie</h4>
+          <div class="icon-pill">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#f5c542" stroke-width="1.7"><path d="M13 2L4 14h7l-2 8 9-12h-7l2-8z"/></svg>
+          </div>
+        </div>
+        <div class="ent"><div class="id"><span class="pre">sensor.</span>bett_leistung</div><div class="desc">Aktuelle Leistung pro Zone (W)</div></div>
+        <div class="ent"><div class="id"><span class="pre">sensor.</span>bett_gesamtleistung</div><div class="desc">Summen-Leistung (W)</div></div>
+        <div class="ent"><div class="id"><span class="pre">sensor.</span>bett_thermische_batterie</div><div class="desc">Wärme­speicher-Ladestand (%)</div></div>
+        <div class="ent"><div class="id"><span class="pre">sensor.</span>bett_energie_heute</div><div class="desc">Verbrauch heute (kWh)</div></div>
+        <div class="ent"><div class="id"><span class="pre">sensor.</span>bett_heizstunden</div><div class="desc">Heizstunden heute</div></div>
+        <div class="ent"><div class="id"><span class="pre">sensor.</span>bett_ersparnis</div><div class="desc">Geschätzte Ersparnis (€)</div></div>
+        <div class="ent"><div class="id"><span class="pre">sensor.</span>bett_solar_prozent</div><div class="desc">Solar-Anteil am Verbrauch</div></div>
+        <div class="ent"><div class="id"><span class="pre">sensor.</span>bett_strompreis_status</div><div class="desc">Aktueller Tarifmodus</div></div>
+        <div class="ent"><div class="id"><span class="pre">switch.</span>bett_solar_batterie</div><div class="desc">Wärme­batterie an/aus</div></div>
+      </div>
+
+      <!-- Device 3 -->
+      <div class="device-card">
+        <div class="dh">
+          <h4>Bett · Schlaf-Analyse</h4>
+          <div class="icon-pill">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#b59cff" stroke-width="1.7"><path d="M21 12.8A9 9 0 1 1 11.2 3a7 7 0 0 0 9.8 9.8z"/></svg>
+          </div>
+        </div>
+        <div class="ent"><div class="id"><span class="pre">sensor.</span>bett_schlaf_score</div><div class="desc">Letzte Nacht (0–100)</div></div>
+        <div class="ent"><div class="id"><span class="pre">sensor.</span>bett_schlaf_score_woche</div><div class="desc">Wochen­durchschnitt</div></div>
+        <div class="ent"><div class="id"><span class="pre">sensor.</span>bett_rampe</div><div class="desc">Heat-up-Ramp-Status</div></div>
+        <div class="ent"><div class="id"><span class="pre">sensor.</span>bett_intelligence</div><div class="desc">Kalibrierung + Lern-Status</div></div>
+        <div class="ent"><div class="id"><span class="pre">binary_sensor.</span>bett_degraded_mode</div><div class="desc">Degraded · Sensor­ausfall</div></div>
+        <div class="ent"><div class="id"><span class="pre">binary_sensor.</span>bett_kondensationsrisiko</div><div class="desc">Kondensations­risiko (&lt; 24°C)</div></div>
+        <div class="ent"><div class="id"><span class="pre">binary_sensor.</span>bett_leckage_verdacht</div><div class="desc">Leckage-Verdacht</div></div>
+        <div class="ent"><div class="id"><span class="pre">binary_sensor.</span>bett_schwitzen</div><div class="desc">Schwitz / Feuchte-Alarm</div></div>
+        <div class="ent"><div class="id"><span class="pre">binary_sensor.</span>bett_system_status</div><div class="desc">System-Health</div></div>
+      </div>
+
+    </div>
+  </div>
+</section>
+
+<!-- ─────────────────────────── SERVICES + SPECIAL MODES ─────────────────────────── -->
+<section id="services" style="border-top: 1px solid var(--line);">
+  <div class="wrap">
+    <div class="section-head">
+      <div>
+        <span class="eyebrow">// 06 · SERVICES & SPECIAL MODES</span>
+        <h2 class="section">Wenn etwas <em>anders</em><br/>laufen muss.</h2>
+      </div>
+    </div>
+
+    <div class="row cols-2" style="gap:60px">
+      <div>
+        <div class="eyebrow" style="margin-bottom:18px">Services</div>
+        <div>
+          <div class="table-row">
+            <span class="k">rejuvenation_bed.set_boost</span>
+            <span class="v">Quick-Heat aktivieren (Dauer konfigurierbar).</span>
+          </div>
+          <div class="table-row">
+            <span class="k">rejuvenation_bed.set_sick_mode</span>
+            <span class="v">Krank-Modus (Temperatur + Tage).</span>
+          </div>
+          <div class="table-row">
+            <span class="k">rejuvenation_bed.set_vacation_mode</span>
+            <span class="v">Urlaubs­modus mit optionaler Temperatur und Enddatum.</span>
+          </div>
+          <div class="table-row">
+            <span class="k">rejuvenation_bed.cancel_special_mode</span>
+            <span class="v">Alle Sondermodi aufheben.</span>
+          </div>
+          <div class="table-row">
+            <span class="k">rejuvenation_bed.preheat_bed</span>
+            <span class="v">Bett vorheizen (Temperatur + Dauer).</span>
+          </div>
+          <div class="table-row">
+            <span class="k">rejuvenation_bed.reset_energy_budget</span>
+            <span class="v">Energie­statistik zurücksetzen.</span>
+          </div>
+        </div>
+      </div>
+
+      <div>
+        <div class="eyebrow" style="margin-bottom:18px">Konfiguration</div>
+        <div>
+          <div class="table-row">
+            <span class="k" style="color:var(--heat)">🌐 Global</span>
+            <span class="v">Zeiten & Temperatur (Wärme­fenster, Sommer­schwelle, Offset, Bett­volumen) · Sensoren & Strompreis.</span>
+          </div>
+          <div class="table-row">
+            <span class="k" style="color:var(--cool)">📡 Zonen-Sensoren</span>
+            <span class="v">Hardware pro Zone: Heizungs-Schalter (Pflicht), Temperatur, Power, Präsenz, Feuchte, Oberflächen­temp.</span>
+          </div>
+          <div class="table-row">
+            <span class="k" style="color:var(--rest)">🌡️ Sleep-Profile</span>
+            <span class="v">Pro Zone: Wecker-Entity, Wochenend-Schlaf, Schlaf­temperaturen, Wearable-Sensor.</span>
+          </div>
+          <div class="table-row">
+            <span class="k" style="color:var(--solar)">🎛️ Special-Modes</span>
+            <span class="v">Krank, Boost, Urlaub, Komfort — alle mit eigenen Parametern.</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div style="margin-top:80px">
+      <div class="eyebrow" style="margin-bottom:24px">Special Modes · auf einen Blick</div>
+      <div class="modes-grid">
+        <div class="mode">
+          <div class="glyph"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#ff7849" stroke-width="1.7"><path d="M13 2L4 14h7l-2 8 9-12h-7l2-8z"/></svg></div>
+          <h5>Boost</h5>
+          <div class="activator">switch.bett_boost</div>
+          <p>Quick-Heat: Soll + Offset für 60 Minuten. Wenn's heute Abend einfach jetzt warm sein soll.</p>
+        </div>
+        <div class="mode">
+          <div class="glyph"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#ff5e5e" stroke-width="1.7"><path d="M12 2v4M12 18v4M2 12h4M18 12h4M5 5l3 3M16 16l3 3M5 19l3-3M16 8l3-3"/></svg></div>
+          <h5>Krank</h5>
+          <div class="activator">switch.bett_krank_modus</div>
+          <p>Konstante Temperatur über mehrere Tage. Komfort­zone, wenn der Körper sie braucht.</p>
+        </div>
+        <div class="mode">
+          <div class="glyph"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#7fd1e6" stroke-width="1.7"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M9 22V12h6v10"/></svg></div>
+          <h5>Urlaub</h5>
+          <div class="activator">switch.bett_urlaub_modus</div>
+          <p>Minimale Halte­temperatur (24°C). Optional mit eigener Zielwert.</p>
+        </div>
+        <div class="mode">
+          <div class="glyph"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#f5c542" stroke-width="1.7"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4 12H2M22 12h-2M5 5l1.5 1.5M17.5 17.5L19 19M19 5l-1.5 1.5M6.5 17.5L5 19"/></svg></div>
+          <h5>Solar</h5>
+          <div class="activator">switch.bett_solar_batterie</div>
+          <p>PV-Überschuss wird als Wärme gespeichert. Sonne heute, Schlaf heute Nacht.</p>
+        </div>
+        <div class="mode">
+          <div class="glyph"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#b59cff" stroke-width="1.7"><path d="M12 1v6m0 10v6M4.22 4.22l4.24 4.24m7.08 7.08l4.24 4.24M1 12h6m10 0h6M4.22 19.78l4.24-4.24m7.08-7.08l4.24-4.24"/></svg></div>
+          <h5>Tarif</h5>
+          <div class="activator">switch.bett_tarifmodus</div>
+          <p>Bei teurem Strom wird abgesenkt. Bei billigem hochgefahren. Dein Bett liest die Börse.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ─────────────────────────── ARCHITECTURE ─────────────────────────── -->
+<section id="arch" style="border-top: 1px solid var(--line);">
+  <div class="wrap">
+    <div class="section-head">
+      <div>
+        <span class="eyebrow">// 07 · ARCHITEKTUR</span>
+        <h2 class="section">Was unter der<br/><em>Decke</em> schlägt.</h2>
+      </div>
+      <p class="lede" style="max-width:440px">
+        Eine zentrale 60-Sekunden-Schleife. Ringsherum 22 Module, die jeweils <em>eine</em> Sache richtig machen.
+      </p>
+    </div>
+
+    <div class="arch">
+      <div class="tree">
+<span class="line"><span class="root">coordinator.py</span> <span class="desc">─── Zentrale 60s-Schleife</span></span>
+<span class="line"> <span class="branch">├──</span> <span class="mod">safety_manager.py</span>          <span class="desc">─ Überhitzungsschutz · fail-safe</span></span>
+<span class="line"> <span class="branch">├──</span> <span class="mod">temperature_calculator.py</span>  <span class="desc">─ Biorhythmus-Kurve · Soll-Temperatur</span></span>
+<span class="line"> <span class="branch">│   ├──</span> <span class="mod">biorhythmus_curve.py</span>    <span class="desc">─ Schlafphasen­kurve (Chronotyp)</span></span>
+<span class="line"> <span class="branch">│   ├──</span> <span class="mod">wake_time_resolver.py</span>   <span class="desc">─ Alarm / fixed / hybrid</span></span>
+<span class="line"> <span class="branch">│   └──</span> <span class="mod">sleep_stage_resolver.py</span> <span class="desc">─ Wearable-Integration</span></span>
+<span class="line"> <span class="branch">├──</span> <span class="mod">energy_state_resolver.py</span>   <span class="desc">─ Solar / Tarif / Normal</span></span>
+<span class="line"> <span class="branch">├──</span> <span class="mod">presence_detector.py</span>       <span class="desc">─ Varianz-basierte Präsenz</span></span>
+<span class="line"> <span class="branch">├──</span> <span class="mod">bed_intelligence.py</span>        <span class="desc">─ Kalibrierung · Decke · Sweat · Bedtime-Learning</span></span>
+<span class="line"> <span class="branch">├──</span> <span class="mod">diagnostics_manager.py</span>     <span class="desc">─ Energie-Budget · Thermal-Summary</span></span>
+<span class="line"> <span class="branch">├──</span> <span class="mod">ramp_controller.py</span>         <span class="desc">─ Heat-up-Ramp (Vinyl-Schutz)</span></span>
+<span class="line"> <span class="branch">├──</span> <span class="mod">anti_short_cycle_manager.py</span> <span class="desc">─ Relais-Schutz</span></span>
+<span class="line"> <span class="branch">└──</span> <span class="mod">sleep_score_calculator.py</span> <span class="desc">─ Schlaf-Score 0–100</span></span>
+      </div>
+
+      <div class="arch-stats">
+        <div class="s"><div class="n">22</div><div class="l">Module</div></div>
+        <div class="s"><div class="n">~10.650</div><div class="l">LOC Python</div></div>
+        <div class="s"><div class="n">DE · EN</div><div class="l">Bilingual</div></div>
+        <div class="s"><div class="n">HACS</div><div class="l">Kompatibel</div></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ─────────────────────────── FAQ ─────────────────────────── -->
+<section id="faq" style="border-top: 1px solid var(--line);">
+  <div class="wrap">
+    <div class="section-head">
+      <div>
+        <span class="eyebrow">// 08 · HÄUFIGE FRAGEN</span>
+        <h2 class="section">Vermutlich<br/><em>schon gefragt.</em></h2>
+      </div>
+    </div>
+
+    <div class="faq-item">
+      <q>Funktioniert das nur mit Wasserbetten?</q>
+      <p>Nein. Jede elektrische Bettheizung funktioniert: Wasserbett, Heizdecke, beheizter Topper. Das Biorhythmus-Prinzip ist universell.</p>
+    </div>
+    <div class="faq-item">
+      <q>Brauche ich einen Temperatur­sensor?</q>
+      <p>Empfohlen. Ohne Sensor läuft das System als intelligenter Timer (Level A). Mit Sensor: volle Biorhythmus-Kurve und Anwesenheits­erkennung.</p>
+    </div>
+    <div class="faq-item">
+      <q>Was passiert, wenn ein Sensor ausfällt?</q>
+      <p>Die Integration degradiert automatisch. Der SHT41 darf jederzeit ausfallen, ohne die Heizung zu beeinflussen. Selbst der Wasser­temperatur­sensor hat ein Fail-safe (30 % Duty-Cycle).</p>
+    </div>
+    <div class="faq-item">
+      <q>Wie funktioniert Präsenz­erkennung bei Heizdecken?</q>
+      <p>Anders als beim Wasserbett (Varianz-Analyse im Wasserkörper) nutzt die Heizdecke den <b>Temperatur-Trend</b>: Wenn die Heizung aus ist und die Temperatur trotzdem steigt, liegt jemand drauf (Körperwärme). Nach ca. 3 Minuten Einschwingzeit zuverlässig.</p>
+    </div>
+    <div class="faq-item">
+      <q>Welcher Temperatursensor?</q>
+      <p>DS18B20 waterproof (<b>IM</b> Wasser) — plus optional ein SHT41 (<b>AUF</b> dem Kern) für Luft & Feuchte.</p>
+    </div>
+  </div>
+</section>
+
+<!-- ─────────────────────────── DASHBOARD / EMBED ─────────────────────────── -->
+<section style="border-top: 1px solid var(--line);">
+  <div class="wrap">
+    <div class="section-head">
+      <div>
+        <span class="eyebrow">// 09 · DASHBOARD-TEMPLATES</span>
+        <h2 class="section">Zwei fertige<br/><em>Cockpits.</em></h2>
+      </div>
+      <p class="lede" style="max-width:440px">
+        Mobile-/Tablet-tauglich. Im Repo unter <code class="inline">/dashboards/</code>. Entity-IDs an deine Installation anpassen.
+      </p>
+    </div>
+
+    <div class="row cols-2">
+      <div class="install-card">
+        <div class="tag-row" style="margin-bottom:12px"><span class="tg">Lovelace · YAML</span></div>
+        <h4>Nightstand Cockpit</h4>
+        <p style="margin:8px 0 0;font-size:14px">Klassisches Lovelace-Template, perfekt für Nachttisch-Tablets neben dem Bett.</p>
+        <pre class="code">
+<span class="c"># rejuvenation_bed_nightstand_cockpit.yaml</span>
+<span class="k">type</span>: vertical-stack
+<span class="k">cards</span>:
+  - <span class="k">type</span>: thermostat
+    <span class="k">entity</span>: <span class="s">climate.rejuvenation_bed</span>
+  - <span class="k">type</span>: glance
+    <span class="k">entities</span>: <span class="s">[sensor.bett_schlaf_score, …]</span></pre>
+      </div>
+
+      <div class="install-card">
+        <div class="tag-row" style="margin-bottom:12px"><span class="tg">Standalone · HTML</span><span class="tg" style="color:var(--heat)">Premium</span></div>
+        <h4>Premium Dashboard</h4>
+        <p style="margin:8px 0 0;font-size:14px">Standalone React/HTML-Dashboard mit Mini-View unter 800px Breite.</p>
+        <pre class="code">
+<span class="c"># Als Panel einbinden:</span>
+<span class="k">panel_iframe</span>:
+  <span class="k">waterbed_cockpit</span>:
+    <span class="k">title</span>: Waterbed Cockpit
+    <span class="k">icon</span>: mdi:bed-outline
+    <span class="k">url</span>: <span class="s">/local/rejuvenation_bed/premium_nightstand_dashboard.html</span></pre>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ─────────────────────────── FOOTER ─────────────────────────── -->
+<footer>
+  <div class="wrap">
+    <div class="ftgrid">
+      <div>
+        <div class="eyebrow" style="margin-bottom:18px"><span class="dot"></span>Rejuvenation Bed</div>
+        <p class="quote">„Gebaut für Menschen, die nachts schlafen wollen — und morgens aufwachen, nicht hochschrecken."</p>
+      </div>
+      <div>
+        <h5>Repo</h5>
+        <ul>
+          <li><a href="https://github.com/Chance-Konstruktion/ha-rejuvenation-bed">github.com/Chance-Konstruktion/<br/>ha-rejuvenation-bed</a></li>
+          <li><a href="https://github.com/Chance-Konstruktion/ha-rejuvenation-bed/releases">Releases · v0.7.2</a></li>
+          <li><a href="https://github.com/Chance-Konstruktion/ha-rejuvenation-bed/blob/main/CHANGELOG.md">Changelog</a></li>
+          <li><a href="https://github.com/Chance-Konstruktion/ha-rejuvenation-bed/blob/main/README_DE.md">README · DE</a></li>
+        </ul>
+      </div>
+      <div>
+        <h5>Topics</h5>
+        <ul>
+          <li><a href="https://github.com/topics/homeassistant">homeassistant</a></li>
+          <li><a href="https://github.com/topics/hacs">hacs</a></li>
+          <li><a href="https://github.com/topics/homeassistant-integration">homeassistant-integration</a></li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="credit">
+      <span>MIT License · © 2026 Chance-Konstruktion</span>
+      <span>Made for sleepers, not for marketers.</span>
+    </div>
+  </div>
+</footer>
+
+<script>
+  // Animate hero cursor along the bio path, update readouts.
+  (function () {
+    const path  = document.getElementById('bioPath');
+    const dot   = document.getElementById('cursor-dot');
+    const halo  = document.getElementById('cursor-halo');
+    const line  = document.getElementById('cursor-line');
+    const tempEl = document.getElementById('now-temp');
+    const phaseEl = document.getElementById('now-phase');
+    const timeEl = document.getElementById('now-time');
+    if (!path) return;
+
+    const len = path.getTotalLength();
+    let t = 0; // 0..1
+    let raf;
+
+    const phases = [
+      { until: 0.18, name: 'EINSCHLAFEN', tBase: 29.2, color: '#ff7849' },
+      { until: 0.60, name: 'DEEP SLEEP',  tBase: 28.0, color: '#7fd1e6' },
+      { until: 0.86, name: 'RAMPE',       tBase: 28.9, color: '#b59cff' },
+      { until: 1.00, name: 'WACH',        tBase: 30.2, color: '#ff7849' },
+    ];
+
+    function format(n) { return n.toFixed(1); }
+    function format2(n) { return n.toFixed(2); }
+
+    function tick() {
+      t = (t + 0.0009) % 1;
+      const p = path.getPointAtLength(t * len);
+      dot.setAttribute('cx', p.x);
+      dot.setAttribute('cy', p.y);
+      halo.setAttribute('cx', p.x);
+      halo.setAttribute('cy', p.y);
+      line.setAttribute('x1', p.x);
+      line.setAttribute('x2', p.x);
+
+      // phase
+      const ph = phases.find(ph => t < ph.until) || phases[phases.length-1];
+      phaseEl.textContent = ph.name;
+      phaseEl.style.color = ph.color;
+      dot.setAttribute('fill', ph.color);
+      halo.setAttribute('stroke', ph.color);
+      line.setAttribute('stroke', ph.color);
+
+      // temperature from path y (220 viewBox → ~26..30°C)
+      // y goes ~40 → 180. Lower y = warmer.
+      const tempVal = 30 - ((p.y - 40) / 140) * 4 + Math.sin(performance.now()/700)*0.05;
+      tempEl.innerHTML = format(tempVal) + '<span class="unit">°C</span>';
+
+      // time 22:00 → 07:30 mapping
+      const minutesTotal = 22*60 + t * (9.5 * 60);
+      const hh = Math.floor(minutesTotal/60) % 24;
+      const mm = Math.floor(minutesTotal % 60);
+      const pad = n => String(n).padStart(2,'0');
+      timeEl.textContent = pad(hh)+':'+pad(mm)+' · Mittwoch';
+
+      raf = requestAnimationFrame(tick);
+    }
+    tick();
+  })();
+</script>
+
+</body>
+</html>
