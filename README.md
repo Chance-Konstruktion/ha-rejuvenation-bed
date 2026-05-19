@@ -6,9 +6,13 @@
 [![Version](https://img.shields.io/badge/version-0.7.1-blue.svg)](https://github.com/Chance-Konstruktion/ha-rejuvenation-bed/releases)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
+> ### → [**View the rendered editorial README**](https://chance-konstruktion.github.io/ha-rejuvenation-bed/)
+> Animated biorhythm curve, dark editorial layout, the whole story.
+> *(Source: [`docs/index.html`](docs/index.html))*
+
 🇩🇪 [Deutsche Version](README_DE.md)
 
-Transforms any bed heater into a self-learning sleep AI. Biorhythm-based temperature curve, bedtime prediction, solar energy as thermal battery, presence detection and auto-calibration. Works with waterbeds, heating pads and heated mattress toppers.
+Transforms any bed heater into a self-learning sleep system. Biorhythm-based temperature curve, bedtime prediction, solar energy as thermal battery, presence detection and auto-calibration. Works with waterbeds, heating pads and heated mattress toppers.
 
 ---
 
@@ -234,4 +238,4 @@ MIT License — see [LICENSE](LICENSE)
 
 ---
 
-*Built with real sensor data from a 2×2m dual-core waterbed. Calibrated on 126,771 data points.*
+*Built for people who want to sleep through the night — and wake up, not jolt up.*
