@@ -4,6 +4,7 @@ import pytest
 import math
 from datetime import datetime, timedelta
 
+import custom_components.rejuvenation_bed.presence_detector as presence_module
 from custom_components.rejuvenation_bed.presence_detector import (
     PresenceDetector,
     PresenceThresholds,
@@ -380,6 +381,124 @@ class TestSlopeBasedDetection:
 
         is_p, conf, reason = long_window_detector.detect_presence(0, water_temp=29.0)
         assert is_p is True, f"Rise→Stable muss ON triggern! reason={reason}"
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# v11.1: STALE-COOLDOWN-RELEASE (echter Tag-Schlaf-Datensatz mit Heizungs-Historie)
+# ═══════════════════════════════════════════════════════════════════════════════
+# Befund aus history2.csv (Nutzer lag 06:00–14:00 CEST, Heizung die ganze Zeit aus):
+# Das warme, leere Bett kühlt nach dem Aufstehen mit ~0.06–0.16 °C/h aus. Sein
+# σ60-Rauschen (~0.045–0.05) hat in v11 den Chaos-Lock stundenlang aufgefrischt,
+# sodass der Sensor ~12 h fälschlich auf „belegt" hing. v11.1 bricht den Lock,
+# wenn die Heizung AUS ist, das Bett anhaltend auskühlt und seit
+# cooldown_release_minutes kein echter Bewegungs-Burst mehr kam.
+
+
+class _Clock:
+    """Steuerbare datetime.now() für zeitbasierte Detector-Tests."""
+
+    def __init__(self, monkeypatch, start: datetime):
+        self._now = start
+        outer = self
+
+        class _FakeDateTime(datetime):
+            @classmethod
+            def now(cls, tz=None):
+                return outer._now
+
+        monkeypatch.setattr(presence_module, "datetime", _FakeDateTime)
+
+    def advance(self, **kw):
+        self._now += timedelta(**kw)
+
+    @property
+    def now(self):
+        return self._now
+
+
+class TestStaleCooldownRelease:
+    @pytest.fixture
+    def thresholds(self):
+        # Schnelle Hysterese + kurzes Release-Fenster, damit der Test handlich bleibt.
+        return PresenceThresholds(
+            history_window_minutes=10,
+            min_samples=5,
+            presence_enter_minutes=0,
+            presence_leave_minutes=0,
+            chaos_lock_minutes=25,
+            cooldown_release_minutes=30,
+        )
+
+    def test_empty_warm_bed_releases_after_cooldown(self, monkeypatch, thresholds):
+        """Burst → ON, danach langes heizungs-aus Auskühlen ohne Burst → OFF.
+
+        DAS ist der v11.1-Kern-Fix: der 12-h-Hänger aus history2.csv.
+        """
+        clock = _Clock(monkeypatch, datetime(2026, 5, 28, 8, 0, 0))
+        det = PresenceDetector(thresholds=thresholds)
+
+        # Phase 1 (10 min): Bewegungs-Burst → ON
+        for i in range(10):
+            temp = 29.0 + 0.3 * math.sin(i * 1.3) + 0.15 * math.cos(i * 2.7)
+            det.detect_presence(zone_index=0, water_temp=temp, heater_active=False)
+            clock.advance(minutes=1)
+        assert det._is_present[0] is True, "Burst muss ON auslösen"
+
+        # Phase 2 (45 min): Heizung AUS, sanftes Auskühlen (-0.07 °C/h), kein Burst.
+        # slope liegt zwischen slope_cooldown_release (-0.05) und
+        # slope_cooling_threshold (-0.10) — es greift NUR der Stale-Cooldown.
+        result = True
+        for i in range(45):
+            temp = 29.0 - 0.07 * (i / 60.0)
+            is_present, _, reason = det.detect_presence(zone_index=0, water_temp=temp, heater_active=False)
+            result = is_present
+            clock.advance(minutes=1)
+
+        assert result is False, f"Leeres, auskühlendes Bett muss OFF werden! reason={reason}"
+        assert "stale-cooldown" in reason
+        assert det._empty_confirmed[0] is True
+
+    def test_confirmed_empty_not_revived_by_heater_pulse(self, monkeypatch, thresholds):
+        """Sobald „leer" bestätigt ist, darf ein Heiz-Burst (σ60-Refresh) den
+        Chaos-Lock NICHT wiederbeleben — das war der Nachmittags-Blip."""
+        clock = _Clock(monkeypatch, datetime(2026, 5, 28, 8, 0, 0))
+        det = PresenceDetector(thresholds=thresholds)
+
+        # Flaches Bett einlesen (slope ≈ 0, kein Trigger), Zustand: leer bestätigt.
+        for i in range(10):
+            det.detect_presence(zone_index=0, water_temp=29.0, heater_active=False)
+            clock.advance(minutes=1)
+        det._empty_confirmed[0] = True
+        det._is_present[0] = False
+
+        # Heizung an + frischer Lock-Zeitstempel (wie ein σ60-Refresh ihn setzt).
+        det._last_chaos_time[0] = clock.now
+        is_present, _, reason = det.detect_presence(zone_index=0, water_temp=29.0, heater_active=True)
+        assert is_present is False, f"Bestätigt leeres Bett darf nicht wiederbelebt werden! reason={reason}"
+
+        # Gegenprobe: ohne die Leer-Bestätigung hält derselbe Lock das Bett ON.
+        det._empty_confirmed[0] = False
+        det._last_chaos_time[0] = clock.now
+        is_present, _, _ = det.detect_presence(zone_index=0, water_temp=29.0, heater_active=True)
+        assert is_present is True, "Ohne Leer-Bestätigung muss der Chaos-Lock ON halten"
+
+    def test_genuine_reentry_burst_clears_empty(self, monkeypatch, thresholds):
+        """Ein echter Bewegungs-Burst nach bestätigter Leere → wieder ON."""
+        clock = _Clock(monkeypatch, datetime(2026, 5, 28, 14, 0, 0))
+        det = PresenceDetector(thresholds=thresholds)
+        for i in range(10):
+            det.detect_presence(zone_index=0, water_temp=29.0, heater_active=False)
+            clock.advance(minutes=1)
+        det._empty_confirmed[0] = True
+        det._is_present[0] = False
+
+        # Wiedereinstieg: chaotische Wellen → Burst → ON, Leere gelöscht.
+        for i in range(8):
+            temp = 29.0 + 0.3 * math.sin(i * 1.3) + 0.15 * math.cos(i * 2.7)
+            is_present, _, reason = det.detect_presence(zone_index=0, water_temp=temp, heater_active=False)
+            clock.advance(minutes=1)
+        assert det._empty_confirmed[0] is False
+        assert is_present is True, f"Wiedereinstieg muss erkannt werden! reason={reason}"
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
