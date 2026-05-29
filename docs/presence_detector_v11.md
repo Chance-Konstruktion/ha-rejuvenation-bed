@@ -55,9 +55,10 @@ bleiben bit-identisch. Externe Aufrufer in `coordinator.py`,
 ```
 1) presence_sensor_state ist gesetzt          → übersteuert alles (unverändert)
 2) is_heating_pad                             → Heizmatten-Pfad (unverändert)
-3) σ_d_long > chaos_refresh_threshold         → Chaos-Lock auffrischen
-4) σ_d > chaos_threshold                      → CHAOS = present, Lock auffrischen
-5) Chaos-Lock noch aktiv (<25 min)            → halte present
+   [v11.1] heater off + slope < -0.05 + stale → STALE-COOLDOWN: not present (bricht Lock)
+3) σ_d_long > chaos_refresh_threshold         → Chaos-Lock auffrischen (NICHT wenn _empty_confirmed)
+4) σ_d > chaos_threshold (0.055)              → CHAOS = present, Lock auffrischen
+5) Chaos-Lock noch aktiv (<25 min)            → halte present (NICHT wenn _empty_confirmed)
 6) slope is None                              → halte alten Status
 
 7) heater_active == True:
@@ -134,10 +135,76 @@ detector = PresenceDetector(
 )
 ```
 
+## v11.1 — Stale-Cooldown-Release
+
+> Status: **aktiv**. Behebt einen ~12-Stunden-Hänger, der erst mit echter
+> Heizungs-Historie sichtbar wurde.
+
+### Problem in v11
+
+Validierungs-Datensatz: ein **Tag-Schlaf** (Nutzer lag 06:00–14:00 CEST) mit
+Wassertemperatur **und** Heizungs-Switch (`switch.plug_fibaro_1`). Die Heizung
+war die **gesamte** Belegzeit aus — das Bett hielt sich allein über Körperwärme
++ thermische Masse warm.
+
+Beobachtung nach dem Aufstehen (14:00 CEST):
+
+1. **Auskühlung flacher als die Schwelle.** Das warme, leere Bett verliert nur
+   ~0.06–0.16 °C/h — `slope_cooling_threshold` (−0.10) wird nur kurz touchiert,
+   meist nicht erreicht. Die „leer kühlt aus"-Regel feuert also nicht zuverlässig.
+2. **σ60-Rauschen ≈ Refresh-Schwelle.** Das leere Bett erzeugt über 60 min ein
+   detrendetes σ von ~0.045–0.05 — exakt auf `chaos_refresh_threshold` (0.045).
+   Der Chaos-Lock frischt sich dadurch alle paar Minuten selbst auf und hält ON.
+3. **Folge:** die heizungs-bewusste Slope-Logik wird vom Lock kurzgeschlossen,
+   bevor sie überhaupt ausgewertet wird → Sensor blieb ~12 h fälschlich „belegt".
+
+Wichtig: `heat_ratio` trennt hier **nicht** belegt/leer — der Heizungs-Duty war
+in **beiden** Phasen 0 %. Der saubere Trenner ist die Kombination *Heizung aus +
+anhaltende Auskühlung + keine echten Bewegungs-Bursts*.
+
+### Was v11.1 ändert
+
+| Konstante | v11 | v11.1 | Begründung |
+|---|---|---|---|
+| `chaos_threshold` | 0.05 | **0.055** | über dem Leer-σ-Floor dieses Setups (Spitzen ~0.051) |
+| `slope_cooldown_release` | — | **−0.05** | NEU: sanfte, *anhaltende* Auskühlung = leer |
+| `cooldown_release_minutes` | — | **90** | NEU: so lange kein echter Burst ⇒ Person ist raus |
+
+Neue Logik (greift **vor** dem Chaos-Lock):
+
+```
+0) Heizung AUS  UND  slope < slope_cooldown_release (−0.05)
+   UND  seit cooldown_release_minutes kein echter Burst (σ_d > chaos_threshold)
+   → STALE-COOLDOWN: not present, bricht den Lock, setzt _empty_confirmed
+```
+
+- **`_empty_confirmed`**: einmal als leer bestätigt, ignoriert der Detector den
+  σ60-Refresh **und** den Lock-Hold, bis ECHTE Wiedereinstiegs-Evidenz kommt
+  (Bewegungs-Burst, Körperwärme-Anstieg oder rise→stable). Verhindert, dass ein
+  kurzer Heiz-Burst das leere Bett wieder „aufweckt" (Nachmittags-Blip).
+- **`_last_burst_time`**: echte Bursts werden getrennt vom σ60-Lock-Refresh
+  getrackt — nur sie setzen den Stale-Timer zurück.
+
+### Validierung
+
+Replay des echten Detectors gegen beide Nacht-Datensätze (mit Heizungs-Forward-Fill):
+
+| | Tag-Schlaf (history2) | `pres.csv` |
+|---|---|---|
+| ON (Einstieg) | 05:29 CEST — deckt sich mit dem realen Sensor (`03:29:06 UTC`) | 05:14 CEST |
+| OFF (Ausstieg) | **13:52 CEST** (≈ Ground-Truth 14:00) statt *nie* | 20:05 CEST (abends, keine Spurious-Flips) |
+| Flips gesamt | 2 (statt 1 + 12 h Hänger) | 2 (unverändert sauber) |
+
+Die 39 Presence-Unit-Tests bleiben grün; drei neue Regressions-Tests
+(`TestStaleCooldownRelease`) sichern Release, Blip-Schutz und Wiedereinstieg ab.
+
 ## Migrations-Hinweise
 
 - **Keine Breaking Changes** in der Public-API. `detect_presence()` und
   `get_diagnostics()` haben dieselbe Signatur und Felder wie v10.
+- **v11.1:** `chaos_threshold` ist jetzt 0.055; neu sind `slope_cooldown_release`
+  und `cooldown_release_minutes`. Wer `PresenceThresholds` per Custom-Init
+  überschreibt, erbt die neuen Defaults automatisch.
 - **Tuning-Werte** in `PresenceThresholds` haben neue Defaults. Wer das per
   Custom-Init überschrieben hatte, sollte einmal kurz prüfen ob die alten
   Werte (`chaos_threshold = 0.10`) immer noch gewollt sind — die alten

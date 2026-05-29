@@ -4,6 +4,26 @@ Alle Änderungen am Rejuvenation Bed Projekt.
 
 ## [Unreleased]
 
+### Bugfixes
+- **Präsenz v11.1 — Stale-Cooldown-Release (Sensor hing ~12 h auf "belegt").**
+  An einem echten Tag-Schlaf-Datensatz (Nutzer lag 06:00–14:00 CEST, jetzt
+  inkl. Heizungs-Switch-Historie) blieb `binary_sensor.…_bett_prasenz` nach
+  dem Aufstehen ~12 h fälschlich ON. Ursache: das warme, leere Bett kühlt nur
+  mit ~0.06–0.16 °C/h aus (flacher als `slope_cooling_threshold` = −0.10) und
+  sein σ60-Rauschen (~0.045–0.05) lag genau auf `chaos_refresh_threshold` —
+  der Chaos-Lock frischte sich endlos selbst auf und schloss die heizungs-
+  bewusste Slope-Logik kurz. `heat_ratio` trennt hier nicht (Heizung war in
+  beiden Phasen aus). Fix:
+  - `chaos_threshold` 0.05 → **0.055** (über dem Leer-σ-Floor dieses Setups).
+  - NEU `slope_cooldown_release` (−0.05 °C/h) + `cooldown_release_minutes` (90):
+    Heizung aus + anhaltende Auskühlung + seit N min kein echter Bewegungs-Burst
+    ⇒ Bett leer, der Chaos-Lock wird gebrochen.
+  - NEU `_empty_confirmed`: ein bestätigt leeres Bett wird nicht durch
+    σ60-Rauschen oder einen kurzen Heiz-Burst wiederbelebt — nur ein echter
+    Burst, Körperwärme-Anstieg oder rise→stable setzt es zurück.
+  Replay-validiert: Ausstieg jetzt 13:52 CEST (≈ Ground-Truth 14:00) statt nie;
+  `pres.csv` bleibt unverändert sauber. Drei neue Regressions-Tests.
+
 ### Features
 - **PV-Prioritäts-Kaskade für Solar-Boost** — Der Bett-Boost ist die
   langsamste Senke im Haushalt (große thermische Masse, ~0.3 °C/h). Bisher
