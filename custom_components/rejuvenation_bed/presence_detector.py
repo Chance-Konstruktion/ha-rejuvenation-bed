@@ -3,6 +3,27 @@ Presence-Detector v11 für das Rejuvenation Bed — Wasser-Only, heizungs-bewuss
 
 Siehe ``docs/presence_detector_v11.md`` für die ausführliche Begründung.
 
+v11.1 — Stale-Cooldown-Release (gegen den "12 h hängen geblieben"-Fehler):
+  Validiert an einem echten Tag-Schlaf-Datensatz MIT Heizungs-Historie
+  (Nutzer lag 06:00–14:00 CEST, Heizung die ganze Zeit aus). Befund: nach
+  dem Aufstehen kühlt das warme, leere Bett nur mit ~0.06–0.16 °C/h aus —
+  flacher als ``slope_cooling_threshold`` (−0.10) — und sein σ60-Rauschen
+  (~0.045–0.05) lag genau auf ``chaos_refresh_threshold``. Dadurch hat der
+  Chaos-Lock sich stundenlang selbst aufgefrischt und die heizungs-bewusste
+  Slope-Logik nie zum Zug kommen lassen → Sensor blieb ~12 h fälschlich ON.
+  Fixe:
+    1) ``chaos_threshold`` 0.05 → 0.055 (über dem Leer-σ-Floor dieses Setups;
+       eliminiert vereinzelte Falsch-Bursts auf dem leeren warmen Bett).
+    2) NEU ``slope_cooldown_release`` (−0.05 °C/h) + ``cooldown_release_minutes``
+       (90): Heizung AUS + anhaltende Auskühlung + seit N Minuten kein ECHTER
+       Bewegungs-Burst ⇒ Bett ist leer, der Chaos-Lock wird gebrochen.
+    3) NEU ``_empty_confirmed``-Flag: ist das Bett einmal als leer bestätigt,
+       darf der σ60-Refresh (oder ein kurzer Heiz-Burst) den Lock NICHT
+       wiederbeleben. Nur ECHTE Wiedereinstiegs-Evidenz (Bewegungs-Burst,
+       Körperwärme-Anstieg, rise→stable) setzt das Flag zurück.
+  Echte Bewegungs-Bursts (σ_d kurz > chaos_threshold) werden separat in
+  ``_last_burst_time`` getrackt — der σ60-Lock-Refresh zählt NICHT als Burst.
+
 Warum v11?
   v10 (CSV-validiert auf einem einzelnen Nacht-Datensatz) hat bei aktivem
   Solar-Boost regelmäßig „Person im Bett" gemeldet, während das Bett leer
@@ -41,7 +62,8 @@ Replay gegen ``pres.csv`` (echte Nacht 2026-04-28/29):
   ground-truth liegt deutlich höher.
 
 ENTSCHEIDUNGS-LOGIK (Priorität von oben nach unten):
-  • σ_d kurz > 0.05 °C                → CHAOS = Person + Lock 25 min ON
+  • Heizung aus + Auskühlung + stale  → STALE-COOLDOWN = leer (bricht Lock) [v11.1]
+  • σ_d kurz > 0.055 °C               → CHAOS = Person + Lock 25 min ON
   • Chaos-Lock noch aktiv             → halte ON (slope nach Burst verzerrt)
   • slope > +0.20 °C/h                → leeres Bett heizt auf → OFF
   • slope < -0.10 °C/h                → Person raus, kühlt aus → OFF
@@ -133,7 +155,12 @@ class PresenceThresholds:
     # heizungs-bewusst. Der DS18B20-Sensor produziert auch bei leerem Bett ein
     # σ ≈ 0.031 °C aus reiner Quantisierung (12-bit, 0.0625 °C/LSB) — die alten
     # Schwellen 0.10 / 0.06 lagen bereits im Rauschbereich nach kurzen Fenstern.
-    chaos_threshold: float = 0.05  # σ_d > X (kurz) → Bewegung im Wasser
+    # v11.1: chaos_threshold auf 0.055 angehoben. Auf einem warmen, leeren Bett
+    # (Heizung aus, Raum warm) erreicht σ_d kurzfristig bis ~0.051 °C aus reiner
+    # Quantisierung + Konvektion — knapp über den alten 0.05. Das löste vereinzelt
+    # falsche Bursts aus, die das leere Bett wieder ON verriegelten. 0.055 liegt
+    # über diesem Leer-Floor; echte Bewegung im Wasser bleibt klar darüber.
+    chaos_threshold: float = 0.055  # σ_d > X (kurz) → Bewegung im Wasser
     chaos_lock_minutes: int = 25  # Nach Chaos: ON-Lock für N Minuten
     chaos_refresh_threshold: float = 0.045  # σ_d_60 > X frischt Lock auf
     slope_body_warming: float = 0.25  # °C/h darüber OHNE Heizung → Körperwärme
@@ -141,6 +168,18 @@ class PresenceThresholds:
     slope_cooling_threshold: float = -0.10  # °C/h darunter OHNE Heizung → leer
     slope_stable_band: float = 0.08  # |slope| < X → stabile Phase
     slope_rise_threshold: float = 0.20  # prev_slope > X UND jetzt stabil = Einstieg
+
+    # v11.1: Stale-Cooldown-Release — bricht den Chaos-Lock bei leerem Bett.
+    # Ein warmes, leeres Bett kühlt mit ~0.06-0.16 °C/h aus; sein σ60-Rauschen
+    # (~0.045-0.05) hielt den σ60-Lock in v11 stundenlang am Leben, sodass die
+    # heizungs-bewusste Slope-Logik nie zum Zug kam (Bett blieb ~12 h fälschlich
+    # ON, validiert an einem Tag-Schlaf-Datensatz mit echter Heizungs-Historie).
+    # Ein anwesender Schläfer erzeugt dagegen immer wieder echte Bewegungs-Bursts
+    # (σ_d > chaos_threshold) und gibt Körperwärme ab. Bedingung für „leer":
+    # Heizung AUS + anhaltende Auskühlung + seit cooldown_release_minutes kein
+    # echter Burst mehr.
+    slope_cooldown_release: float = -0.05  # °C/h: sanfte, anhaltende Auskühlung
+    cooldown_release_minutes: int = 90  # ohne echten Burst → Ausstieg (bricht Lock)
 
     # heat_ratio: nur Diagnose, KEIN Trigger (v9 deaktivierte das Bett zu früh)
     heat_ratio_window_minutes: int = 60  # Fenster für Heizverhältnis-Beobachtung
@@ -175,6 +214,18 @@ class PresenceDetector:
         # v8: Chaos-Lock (Zeitpunkt der letzten erkannten Aktivität)
         # Solange aktiv → Sensor bleibt ON, slope-basierte Logik wird ignoriert
         self._last_chaos_time: dict[int, Optional[datetime]] = {}
+
+        # v11.1: Zeitpunkt des letzten ECHTEN Bewegungs-Bursts (σ_d > chaos).
+        # Getrennt vom σ60-Lock-Refresh, der auch auf dem Rauschen eines warmen
+        # leeren Betts feuert. Grundlage für den Stale-Cooldown-Release.
+        self._last_burst_time: dict[int, Optional[datetime]] = {}
+
+        # v11.1: „Bett ist sicher leer" — gesetzt vom Stale-Cooldown-Release.
+        # Solange aktiv, darf der σ60-Refresh den Chaos-Lock NICHT neu aufbauen
+        # (sonst weckt ein kurzer Heiz-Burst das leere Bett wieder auf). Wird
+        # nur durch ECHTE Wiedereinstiegs-Evidenz gelöscht: Bewegungs-Burst,
+        # Körperwärme-Anstieg oder rise→stable.
+        self._empty_confirmed: dict[int, bool] = {}
 
         # Diagnostics
         self._last_water_variance: dict[int, float] = {}
@@ -574,19 +625,58 @@ class PresenceDetector:
         if heat_ratio is not None:
             reasons.append(f"heat%={heat_ratio:.0%}")
 
+        # ─── Echte Bewegungs-Bursts getrennt mitschreiben ─────────────────
+        # Nur σ_d (kurz) über chaos_threshold zählt als echter Burst. Der
+        # σ60-Refresh weiter unten feuert auch auf Leer-Rauschen — er darf
+        # den Stale-Timer NICHT zurücksetzen.
+        if detrended_std > t.chaos_threshold:
+            self._last_burst_time[zone_index] = now
+
+        # ─── 0) Stale heizungs-aus Cooldown ⇒ Bett ist leer ──────────────
+        # Bricht den Chaos-Lock: Heizung AUS + anhaltende Auskühlung + seit
+        # cooldown_release_minutes kein echter Burst → die Person ist raus.
+        # Ein anwesender Schläfer gibt Körperwärme ab (Trend flach/steigend)
+        # und erzeugt wiederkehrende Bursts; ein warmes leeres Bett kühlt
+        # stetig aus, während sein σ60-Rauschen den Lock sonst ON hielte.
+        #
+        # "Stale" wird relativ zum letzten echten Burst gemessen — gab es noch
+        # nie einen, relativ zum Beobachtungsbeginn (ältester Puffer-Sample).
+        # So löst ein 30-min-Kaltstart NICHT sofort aus, sondern erst nach
+        # cooldown_release_minutes tatsächlicher Beobachtung.
+        last_burst = self._last_burst_time.get(zone_index)
+        buffer = self._water_temps.get(zone_index)
+        stale_since = last_burst if last_burst is not None else (buffer[0][0] if buffer else now)
+        quiet_min = (now - stale_since).total_seconds() / 60
+        if (
+            not heater_active
+            and slope is not None
+            and slope < t.slope_cooldown_release
+            and quiet_min >= t.cooldown_release_minutes
+        ):
+            self._empty_confirmed[zone_index] = True
+            tag = "seit-start" if last_burst is None else "letzter-burst"
+            reasons.append(f"→stale-cooldown(empty, {tag}={quiet_min:.0f}min)")
+            return False, 0.10, reasons
+
+        empty_confirmed = self._empty_confirmed.get(zone_index, False)
+
         # ─── Chaos-Lock auffrischen wenn längeres Fenster aktiv aussieht ──
-        if detrended_std_long > t.chaos_refresh_threshold:
+        # NICHT solange das Bett als leer bestätigt ist — sonst baut das
+        # σ60-Rauschen (oder ein kurzer Heiz-Burst) den Lock sofort wieder auf.
+        if detrended_std_long > t.chaos_refresh_threshold and not empty_confirmed:
             self._last_chaos_time[zone_index] = now
 
-        # ─── 1) Chaos-Burst: sofort ON ────────────────────────────────────
+        # ─── 1) Chaos-Burst: sofort ON (echter Wiedereinstieg) ────────────
         if detrended_std > t.chaos_threshold:
             self._last_chaos_time[zone_index] = now
+            self._empty_confirmed[zone_index] = False
             reasons.append("→chaos")
             return True, 0.95, reasons
 
         # ─── 2) Chaos-Lock aktiv: ON halten ──────────────────────────────
+        # Ein bestätigt leeres Bett wird NICHT vom Lock wiederbelebt.
         last_chaos = self._last_chaos_time.get(zone_index)
-        if last_chaos is not None:
+        if last_chaos is not None and not empty_confirmed:
             elapsed_min = (now - last_chaos).total_seconds() / 60
             if elapsed_min < t.chaos_lock_minutes:
                 reasons.append(f"→lock({elapsed_min:.0f}/{t.chaos_lock_minutes}min)")
@@ -611,6 +701,7 @@ class PresenceDetector:
             ):
                 reasons.append(f"→rise→stable(prev={prev_slope:+.2f})")
                 self._last_chaos_time[zone_index] = now
+                self._empty_confirmed[zone_index] = False
                 return True, 0.80, reasons
         else:
             # Heizung aus: Physik gibt sauberes Signal.
@@ -618,6 +709,7 @@ class PresenceDetector:
             if slope > t.slope_body_warming:
                 reasons.append("→Körperwärme")
                 self._last_chaos_time[zone_index] = now
+                self._empty_confirmed[zone_index] = False
                 return True, 0.90, reasons
             # Fall ohne Heizung = leer kühlt aus.
             if slope < t.slope_cooling_threshold:
@@ -630,6 +722,7 @@ class PresenceDetector:
                 and prev_slope > t.slope_rise_threshold
             ):
                 reasons.append(f"→rise→stable(prev={prev_slope:+.2f})")
+                self._empty_confirmed[zone_index] = False
                 self._last_chaos_time[zone_index] = now
                 return True, 0.80, reasons
 
