@@ -76,6 +76,7 @@ class RejuvenationBedOptionsFlow(config_entries.OptionsFlow):
             menu_options={
                 "global_times": "🌡️ Temperatur & Bett",
                 "global_sensors": "📊 Sensoren & Strompreis",
+                "init": "⬅️ Zurück",
             },
         )
 
