@@ -131,6 +131,10 @@ BOOST_MAX_TEMP = 34.0  # Absolute Obergrenze Boost (Hardware-Thermostat = Backup
 #   3. PV-Forecast:     Rest-Tag-Prognose >= Schwelle (optional)
 # Nur konfigurierte Sensoren zählen; fehlende Sensoren blockieren NICHT.
 # Solar-only Setups verhalten sich also exakt wie früher.
+#
+# Optional: Akku-Vorrang (option "battery_priority", Default AUS). AN gatet
+# die Solar-Schwelle hinter SoC/Forecast (UND) — klassisches Gating, gibt
+# Akku/Boiler Vorrang auf den PV-Überschuss.
 
 DEFAULT_BED_BOOST_SOC_THRESHOLD = 90.0   # %SoC ab dem der SoC-Trigger auslöst
 DEFAULT_BED_BOOST_MIN_FORECAST_KWH = 3.0  # kWh Rest-Tag ab denen Forecast auslöst

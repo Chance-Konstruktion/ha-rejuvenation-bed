@@ -15,7 +15,7 @@ Wichtig: Energie-Logik wirkt ADDITIV, nie destruktiv!
 
 import logging
 from enum import Enum
-from typing import Optional, Tuple
+from typing import Optional
 
 from homeassistant.core import HomeAssistant
 
@@ -84,6 +84,7 @@ class EnergyStateResolver:
         # Solar-Boost-Trigger: welche unabhängigen Auslöser gerade greifen
         # (für UI/Diagnose) und ein menschenlesbarer Grund.
         self._boost_reason = ""
+        self._boost_waiting = False
         self._active_triggers = {"solar": None, "soc": None, "forecast": None}
 
         # Referenz zum Coordinator (wird gesetzt nach init)
@@ -157,6 +158,24 @@ class EnergyStateResolver:
         )
         return float(val)
 
+    @property
+    def battery_priority(self) -> bool:
+        """
+        Akku-Vorrang (optional, Default AUS).
+
+        AUS: Solar-Schwelle, Akku-SoC und Forecast sind unabhängige
+             ODER-Trigger — jeder löst Boost allein aus.
+        AN:  Akku/Boiler haben Vorrang. Die Solar-Schwelle löst nur dann
+             aus, wenn zusätzlich der Akku (fast) voll ODER die Forecast
+             üppig ist. Ohne Akku-/Forecast-Sensor bleibt es beim
+             klassischen Solar-only-Verhalten.
+        """
+        val = self.config_entry.options.get(
+            "battery_priority",
+            self.global_config.get("battery_priority", False),
+        )
+        return bool(val)
+
     def resolve(self) -> dict:
         """
         Hauptfunktion: Ermittelt den aktuellen Energie-Zustand.
@@ -201,7 +220,9 @@ class EnergyStateResolver:
             "reason": reason,
             "boost_available": mode == EnergyMode.SOLAR_BOOST,
             "boost_reason": self._boost_reason,
+            "boost_waiting": self._boost_waiting,
             "active_triggers": dict(self._active_triggers),
+            "battery_priority": self.battery_priority,
             "battery_soc": self._read_battery_soc(),
             "forecast_remaining_kwh": self._read_forecast_remaining_kwh(),
         }
@@ -338,55 +359,52 @@ class EnergyStateResolver:
             )
             return None
 
-    def _evaluate_boost_triggers(self, solar_power: float) -> Tuple[bool, str]:
+    def _evaluate_boost_triggers(self, solar_power: float) -> dict:
         """
-        Wertet die unabhängigen Solar-Boost-Trigger aus (ODER-Logik).
+        Wertet die einzelnen Solar-Boost-Trigger aus.
 
-        Jeder Trigger arbeitet EIGENSTÄNDIG — ein einziger erfüllter
-        Auslöser genügt für den Boost, und jeder funktioniert auch ohne
-        die anderen:
+        Drei Auslöser, jeder mit eigener Hysterese (referenziert
+        ``self._current_mode``, damit nichts flattert):
 
         - Solar-Schwelle: aktuelle PV-Leistung ≥ Schwelle (klassisch).
-        - Akku-SoC:       Hausakku-SoC ≥ Schwelle (Akku ohnehin voll →
-                          Überschuss fürs Bett nutzen).
+        - Akku-SoC:       Hausakku-SoC ≥ Schwelle.
         - PV-Forecast:    Rest-Tag-Prognose ≥ Schwelle (optional).
 
         Ein Trigger zählt nur, wenn sein Sensor konfiguriert UND lesbar
-        ist. Nicht konfigurierte Sensoren blockieren NICHT (sie lösen
-        auch nicht aus). So funktioniert SoC unabhängig von der
-        Solar-Schwelle — und beide zusammen, wenn beide gesetzt sind.
+        ist; sonst ist sein Status ``None`` (nicht vorhanden).
 
-        Jeder Trigger hat eine eigene Hysterese (referenziert
-        ``self._current_mode``), damit nichts flattert.
+        Die Verknüpfung (ODER bzw. Akku-Vorrang-Gating) übernimmt
+        ``_determine_mode``.
 
         Returns:
-            (any_active, reason) — reason ist menschenlesbar für UI/Logs
-            und listet die gerade aktiven Auslöser auf.
+            Dict ``{trigger: (active|None, label|None)}`` für solar,
+            soc, forecast. ``active`` ist True/False, ``None`` bei
+            fehlendem/unlesbarem Sensor; ``label`` ist menschenlesbar.
         """
         already_boost = self._current_mode == EnergyMode.SOLAR_BOOST
-        detail = {"solar": None, "soc": None, "forecast": None}
-        active_parts = []
+        triggers = {
+            "solar": (None, None),
+            "soc": (None, None),
+            "forecast": (None, None),
+        }
 
         # ── Trigger 1: Solar-Schwelle ───────────────────────────────────
         if self.solar_sensor:
             threshold = (
                 self.solar_boost_off_w if already_boost else self.solar_boost_on_w
             )
-            active = solar_power >= threshold
-            detail["solar"] = active
-            if active:
-                active_parts.append(f"{solar_power:.0f}W Überschuss")
+            triggers["solar"] = (
+                solar_power >= threshold,
+                f"{solar_power:.0f}W Überschuss",
+            )
 
-        # ── Trigger 2: Akku-SoC (unabhängig von der Solar-Schwelle) ─────
+        # ── Trigger 2: Akku-SoC ─────────────────────────────────────────
         soc = self._read_battery_soc()
         if self.battery_soc_sensor and soc is not None:
             threshold = self.bed_boost_soc_threshold
             if already_boost:
                 threshold -= BED_BOOST_SOC_HYSTERESIS
-            active = soc >= threshold
-            detail["soc"] = active
-            if active:
-                active_parts.append(f"Akku {soc:.0f}%")
+            triggers["soc"] = (soc >= threshold, f"Akku {soc:.0f}%")
 
         # ── Trigger 3: PV-Forecast (optional) ───────────────────────────
         forecast = self._read_forecast_remaining_kwh()
@@ -394,16 +412,70 @@ class EnergyStateResolver:
             threshold = self.bed_boost_min_forecast_kwh
             if already_boost:
                 threshold -= BED_BOOST_FORECAST_HYSTERESIS_KWH
-            active = forecast >= threshold
-            detail["forecast"] = active
-            if active:
-                active_parts.append(f"Forecast {forecast:.1f} kWh")
+            triggers["forecast"] = (
+                forecast >= threshold,
+                f"Forecast {forecast:.1f} kWh",
+            )
 
-        self._active_triggers = detail
-        any_active = bool(active_parts)
-        reason = " · ".join(active_parts)
-        self._boost_reason = reason
-        return any_active, reason
+        return triggers
+
+    def _evaluate_solar_boost(self, solar_power: float) -> bool:
+        """
+        Verknüpft die Trigger zur Solar-Boost-Entscheidung.
+
+        - Akku-Vorrang AUS (Default): ODER — ein Trigger genügt.
+        - Akku-Vorrang AN: Die Solar-Schwelle löst nur aus, wenn der
+          Akku/Forecast den Boost freigibt (UND). Ist kein Akku-/
+          Forecast-Sensor konfiguriert, greift das Gate nicht und es
+          bleibt beim klassischen Solar-only-Verhalten.
+
+        Setzt ``self._active_triggers``, ``self._boost_reason`` und
+        ``self._boost_waiting`` als Nebeneffekt (für UI/Diagnose).
+        """
+        triggers = self._evaluate_boost_triggers(solar_power)
+        self._active_triggers = {k: v[0] for k, v in triggers.items()}
+        self._boost_waiting = False
+
+        solar_active = triggers["solar"][0] is True
+        soc_active = triggers["soc"][0] is True
+        forecast_active = triggers["forecast"][0] is True
+
+        reserve_active = soc_active or forecast_active
+        reserve_configured = (
+            triggers["soc"][0] is not None or triggers["forecast"][0] is not None
+        )
+
+        if self.battery_priority and reserve_configured:
+            boost = solar_active and reserve_active
+        else:
+            boost = solar_active or soc_active or forecast_active
+
+        if boost:
+            parts = [
+                triggers[k][1]
+                for k in ("solar", "soc", "forecast")
+                if triggers[k][0] is True
+            ]
+            self._boost_reason = " · ".join(parts)
+            return True
+
+        # Kein Boost — Grund merken, falls der Akku-Vorrang gerade gatet
+        self._boost_reason = ""
+        if self.battery_priority and reserve_configured and solar_active:
+            self._boost_waiting = True
+            wait_parts = []
+            soc = self._read_battery_soc()
+            if triggers["soc"][0] is not None and soc is not None:
+                wait_parts.append(
+                    f"Akku {soc:.0f}% < {self.bed_boost_soc_threshold:.0f}%"
+                )
+            forecast = self._read_forecast_remaining_kwh()
+            if triggers["forecast"][0] is not None and forecast is not None:
+                wait_parts.append(
+                    f"Forecast {forecast:.1f} < {self.bed_boost_min_forecast_kwh:.1f} kWh"
+                )
+            self._boost_reason = " · ".join(wait_parts)
+        return False
 
     def _determine_mode(
         self,
@@ -427,12 +499,8 @@ class EnergyStateResolver:
         """
         # Solar-Boost nur wenn Switch AN
         if solar_enabled:
-            # Unabhängige Trigger (ODER): Solar-Schwelle, Akku-SoC,
-            # PV-Forecast. Jeder löst eigenständig aus, alle wirken
-            # auch zusammen.
-            boost_active, _ = self._evaluate_boost_triggers(solar_power)
-
-            if boost_active:
+            # Trigger verknüpfen (ODER, oder Akku-Vorrang-Gating).
+            if self._evaluate_solar_boost(solar_power):
                 self._current_mode = EnergyMode.SOLAR_BOOST
                 return EnergyMode.SOLAR_BOOST
 
@@ -441,10 +509,12 @@ class EnergyStateResolver:
             if price <= self.CHEAP_PRICE_THRESHOLD_EUR:
                 self._current_mode = EnergyMode.SOLAR_BOOST
                 self._boost_reason = ""
+                self._boost_waiting = False
                 return EnergyMode.SOLAR_BOOST
         else:
             self._active_triggers = {"solar": None, "soc": None, "forecast": None}
             self._boost_reason = ""
+            self._boost_waiting = False
 
         # Eco-Mode nur wenn Switch AN
         if eco_enabled:
@@ -499,6 +569,9 @@ class EnergyStateResolver:
             return "⚠️ Netz-Notfall: Minimalbetrieb"
 
         else:
+            # Akku-Vorrang gatet gerade den Boost trotz PV-Überschuss
+            if self._boost_waiting and self._boost_reason:
+                return f"⏸ Boost wartet (Akku-Vorrang) — {self._boost_reason}"
             return "✅ Normal-Betrieb"
     
     def get_diagnostics(self) -> dict:
@@ -521,7 +594,9 @@ class EnergyStateResolver:
             "forecast_remaining_kwh": state["forecast_remaining_kwh"],
             "boost_available": state["boost_available"],
             "boost_reason": state["boost_reason"],
+            "boost_waiting": state["boost_waiting"],
             "active_triggers": state["active_triggers"],
+            "battery_priority": state["battery_priority"],
             "thresholds": {
                 "solar_boost_on_w": self.solar_boost_on_w,
                 "solar_boost_off_w": self.solar_boost_off_w,

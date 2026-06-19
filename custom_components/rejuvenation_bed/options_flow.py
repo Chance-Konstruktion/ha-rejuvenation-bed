@@ -247,6 +247,16 @@ class RejuvenationBedOptionsFlow(config_entries.OptionsFlow):
                     )
                 ),
 
+                # ─── Akku-Vorrang (optional) ──────────────────────
+                # AUS (Default): Solar-Schwelle, SoC und Forecast sind
+                # unabhängige ODER-Trigger. AN: Akku/Boiler haben Vorrang,
+                # die Solar-Schwelle löst nur mit (fast) vollem Akku /
+                # üppiger Forecast aus.
+                vol.Optional(
+                    "battery_priority",
+                    default=_val("battery_priority", False)
+                ): selector.BooleanSelector(),
+
                 # ─── CO₂ ──────────────────────────────────────────
                 vol.Optional(
                     "co2_sensor",

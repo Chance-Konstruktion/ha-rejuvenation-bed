@@ -49,6 +49,13 @@ Alle Änderungen am Rejuvenation Bed Projekt.
   Jeder Trigger hat eine eigene Hysterese, damit nichts flattert:
   50 W (Solar), 5 %SoC, 1 kWh Forecast.
 
+  Neu: optionales Häkchen **Akku-Vorrang** (`battery_priority`, Default
+  AUS) in `📊 Sensoren & Strompreis`. AN stellt das klassische Gating
+  wieder her: die Solar-Schwelle löst dann nur aus, wenn der Akku (fast)
+  voll **oder** die Forecast üppig ist — so bekommen Akku/Boiler Vorrang
+  auf den PV-Überschuss. Ohne Akku-/Forecast-Sensor wirkungslos. Im
+  Wartezustand: "⏸ Boost wartet (Akku-Vorrang) — Akku 73% < 90%".
+
   Der Strompreis-Pfad ("günstiger Netzstrom < 15 ct/kWh = Boost") bleibt
   ein weiterer unabhängiger Auslöser (Netzstrom, kein PV-Überschuss).
 
