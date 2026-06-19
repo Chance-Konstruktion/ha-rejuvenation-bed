@@ -190,10 +190,11 @@ The options flow is split into four panes — each one a single page, no nesting
 
 <br>
 
-Split into two cards:
+Split into three cards:
 
 - **Times & Temperature** — warm window, summer threshold, manual offset, bed water volume in litres.
-- **Sensors & Electricity Price** — solar production sensor, dynamic price sensor or fixed tariff (ct/kWh), grid CO₂ intensity.
+- **Sensors & Electricity Price** — dynamic price sensor or fixed tariff (ct/kWh), grid CO₂ intensity.
+- **Solar & Battery** — solar production sensor + threshold, optional home-battery SoC sensor + threshold, optional PV forecast sensor + threshold, and a *home battery priority* toggle. Solar threshold, SoC and forecast act as independent triggers — any one starts Solar Boost; turn on battery priority to make the solar threshold wait for a full battery / generous forecast.
 
 </details>
 

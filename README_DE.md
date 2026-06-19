@@ -73,7 +73,7 @@ Minimum: Ein Smart-Plug der die Heizung schaltet.
 
 Der Setup-Assistent führt durch alle Schritte. Danach sind vier Bereiche über den Options-Flow erreichbar:
 
-**🌐 Globale Einstellungen** – Aufgeteilt in Zeiten & Temperatur (Warmhalte-Fenster, Sommer-Schwelle, Offset, Bett-Volumen) und Sensoren & Strompreis (Solar, Preis-Sensor, Festtarif, CO₂).
+**🌐 Globale Einstellungen** – Aufgeteilt in *Temperatur & Bett* (Warmhalte-Fenster, Sommer-Schwelle, Offset, Bett-Volumen), *Sensoren & Strompreis* (Preis-Sensor, Festtarif, CO₂) und *Solar & Akku* (Solar-Sensor + Schwelle, optionaler Hausakku-SoC + Schwelle, optionale PV-Forecast + Schwelle, Akku-Vorrang-Häkchen). Solar-Schwelle, SoC und Forecast sind unabhängige Trigger – jeder startet Solar-Boost; Akku-Vorrang lässt die Solar-Schwelle auf vollen Akku / üppige Forecast warten.
 
 **📡 Zonen-Sensoren** – Hardware pro Zone: Heizungsschalter (Pflicht), Temperatursensor, Leistungssensor, Präsenzsensor, Feuchtigkeitssensor, Oberflächentemperatur.
 
