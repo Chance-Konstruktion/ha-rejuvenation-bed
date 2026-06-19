@@ -199,12 +199,23 @@
       },
       "global_sensors": {
         "title": "📊 Sensors & Electricity Price",
-        "description": "Electricity price and optional sensors for energy optimization and sleep quality.\n\n**Electricity price** — Your current tariff in ct/kWh. Used for savings calculation and as fallback without a price sensor.\n\n**Price sensor** — Dynamic electricity price from Tibber, Octopus or ENTSO-E. Overrides the fixed tariff and enables Eco mode.\n\n**Solar sensor** — PV power in watts (e.g. Fronius, SMA, Huawei). When surplus exceeds the threshold, Solar Boost uses free energy.\n\n**Solar threshold** — Minimum surplus in watts to activate boost. Set at least as high as the bed's heater power (e.g. 300 W single, 600 W double).\n\n**Battery SoC (optional)** — An independent boost trigger. If you have a home battery, the boost also fires once SoC reaches the threshold (battery full → use the surplus). Works on its own and alongside the solar threshold.\n\n**PV forecast (optional)** — Another independent trigger. If you have a forecast (e.g. Solcast), the boost also fires when the remaining-day forecast is generous. Purely optional — leave it empty and nothing changes.\n\nThe triggers are OR-combined: any one is enough, and only the sensors you configure count.\n\n**Home battery priority (optional)** — Off by default. Turn it on to give the battery/boiler priority: the solar threshold then only fires when the battery is (nearly) full *or* the forecast is generous (the classic gating behaviour).\n\n**CO₂ sensor** — CO₂ in the bedroom for the sleep score (25% weight).",
+        "description": "Electricity price and room sensors. Solar & battery have their own section.\n\n**Electricity price** — Your current tariff in ct/kWh. Used for savings calculation and as fallback without a price sensor.\n\n**Price sensor** — Dynamic electricity price from Tibber, Octopus or ENTSO-E. Overrides the fixed tariff and enables Eco mode.\n\n**CO₂ sensor** — CO₂ in the bedroom for the sleep score (25% weight).",
         "data": {
           "electricity_price": "Electricity price (fixed tariff)",
           "price_sensor": "Dynamic price sensor",
+          "co2_sensor": "CO₂ sensor"
+        },
+        "data_description": {
+          "electricity_price": "Your current electricity tariff. Used for savings calculation and as fallback without a price sensor.",
+          "price_sensor": "Overrides the fixed price with real-time data and enables Eco mode.",
+          "co2_sensor": "CO₂ in the bedroom for the sleep score."
+        }
+      },
+      "global_solar": {
+        "title": "☀️ Solar & Battery",
+        "description": "Solar Boost charges the bed (thermal mass) from PV surplus. Three independent triggers — any one fires the boost, and only the sensors you configure count.\n\n**Solar sensor** — PV power in watts (e.g. Fronius, SMA, Huawei).\n\n**Solar threshold** — Minimum surplus in watts to activate boost. Set at least as high as the bed's heater power (e.g. 300 W single, 600 W double).\n\n**Battery SoC (optional)** — Independent trigger: the boost also fires once SoC reaches the threshold (battery full → use the surplus). Works on its own and alongside the solar threshold.\n\n**PV forecast (optional)** — Another independent trigger: the boost also fires when the remaining-day forecast is generous. Leave empty and nothing changes.\n\n**Home battery priority (optional)** — Off by default. Turn it on to give the battery/boiler priority: the solar threshold then only fires when the battery is (nearly) full *or* the forecast is generous (the classic gating behaviour).",
+        "data": {
           "solar_sensor": "Solar sensor",
-          "co2_sensor": "CO₂ sensor",
           "solar_boost_threshold": "Solar threshold",
           "battery_soc_sensor": "Home battery SoC sensor",
           "bed_boost_soc_threshold": "Battery SoC threshold for bed boost",
@@ -213,10 +224,7 @@
           "battery_priority": "Home battery priority"
         },
         "data_description": {
-          "electricity_price": "Your current electricity tariff. Used for savings calculation and as fallback without a price sensor.",
-          "price_sensor": "Overrides the fixed price with real-time data and enables Eco mode.",
-          "solar_sensor": "PV power in watts. Solar Boost activates above 500 W surplus.",
-          "co2_sensor": "CO₂ in the bedroom for the sleep score.",
+          "solar_sensor": "PV power in watts. Solar Boost activates above the solar threshold.",
           "solar_boost_threshold": "PV surplus in watts needed to activate Solar Boost. For a double bed with 600 W heater, set to 600 W or higher.",
           "battery_soc_sensor": "State of charge of your home battery in percent. Independent trigger: the boost also fires once SoC reaches the threshold — works on its own and alongside the solar threshold.",
           "bed_boost_soc_threshold": "Battery SoC at which the SoC trigger fires the boost. Default 90%. 5% hysteresis (releases below 85%).",

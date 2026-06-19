@@ -234,12 +234,23 @@
       },
       "global_sensors": {
         "title": "📊 Sensoren & Strompreis",
-        "description": "Strompreis und optionale Sensoren für Energieoptimierung und Schlafqualität.\n\n**Strompreis** — Dein aktueller Tarif in ct/kWh. Wird für die Ersparnis-Berechnung und als Fallback verwendet, wenn kein dynamischer Preis-Sensor vorhanden ist.\n\n**Preis-Sensor** — Dynamischer Strompreis von Tibber, aWATTar oder ENTSO-E. Überschreibt den festen Tarif und schaltet den Eco-Modus bei hohem Preis.\n\n**Solar-Sensor** — PV-Leistung in Watt (z.B. Fronius, SMA, Huawei). Bei Überschuss über der eingestellten Schwelle nutzt Solar-Boost den Gratis-Strom.\n\n**Solar-Schwelle** — Ab wie viel Watt Überschuss der Boost startet. Richtwert: mindestens so hoch wie die Heizleistung des Betts (z.B. 300 W für Einzelbett, 600 W für Doppelbett).\n\n**Akku-SoC (optional)** — Ein eigenständiger Boost-Trigger. Mit Hausakku startet der Boost auch, sobald der SoC die Schwelle erreicht (Akku voll → Überschuss nutzen). Funktioniert allein und zusammen mit der Solar-Schwelle.\n\n**PV-Forecast (optional)** — Ein weiterer eigenständiger Trigger. Mit einer Prognose (z.B. Solcast) startet der Boost auch, wenn die Rest-Tags-Prognose üppig genug ist. Rein optional — leer lassen und nichts ändert sich.\n\nDie Trigger sind ODER-verknüpft: einer genügt, und nur die konfigurierten Sensoren zählen.\n\n**Akku-Vorrang (optional)** — Standardmäßig AUS. Einschalten, um Akku/Boiler Vorrang zu geben: die Solar-Schwelle löst dann nur aus, wenn der Akku (fast) voll *oder* die Forecast üppig ist (das klassische Gating-Verhalten).\n\n**CO₂-Sensor** — CO₂ im Schlafzimmer (z.B. Netatmo, SCD40, SCD41). Fließt mit 25% in den Schlaf-Score ein.",
+        "description": "Strompreis und Raum-Sensoren. Solar & Akku haben einen eigenen Bereich.\n\n**Strompreis** — Dein aktueller Tarif in ct/kWh. Wird für die Ersparnis-Berechnung und als Fallback verwendet, wenn kein dynamischer Preis-Sensor vorhanden ist.\n\n**Preis-Sensor** — Dynamischer Strompreis von Tibber, aWATTar oder ENTSO-E. Überschreibt den festen Tarif und schaltet den Eco-Modus bei hohem Preis.\n\n**CO₂-Sensor** — CO₂ im Schlafzimmer (z.B. Netatmo, SCD40, SCD41). Fließt mit 25% in den Schlaf-Score ein.",
         "data": {
           "electricity_price": "Strompreis (Festtarif)",
           "price_sensor": "Dynamischer Preis-Sensor",
+          "co2_sensor": "CO₂-Sensor"
+        },
+        "data_description": {
+          "electricity_price": "Dein aktueller Stromtarif. Wird für die Ersparnis-Berechnung und als Fallback ohne Preis-Sensor verwendet.",
+          "price_sensor": "Überschreibt den Festpreis mit Echtzeit-Daten und schaltet den Eco-Modus.",
+          "co2_sensor": "CO₂ im Schlafzimmer für den Schlaf-Score."
+        }
+      },
+      "global_solar": {
+        "title": "☀️ Solar & Akku",
+        "description": "Solar-Boost lädt das Bett (thermische Masse) aus PV-Überschuss. Drei unabhängige Trigger — einer genügt, und nur die konfigurierten Sensoren zählen.\n\n**Solar-Sensor** — PV-Leistung in Watt (z.B. Fronius, SMA, Huawei).\n\n**Solar-Schwelle** — Ab wie viel Watt Überschuss der Boost startet. Richtwert: mindestens so hoch wie die Heizleistung des Betts (z.B. 300 W für Einzelbett, 600 W für Doppelbett).\n\n**Akku-SoC (optional)** — Eigenständiger Trigger: der Boost startet auch, sobald der SoC die Schwelle erreicht (Akku voll → Überschuss nutzen). Funktioniert allein und zusammen mit der Solar-Schwelle.\n\n**PV-Forecast (optional)** — Ein weiterer eigenständiger Trigger: der Boost startet auch, wenn die Rest-Tags-Prognose üppig genug ist. Leer lassen und nichts ändert sich.\n\n**Akku-Vorrang (optional)** — Standardmäßig AUS. Einschalten, um Akku/Boiler Vorrang zu geben: die Solar-Schwelle löst dann nur aus, wenn der Akku (fast) voll *oder* die Forecast üppig ist (das klassische Gating-Verhalten).",
+        "data": {
           "solar_sensor": "Solar-Sensor",
-          "co2_sensor": "CO₂-Sensor",
           "solar_boost_threshold": "Solar-Schwelle",
           "battery_soc_sensor": "Hausakku-SoC-Sensor",
           "bed_boost_soc_threshold": "Akku-Schwelle für Bett-Boost",
@@ -248,10 +259,7 @@
           "battery_priority": "Akku-Vorrang"
         },
         "data_description": {
-          "electricity_price": "Dein aktueller Stromtarif. Wird für die Ersparnis-Berechnung und als Fallback ohne Preis-Sensor verwendet.",
-          "price_sensor": "Überschreibt den Festpreis mit Echtzeit-Daten und schaltet den Eco-Modus.",
-          "solar_sensor": "PV-Leistung in Watt. Solar-Boost aktiviert ab 500 W Überschuss.",
-          "co2_sensor": "CO₂ im Schlafzimmer für den Schlaf-Score.",
+          "solar_sensor": "PV-Leistung in Watt. Solar-Boost aktiviert ab der Solar-Schwelle.",
           "solar_boost_threshold": "Ab wie viel Watt PV-Überschuss der Solar-Boost aktiviert wird. Bei einem Doppelbett mit 600 W Heizleistung auf 600 W oder höher einstellen.",
           "battery_soc_sensor": "Ladezustand deines Hausakkus in Prozent. Eigenständiger Trigger: der Boost startet auch, sobald der SoC die Schwelle erreicht — allein und zusammen mit der Solar-Schwelle.",
           "bed_boost_soc_threshold": "SoC, ab dem der SoC-Trigger den Boost auslöst. Default 90%. 5% Hysterese (geht erst unter 85% wieder aus).",

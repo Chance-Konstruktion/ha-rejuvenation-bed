@@ -76,6 +76,7 @@ class RejuvenationBedOptionsFlow(config_entries.OptionsFlow):
             menu_options={
                 "global_times": "🌡️ Temperatur & Bett",
                 "global_sensors": "📊 Sensoren & Strompreis",
+                "global_solar": "☀️ Solar & Akku",
                 "init": "⬅️ Zurück",
             },
         )
@@ -132,15 +133,12 @@ class RejuvenationBedOptionsFlow(config_entries.OptionsFlow):
         )
 
     async def async_step_global_sensors(self, user_input=None):
-        """Sensoren und Strompreis."""
+        """Sensoren und Strompreis (Solar & Akku siehe eigener Bereich)."""
         if user_input is not None:
             new_options = dict(self._config_entry.options)
             optional_sensors = {
-                "solar_sensor",
                 "price_sensor",
                 "co2_sensor",
-                "battery_soc_sensor",
-                "forecast_sensor",
             }
             for key, value in user_input.items():
                 if key in optional_sensors and (value is None or value == ""):
@@ -179,6 +177,44 @@ class RejuvenationBedOptionsFlow(config_entries.OptionsFlow):
                     selector.EntitySelectorConfig(domain="sensor")
                 ),
 
+                # ─── CO₂ ──────────────────────────────────────────
+                vol.Optional(
+                    "co2_sensor",
+                    description={"suggested_value": _val("co2_sensor")}
+                ): selector.EntitySelector(
+                    selector.EntitySelectorConfig(
+                        domain="sensor", device_class="carbon_dioxide"
+                    )
+                ),
+            }),
+        )
+
+    async def async_step_global_solar(self, user_input=None):
+        """Solar & Akku: Solar-Boost-Trigger (Solar-Schwelle, SoC, Forecast)."""
+        if user_input is not None:
+            new_options = dict(self._config_entry.options)
+            optional_sensors = {
+                "solar_sensor",
+                "battery_soc_sensor",
+                "forecast_sensor",
+            }
+            for key, value in user_input.items():
+                if key in optional_sensors and (value is None or value == ""):
+                    new_options.pop(key, None)
+                else:
+                    new_options[key] = value
+            return self.async_create_entry(title="", data=new_options)
+
+        current = self._config_entry.options
+        global_data = self._config_entry.data.get("global", {})
+
+        def _val(key, fallback=None):
+            return current.get(key, global_data.get(key, fallback))
+
+        return self.async_show_form(
+            step_id="global_solar",
+            data_schema=vol.Schema({
+
                 # ─── Solar ────────────────────────────────────────
                 vol.Optional(
                     "solar_sensor",
@@ -200,10 +236,7 @@ class RejuvenationBedOptionsFlow(config_entries.OptionsFlow):
                     )
                 ),
 
-                # ─── PV-Prioritäts-Kaskade (optional) ─────────────
-                # Hausakku + PV-Forecast geben dem Bett-Boost niedrigere
-                # Priorität als Akku/Boiler. Ohne diese Sensoren bleibt
-                # das klassische Verhalten erhalten.
+                # ─── Akku-SoC (unabhängiger Trigger) ──────────────
                 vol.Optional(
                     "battery_soc_sensor",
                     description={"suggested_value": _val("battery_soc_sensor")}
@@ -227,6 +260,7 @@ class RejuvenationBedOptionsFlow(config_entries.OptionsFlow):
                     )
                 ),
 
+                # ─── PV-Forecast (optionaler Trigger) ─────────────
                 vol.Optional(
                     "forecast_sensor",
                     description={"suggested_value": _val("forecast_sensor")}
@@ -257,16 +291,6 @@ class RejuvenationBedOptionsFlow(config_entries.OptionsFlow):
                     "battery_priority",
                     default=_val("battery_priority", False)
                 ): selector.BooleanSelector(),
-
-                # ─── CO₂ ──────────────────────────────────────────
-                vol.Optional(
-                    "co2_sensor",
-                    description={"suggested_value": _val("co2_sensor")}
-                ): selector.EntitySelector(
-                    selector.EntitySelectorConfig(
-                        domain="sensor", device_class="carbon_dioxide"
-                    )
-                ),
             }),
         )
 
