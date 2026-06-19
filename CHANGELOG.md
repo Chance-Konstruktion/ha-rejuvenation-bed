@@ -63,6 +63,11 @@ Alle Änderungen am Rejuvenation Bed Projekt.
   Überschuss · Akku 92% · Forecast 5.2 kWh". Die aktiven Trigger stehen
   zusätzlich in `state["active_triggers"]` (Diagnose).
 
+- **Options-Flow aufgeräumt.** Solar/Akku-Felder aus „📊 Sensoren &
+  Strompreis" in einen eigenen Bereich **„☀️ Solar & Akku"** ausgelagert
+  (kürzere Formulare). Neuer **„⬅️ Zurück"**-Eintrag im Untermenü
+  „🌐 Globale Einstellungen".
+
 ## [0.7.2] - 2026-05-15
 
 ### Bugfixes
