@@ -96,13 +96,7 @@
       },
       "zone_sensors": {
         "title": "📡 Select Zone",
-        "description": "Which zone would you like to edit?",
-        "data": {
-          "zone_index": "Zone"
-        },
-        "data_description": {
-          "zone_index": "Select the zone to configure sensors for."
-        }
+        "description": "Which zone would you like to edit?"
       },
       "edit_zone_sensors": {
         "title": "📡 Sensors – {zone_name}",
@@ -126,23 +120,7 @@
       },
       "zone_settings": {
         "title": "🌡️ Select Zone",
-        "description": "Which zone's sleep profile would you like to adjust?",
-        "data": {
-          "zone_index": "Zone"
-        },
-        "data_description": {
-          "zone_index": "Select the zone."
-        }
-      },
-      "zone_settings_select": {
-        "title": "🌡️ Select Zone",
-        "description": "Which zone's sleep profile would you like to adjust?",
-        "data": {
-          "zone_index": "Zone"
-        },
-        "data_description": {
-          "zone_index": "Select the zone."
-        }
+        "description": "Which zone's sleep profile would you like to adjust?"
       },
       "edit_zone_settings": {
         "title": "🌡️ Sleep Profile – {zone_name}",

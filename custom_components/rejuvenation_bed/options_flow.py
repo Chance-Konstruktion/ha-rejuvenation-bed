@@ -299,32 +299,32 @@ class RejuvenationBedOptionsFlow(config_entries.OptionsFlow):
     # ═══════════════════════════════════════════════════════════════════════
 
     async def async_step_zone_sensors(self, user_input=None):
-        """Zonen-Sensoren: Bei Dual-Zone erst auswählen."""
+        """Zonen-Sensoren: Bei Dual-Zone erst per Menü auswählen (mit Zurück)."""
         zones = self._config_entry.data.get("zones", [])
         if not zones:
             return self.async_abort(reason="no_zones")
 
-        if len(zones) > 1 and user_input is None:
-            return self.async_show_form(
+        if len(zones) > 1:
+            return self.async_show_menu(
                 step_id="zone_sensors",
-                data_schema=vol.Schema({
-                    vol.Required("zone_index", default="0"): selector.SelectSelector(
-                        selector.SelectSelectorConfig(
-                            options=[
-                                {"value": "0", "label": "Zone 1 (Links)"},
-                                {"value": "1", "label": "Zone 2 (Rechts)"},
-                            ],
-                            mode=selector.SelectSelectorMode.LIST
-                        )
-                    ),
-                }),
+                menu_options={
+                    "zone_sensors_left": "📡 Zone 1 (Links)",
+                    "zone_sensors_right": "📡 Zone 2 (Rechts)",
+                    "init": "⬅️ Zurück",
+                },
             )
 
-        if user_input is not None and "zone_index" in user_input:
-            self._editing_zone_index = int(user_input["zone_index"])
-            return await self.async_step_edit_zone_sensors()
-
         self._editing_zone_index = 0
+        return await self.async_step_edit_zone_sensors()
+
+    async def async_step_zone_sensors_left(self, user_input=None):
+        """Zone 1 (Links) Hardware bearbeiten."""
+        self._editing_zone_index = 0
+        return await self.async_step_edit_zone_sensors()
+
+    async def async_step_zone_sensors_right(self, user_input=None):
+        """Zone 2 (Rechts) Hardware bearbeiten."""
+        self._editing_zone_index = 1
         return await self.async_step_edit_zone_sensors()
 
     async def async_step_edit_zone_sensors(self, user_input=None):
@@ -409,40 +409,32 @@ class RejuvenationBedOptionsFlow(config_entries.OptionsFlow):
     # ═══════════════════════════════════════════════════════════════════════
 
     async def async_step_zone_settings(self, user_input=None):
-        """Schlaf-Profil: Bei Dual-Zone erst auswählen."""
+        """Schlaf-Profil: Bei Dual-Zone erst per Menü auswählen (mit Zurück)."""
         zones = self._config_entry.data.get("zones", [])
         if not zones:
             return self.async_abort(reason="no_zones")
 
-        if len(zones) > 1 and user_input is None:
-            return self.async_show_form(
-                step_id="zone_settings_select",
-                data_schema=vol.Schema({
-                    vol.Required("zone_index", default="0"): selector.SelectSelector(
-                        selector.SelectSelectorConfig(
-                            options=[
-                                {"value": "0", "label": "Zone 1 (Links)"},
-                                {"value": "1", "label": "Zone 2 (Rechts)"},
-                            ],
-                            mode=selector.SelectSelectorMode.LIST
-                        )
-                    ),
-                }),
+        if len(zones) > 1:
+            return self.async_show_menu(
+                step_id="zone_settings",
+                menu_options={
+                    "zone_settings_left": "🌡️ Zone 1 (Links)",
+                    "zone_settings_right": "🌡️ Zone 2 (Rechts)",
+                    "init": "⬅️ Zurück",
+                },
             )
-
-        if user_input is not None and "zone_index" in user_input:
-            self._editing_zone_index = int(user_input["zone_index"])
-            return await self.async_step_edit_zone_settings()
 
         self._editing_zone_index = 0
         return await self.async_step_edit_zone_settings()
 
-    async def async_step_zone_settings_select(self, user_input=None):
-        """Zone-Auswahl Weiterleitung."""
-        if user_input is not None and "zone_index" in user_input:
-            self._editing_zone_index = int(user_input["zone_index"])
-            return await self.async_step_edit_zone_settings()
+    async def async_step_zone_settings_left(self, user_input=None):
+        """Zone 1 (Links) Schlaf-Profil bearbeiten."""
         self._editing_zone_index = 0
+        return await self.async_step_edit_zone_settings()
+
+    async def async_step_zone_settings_right(self, user_input=None):
+        """Zone 2 (Rechts) Schlaf-Profil bearbeiten."""
+        self._editing_zone_index = 1
         return await self.async_step_edit_zone_settings()
 
     async def async_step_edit_zone_settings(self, user_input=None):
