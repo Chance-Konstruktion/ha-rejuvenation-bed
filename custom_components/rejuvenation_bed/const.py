@@ -122,16 +122,22 @@ DEFAULT_COMFORT_OFFSET = 0.5  # +0.5°C beim Ausschlafen
 BOOST_MAX_TEMP = 34.0  # Absolute Obergrenze Boost (Hardware-Thermostat = Backup)
 
 # ═══════════════════════════════════════════════════════════════════════════════
-# PV-PRIORITÄTS-KASKADE (Solar-Boost Gating)
+# SOLAR-BOOST TRIGGER (unabhängige ODER-Auslöser)
 # ═══════════════════════════════════════════════════════════════════════════════
-# Solar-Boost fürs Bett ist die LANGSAMSTE Senke (große thermische Masse).
-# Wenn Hausakku-SoC und/oder PV-Forecast-Sensor konfiguriert sind, gilt:
-# Boost nur wenn (SoC >= Schwelle) ODER (Forecast Rest-Tag >= Schwelle).
-# Hintergedanke: Akku/Boiler haben höhere Priorität auf den PV-Überschuss.
-# Ohne diese Sensoren bleibt das Verhalten klassisch (kein Gating).
+# Der Bett-Boost kennt drei EIGENSTÄNDIGE Auslöser, die mit ODER verknüpft
+# sind — jeder funktioniert allein, alle wirken auch zusammen:
+#   1. Solar-Schwelle:  aktuelle PV-Leistung >= solar_boost_threshold
+#   2. Akku-SoC:        Hausakku-SoC >= Schwelle (Akku voll → Überschuss nutzen)
+#   3. PV-Forecast:     Rest-Tag-Prognose >= Schwelle (optional)
+# Nur konfigurierte Sensoren zählen; fehlende Sensoren blockieren NICHT.
+# Solar-only Setups verhalten sich also exakt wie früher.
+#
+# Optional: Akku-Vorrang (option "battery_priority", Default AUS). AN gatet
+# die Solar-Schwelle hinter SoC/Forecast (UND) — klassisches Gating, gibt
+# Akku/Boiler Vorrang auf den PV-Überschuss.
 
-DEFAULT_BED_BOOST_SOC_THRESHOLD = 90.0   # %SoC ab dem Bett-Boost OK ist
-DEFAULT_BED_BOOST_MIN_FORECAST_KWH = 3.0  # kWh Rest-Tag ab denen Boost OK ist
+DEFAULT_BED_BOOST_SOC_THRESHOLD = 90.0   # %SoC ab dem der SoC-Trigger auslöst
+DEFAULT_BED_BOOST_MIN_FORECAST_KWH = 3.0  # kWh Rest-Tag ab denen Forecast auslöst
 BED_BOOST_SOC_HYSTERESIS = 5.0            # %SoC Hysterese (an: 90%, aus: 85%)
 BED_BOOST_FORECAST_HYSTERESIS_KWH = 1.0   # kWh Hysterese (an: 3, aus: 2)
 
@@ -152,7 +158,7 @@ PRESENCE_BODY_TEMP_DIFF = 1.5  # °C Differenz Auflage-Wasser für Körperkontak
 
 # Device Info
 MANUFACTURER = "Rejuvenation Bed"
-SW_VERSION = "0.7.1"
+SW_VERSION = "260619"
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # ZEIT-HELPER
