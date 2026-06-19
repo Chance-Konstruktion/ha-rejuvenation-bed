@@ -199,7 +199,7 @@
       },
       "global_sensors": {
         "title": "📊 Sensors & Electricity Price",
-        "description": "Electricity price and optional sensors for energy optimization and sleep quality.\n\n**Electricity price** — Your current tariff in ct/kWh. Used for savings calculation and as fallback without a price sensor.\n\n**Price sensor** — Dynamic electricity price from Tibber, Octopus or ENTSO-E. Overrides the fixed tariff and enables Eco mode.\n\n**Solar sensor** — PV power in watts (e.g. Fronius, SMA, Huawei). When surplus exceeds the threshold, Solar Boost uses free energy.\n\n**Solar threshold** — Minimum surplus in watts to activate boost. Set at least as high as the bed's heater power (e.g. 300 W single, 600 W double).\n\n**PV priority cascade (optional)** — If you have a home battery and/or PV forecast (e.g. Solcast), the bed boost only fires when the battery is (nearly) full *or* the remaining-day forecast is generous. This gives the home battery and boiler priority on PV surplus. Without these sensors the classic behaviour applies.\n\n**CO₂ sensor** — CO₂ in the bedroom for the sleep score (25% weight).",
+        "description": "Electricity price and optional sensors for energy optimization and sleep quality.\n\n**Electricity price** — Your current tariff in ct/kWh. Used for savings calculation and as fallback without a price sensor.\n\n**Price sensor** — Dynamic electricity price from Tibber, Octopus or ENTSO-E. Overrides the fixed tariff and enables Eco mode.\n\n**Solar sensor** — PV power in watts (e.g. Fronius, SMA, Huawei). When surplus exceeds the threshold, Solar Boost uses free energy.\n\n**Solar threshold** — Minimum surplus in watts to activate boost. Set at least as high as the bed's heater power (e.g. 300 W single, 600 W double).\n\n**Battery SoC (optional)** — An independent boost trigger. If you have a home battery, the boost also fires once SoC reaches the threshold (battery full → use the surplus). Works on its own and alongside the solar threshold.\n\n**PV forecast (optional)** — Another independent trigger. If you have a forecast (e.g. Solcast), the boost also fires when the remaining-day forecast is generous. Purely optional — leave it empty and nothing changes.\n\nThe triggers are OR-combined: any one is enough, and only the sensors you configure count.\n\n**CO₂ sensor** — CO₂ in the bedroom for the sleep score (25% weight).",
         "data": {
           "electricity_price": "Electricity price (fixed tariff)",
           "price_sensor": "Dynamic price sensor",
@@ -217,10 +217,10 @@
           "solar_sensor": "PV power in watts. Solar Boost activates above 500 W surplus.",
           "co2_sensor": "CO₂ in the bedroom for the sleep score.",
           "solar_boost_threshold": "PV surplus in watts needed to activate Solar Boost. For a double bed with 600 W heater, set to 600 W or higher.",
-          "battery_soc_sensor": "State of charge of your home battery in percent. When configured, the bed boost waits for the battery to be (nearly) full.",
-          "bed_boost_soc_threshold": "Minimum battery SoC to allow bed boost. Default 90%. 5% hysteresis (boost only releases below 85%).",
-          "forecast_sensor": "PV forecast in kWh remaining for the rest of the day (e.g. sensor.solcast_pv_forecast_forecast_remaining_today).",
-          "bed_boost_min_forecast_kwh": "Minimum remaining PV forecast to allow bed boost. Default 3 kWh. Hysteresis 1 kWh."
+          "battery_soc_sensor": "State of charge of your home battery in percent. Independent trigger: the boost also fires once SoC reaches the threshold — works on its own and alongside the solar threshold.",
+          "bed_boost_soc_threshold": "Battery SoC at which the SoC trigger fires the boost. Default 90%. 5% hysteresis (releases below 85%).",
+          "forecast_sensor": "Optional. PV forecast in kWh remaining for the rest of the day (e.g. sensor.solcast_pv_forecast_forecast_remaining_today).",
+          "bed_boost_min_forecast_kwh": "Remaining PV forecast at which the forecast trigger fires the boost. Default 3 kWh. Hysteresis 1 kWh."
         }
       }
     },

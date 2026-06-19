@@ -81,9 +81,10 @@ class EnergyStateResolver:
         # NEU: Zustand für Hysterese merken
         self._current_mode = EnergyMode.NORMAL
 
-        # Cascade-Hysterese: merken ob Cascade gerade Boost erlaubt
-        self._cascade_allows = False
-        self._cascade_reason = ""
+        # Solar-Boost-Trigger: welche unabhängigen Auslöser gerade greifen
+        # (für UI/Diagnose) und ein menschenlesbarer Grund.
+        self._boost_reason = ""
+        self._active_triggers = {"solar": None, "soc": None, "forecast": None}
 
         # Referenz zum Coordinator (wird gesetzt nach init)
         self._coordinator = None
@@ -117,12 +118,12 @@ class EnergyStateResolver:
         return self.solar_boost_on_w - 50
 
     # ───────────────────────────────────────────────────────────────────────
-    # PV-Prioritäts-Kaskade: Hausakku-SoC und PV-Forecast
+    # Unabhängige Solar-Boost-Trigger: Hausakku-SoC und PV-Forecast
     # ───────────────────────────────────────────────────────────────────────
 
     @property
     def battery_soc_sensor(self) -> str:
-        """Hausakku-SoC-Sensor (optional). Ohne den ist die Cascade-Gate inaktiv."""
+        """Hausakku-SoC-Sensor (optional). Eigenständiger Boost-Trigger."""
         return self.config_entry.options.get(
             "battery_soc_sensor", self.global_config.get("battery_soc_sensor")
         )
@@ -136,7 +137,7 @@ class EnergyStateResolver:
 
     @property
     def bed_boost_soc_threshold(self) -> float:
-        """SoC-Schwelle ab der Bett-Boost erlaubt ist (Default 90%)."""
+        """SoC-Schwelle ab der der SoC-Trigger Boost auslöst (Default 90%)."""
         val = self.config_entry.options.get(
             "bed_boost_soc_threshold",
             self.global_config.get(
@@ -147,7 +148,7 @@ class EnergyStateResolver:
 
     @property
     def bed_boost_min_forecast_kwh(self) -> float:
-        """Forecast-Rest-Tag-Schwelle in kWh ab der Bett-Boost erlaubt ist (Default 3)."""
+        """Forecast-Rest-Tag-Schwelle in kWh ab der der Forecast-Trigger auslöst (Default 3)."""
         val = self.config_entry.options.get(
             "bed_boost_min_forecast_kwh",
             self.global_config.get(
@@ -199,8 +200,8 @@ class EnergyStateResolver:
             "current_price": current_price,
             "reason": reason,
             "boost_available": mode == EnergyMode.SOLAR_BOOST,
-            "cascade_allows_boost": self._cascade_allows,
-            "cascade_reason": self._cascade_reason,
+            "boost_reason": self._boost_reason,
+            "active_triggers": dict(self._active_triggers),
             "battery_soc": self._read_battery_soc(),
             "forecast_remaining_kwh": self._read_forecast_remaining_kwh(),
         }
@@ -337,79 +338,72 @@ class EnergyStateResolver:
             )
             return None
 
-    def _cascade_evaluate(self) -> Tuple[bool, str]:
+    def _evaluate_boost_triggers(self, solar_power: float) -> Tuple[bool, str]:
         """
-        Prüft die PV-Prioritäts-Kaskade für Solar-Boost.
+        Wertet die unabhängigen Solar-Boost-Trigger aus (ODER-Logik).
 
-        Logik (ODER):
-        - Sind WEDER Akku-Sensor NOCH Forecast-Sensor konfiguriert
-          → Cascade inaktiv, Boost erlaubt (klassisches Verhalten).
-        - Mindestens einer konfiguriert
-          → Boost erlaubt wenn Akku >= Schwelle ODER Forecast >= Schwelle.
-        - Beide konfiguriert aber beide unavailable
-          → Boost blockiert (lieber auf Nummer sicher: Akku/Boiler-Prio).
+        Jeder Trigger arbeitet EIGENSTÄNDIG — ein einziger erfüllter
+        Auslöser genügt für den Boost, und jeder funktioniert auch ohne
+        die anderen:
 
-        Hysterese: Sobald Boost erlaubt, bleibt er erlaubt bis
-        SoC < (Schwelle − 5%) UND Forecast < (Schwelle − 1 kWh).
-        Das verhindert Flattern wenn SoC um die Schwelle pendelt.
+        - Solar-Schwelle: aktuelle PV-Leistung ≥ Schwelle (klassisch).
+        - Akku-SoC:       Hausakku-SoC ≥ Schwelle (Akku ohnehin voll →
+                          Überschuss fürs Bett nutzen).
+        - PV-Forecast:    Rest-Tag-Prognose ≥ Schwelle (optional).
+
+        Ein Trigger zählt nur, wenn sein Sensor konfiguriert UND lesbar
+        ist. Nicht konfigurierte Sensoren blockieren NICHT (sie lösen
+        auch nicht aus). So funktioniert SoC unabhängig von der
+        Solar-Schwelle — und beide zusammen, wenn beide gesetzt sind.
+
+        Jeder Trigger hat eine eigene Hysterese (referenziert
+        ``self._current_mode``), damit nichts flattert.
 
         Returns:
-            (allowed, reason) — reason ist menschenlesbar für UI/Logs.
+            (any_active, reason) — reason ist menschenlesbar für UI/Logs
+            und listet die gerade aktiven Auslöser auf.
         """
-        has_battery = bool(self.battery_soc_sensor)
-        has_forecast = bool(self.forecast_sensor)
+        already_boost = self._current_mode == EnergyMode.SOLAR_BOOST
+        detail = {"solar": None, "soc": None, "forecast": None}
+        active_parts = []
 
-        if not has_battery and not has_forecast:
-            self._cascade_allows = True
-            self._cascade_reason = ""
-            return True, ""
+        # ── Trigger 1: Solar-Schwelle ───────────────────────────────────
+        if self.solar_sensor:
+            threshold = (
+                self.solar_boost_off_w if already_boost else self.solar_boost_on_w
+            )
+            active = solar_power >= threshold
+            detail["solar"] = active
+            if active:
+                active_parts.append(f"{solar_power:.0f}W Überschuss")
 
-        soc = self._read_battery_soc() if has_battery else None
-        forecast = self._read_forecast_remaining_kwh() if has_forecast else None
+        # ── Trigger 2: Akku-SoC (unabhängig von der Solar-Schwelle) ─────
+        soc = self._read_battery_soc()
+        if self.battery_soc_sensor and soc is not None:
+            threshold = self.bed_boost_soc_threshold
+            if already_boost:
+                threshold -= BED_BOOST_SOC_HYSTERESIS
+            active = soc >= threshold
+            detail["soc"] = active
+            if active:
+                active_parts.append(f"Akku {soc:.0f}%")
 
-        soc_threshold = self.bed_boost_soc_threshold
-        fc_threshold = self.bed_boost_min_forecast_kwh
+        # ── Trigger 3: PV-Forecast (optional) ───────────────────────────
+        forecast = self._read_forecast_remaining_kwh()
+        if self.forecast_sensor and forecast is not None:
+            threshold = self.bed_boost_min_forecast_kwh
+            if already_boost:
+                threshold -= BED_BOOST_FORECAST_HYSTERESIS_KWH
+            active = forecast >= threshold
+            detail["forecast"] = active
+            if active:
+                active_parts.append(f"Forecast {forecast:.1f} kWh")
 
-        # Hysterese: andere Schwelle je nachdem ob aktuell schon erlaubt
-        if self._cascade_allows:
-            soc_gate = soc_threshold - BED_BOOST_SOC_HYSTERESIS
-            fc_gate = fc_threshold - BED_BOOST_FORECAST_HYSTERESIS_KWH
-        else:
-            soc_gate = soc_threshold
-            fc_gate = fc_threshold
-
-        soc_ok = soc is not None and soc >= soc_gate
-        fc_ok = forecast is not None and forecast >= fc_gate
-
-        if soc_ok or fc_ok:
-            parts = []
-            if soc is not None:
-                parts.append(f"Akku {soc:.0f}%")
-            if forecast is not None:
-                parts.append(f"Forecast {forecast:.1f} kWh")
-            reason = " · ".join(parts) if parts else ""
-            self._cascade_allows = True
-            self._cascade_reason = reason
-            return True, reason
-
-        # Boost blockiert — Grund erklären
-        if soc is None and forecast is None:
-            reason = "Akku/Forecast-Sensoren unavailable — Boost pausiert (Prio: Akku)"
-        else:
-            parts = []
-            if soc is not None:
-                parts.append(f"Akku {soc:.0f}% < {soc_threshold:.0f}%")
-            elif has_battery:
-                parts.append("Akku-Sensor unavailable")
-            if forecast is not None:
-                parts.append(f"Forecast {forecast:.1f} < {fc_threshold:.1f} kWh")
-            elif has_forecast:
-                parts.append("Forecast-Sensor unavailable")
-            reason = " · ".join(parts)
-
-        self._cascade_allows = False
-        self._cascade_reason = reason
-        return False, reason
+        self._active_triggers = detail
+        any_active = bool(active_parts)
+        reason = " · ".join(active_parts)
+        self._boost_reason = reason
+        return any_active, reason
 
     def _determine_mode(
         self,
@@ -433,24 +427,25 @@ class EnergyStateResolver:
         """
         # Solar-Boost nur wenn Switch AN
         if solar_enabled:
-            # PV-Kaskade: Akku/Boiler haben Vorrang vor Bett-Boost
-            cascade_ok, _ = self._cascade_evaluate()
+            # Unabhängige Trigger (ODER): Solar-Schwelle, Akku-SoC,
+            # PV-Forecast. Jeder löst eigenständig aus, alle wirken
+            # auch zusammen.
+            boost_active, _ = self._evaluate_boost_triggers(solar_power)
 
-            if cascade_ok:
-                if self._current_mode == EnergyMode.SOLAR_BOOST:
-                    if solar_power >= self.solar_boost_off_w:
-                        return EnergyMode.SOLAR_BOOST
-                else:
-                    if solar_power >= self.solar_boost_on_w:
-                        self._current_mode = EnergyMode.SOLAR_BOOST
-                        return EnergyMode.SOLAR_BOOST
-
-            # Sehr günstiger Strom = auch Solar-Boost
-            # (Cascade gilt nicht: das ist Netzstrom, Akku-Prio irrelevant)
-            if price <= self.CHEAP_PRICE_THRESHOLD_EUR:
+            if boost_active:
                 self._current_mode = EnergyMode.SOLAR_BOOST
                 return EnergyMode.SOLAR_BOOST
-        
+
+            # Sehr günstiger Strom = auch Solar-Boost
+            # (Netzstrom-Pfad: unabhängig von PV-Triggern)
+            if price <= self.CHEAP_PRICE_THRESHOLD_EUR:
+                self._current_mode = EnergyMode.SOLAR_BOOST
+                self._boost_reason = ""
+                return EnergyMode.SOLAR_BOOST
+        else:
+            self._active_triggers = {"solar": None, "soc": None, "forecast": None}
+            self._boost_reason = ""
+
         # Eco-Mode nur wenn Switch AN
         if eco_enabled:
             if self._current_mode == EnergyMode.ECO_MODE:
@@ -491,13 +486,11 @@ class EnergyStateResolver:
         Generiert eine menschenlesbare Erklärung für das UI.
         """
         if mode == EnergyMode.SOLAR_BOOST:
+            if self._boost_reason:
+                return f"☀️ Solar-Boost aktiv — {self._boost_reason}"
             if solar_power > 0:
-                base = f"☀️ Solar-Boost aktiv ({solar_power:.0f}W Überschuss)"
-                if self._cascade_reason:
-                    return f"{base} — {self._cascade_reason}"
-                return base
-            else:
-                return f"💰 Günstiger Strom ({price:.2f} €/kWh)"
+                return f"☀️ Solar-Boost aktiv ({solar_power:.0f}W Überschuss)"
+            return f"💰 Günstiger Strom ({price:.2f} €/kWh)"
 
         elif mode == EnergyMode.ECO_MODE:
             return f"💡 Energie-Sparmodus ({price:.2f} €/kWh)"
@@ -506,15 +499,6 @@ class EnergyStateResolver:
             return "⚠️ Netz-Notfall: Minimalbetrieb"
 
         else:
-            # Erklärung wenn Cascade gerade Boost blockiert (interessant für UI)
-            cascade_configured = bool(self.battery_soc_sensor or self.forecast_sensor)
-            cascade_blocks_boost = (
-                cascade_configured
-                and solar_power >= self.solar_boost_on_w
-                and not self._cascade_allows
-            )
-            if cascade_blocks_boost and self._cascade_reason:
-                return f"⏸ Boost wartet — {self._cascade_reason}"
             return "✅ Normal-Betrieb"
     
     def get_diagnostics(self) -> dict:
@@ -535,8 +519,9 @@ class EnergyStateResolver:
             "forecast_sensor": self.forecast_sensor or "Nicht konfiguriert",
             "battery_soc": state["battery_soc"],
             "forecast_remaining_kwh": state["forecast_remaining_kwh"],
-            "cascade_allows_boost": state["cascade_allows_boost"],
-            "cascade_reason": state["cascade_reason"],
+            "boost_available": state["boost_available"],
+            "boost_reason": state["boost_reason"],
+            "active_triggers": state["active_triggers"],
             "thresholds": {
                 "solar_boost_on_w": self.solar_boost_on_w,
                 "solar_boost_off_w": self.solar_boost_off_w,
