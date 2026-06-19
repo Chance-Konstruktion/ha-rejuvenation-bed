@@ -4,6 +4,8 @@ Alle Änderungen am Rejuvenation Bed Projekt.
 
 ## [Unreleased]
 
+## [v260619] - 2026-06-19
+
 ### Bugfixes
 - **Präsenz v11.1 — Stale-Cooldown-Release (Sensor hing ~12 h auf "belegt").**
   An einem echten Tag-Schlaf-Datensatz (Nutzer lag 06:00–14:00 CEST, jetzt
@@ -25,34 +27,34 @@ Alle Änderungen am Rejuvenation Bed Projekt.
   `pres.csv` bleibt unverändert sauber. Drei neue Regressions-Tests.
 
 ### Features
-- **PV-Prioritäts-Kaskade für Solar-Boost** — Der Bett-Boost ist die
-  langsamste Senke im Haushalt (große thermische Masse, ~0.3 °C/h). Bisher
-  hat er los gefeuert, sobald `solar_power >= solar_boost_threshold` —
-  unabhängig davon, ob der Hausakku gerade noch Kapazität für die nächste
-  Lastspitze brauchen würde oder nicht.
+- **Solar-Boost: Akku-SoC und Solar-Schwelle als unabhängige Trigger.**
+  Der Bett-Boost kennt jetzt drei **eigenständige** Auslöser, die mit
+  **ODER** verknüpft sind — jeder funktioniert allein, alle wirken auch
+  zusammen:
+  - **Solar-Schwelle** — aktuelle PV-Leistung ≥ `solar_boost_threshold`
+    (klassisches Verhalten).
+  - **Akku-SoC** — Hausakku-SoC ≥ Schwelle (Default 90%). Löst jetzt
+    **unabhängig** von der Solar-Schwelle aus: voller Akku → Überschuss
+    fürs Bett nutzen, auch wenn die Momentan-Leistung gerade unter der
+    Solar-Schwelle liegt.
+  - **PV-Forecast** — Rest-Tags-Prognose ≥ Schwelle (Default 3 kWh).
+    **Rein optional** — ohne Sensor ändert sich nichts.
 
-  Neu: zwei optionale Sensoren in `📊 Sensoren & Strompreis`:
-  - **`battery_soc_sensor`** — Hausakku-SoC (%). Default-Schwelle 90%.
-  - **`forecast_sensor`** — PV-Prognose Rest-Tag in kWh (z.B. Solcast
-    `sensor.solcast_pv_forecast_forecast_remaining_today`). Default 3 kWh.
+  Vorher gateten Akku/Forecast die Solar-Schwelle (UND-Logik): der Boost
+  startete *nur* wenn zusätzlich genug PV-Leistung anlag. Jetzt genügt
+  ein einziger erfüllter Trigger. Nur konfigurierte Sensoren zählen;
+  fehlende Sensoren blockieren nicht. Solar-only-Setups verhalten sich
+  damit exakt wie früher.
 
-  Logik (ODER): wenn mindestens einer der beiden Sensoren konfiguriert ist,
-  startet der Bett-Boost nur wenn der Akku (fast) voll **oder** die
-  Rest-Prognose üppig genug ist. Beispiel: Akku 85% bei wolkigem Forecast
-  → Boost wartet (Strom geht in den Akku). Akku 85% bei "noch 6 kWh
-  erwartet" → Boost startet (Akku wird ohnehin voll). Ohne diese Sensoren
-  bleibt das klassische Verhalten unverändert (backwards compatible).
+  Jeder Trigger hat eine eigene Hysterese, damit nichts flattert:
+  50 W (Solar), 5 %SoC, 1 kWh Forecast.
 
-  Hysterese eingebaut, damit der Boost nicht flattert: 5 %SoC bzw.
-  1 kWh Forecast — wer mit SoC 92% gestartet hat, bleibt bis 85% im Boost.
+  Der Strompreis-Pfad ("günstiger Netzstrom < 15 ct/kWh = Boost") bleibt
+  ein weiterer unabhängiger Auslöser (Netzstrom, kein PV-Überschuss).
 
-  Der Strompreis-Pfad ("günstiger Netzstrom < 15 ct/kWh = Boost") ist
-  bewusst nicht von der Kaskade gegated: das ist Netzstrom, nicht
-  PV-Überschuss; da konkurriert der Hausakku nicht mit dem Bett.
-
-  Sichtbar in `state["reason"]`: aktiv → "☀️ Solar-Boost aktiv (1234W
-  Überschuss) — Akku 92% · Forecast 5.2 kWh"; blockiert → "⏸ Boost
-  wartet — Akku 73% < 90% · Forecast 1.4 < 3.0 kWh".
+  Sichtbar in `state["reason"]`, z.B. "☀️ Solar-Boost aktiv — 1234W
+  Überschuss · Akku 92% · Forecast 5.2 kWh". Die aktiven Trigger stehen
+  zusätzlich in `state["active_triggers"]` (Diagnose).
 
 ## [0.7.2] - 2026-05-15
 

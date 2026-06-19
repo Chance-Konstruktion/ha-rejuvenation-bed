@@ -1,13 +1,19 @@
-"""Tests for EnergyStateResolver - in particular the PV priority cascade.
+"""Tests for EnergyStateResolver - the independent Solar-Boost triggers.
 
-The cascade gates Solar-Boost on home battery SoC and/or PV forecast.
-Logic (OR):
-  - Neither sensor configured → no gating (classic behaviour).
-  - At least one configured → boost allowed when (SoC >= threshold) OR
-    (forecast >= threshold).
-  - Boost only takes the price-fallback path (cheap electricity) when
-    the price drops below the cheap threshold; cascade does NOT gate
-    that path (it's grid energy, not PV surplus).
+Solar-Boost has THREE independent OR-triggers. Each works on its own and
+all of them work together:
+
+  1. Solar threshold — current PV power >= threshold (classic behaviour).
+  2. Battery SoC     — home battery SoC >= threshold (battery already full).
+  3. PV forecast     — remaining-today forecast >= threshold (optional).
+
+A single satisfied trigger is enough for boost. A sensor that is not
+configured (or unavailable) simply does not contribute — it never blocks
+the boost. So a solar-only setup behaves exactly as before, SoC works
+independently of the solar threshold, and both combine when configured.
+
+The cheap-grid-electricity path (< 15 ct/kWh) still triggers boost
+independently of the PV triggers (it's grid energy, not PV surplus).
 """
 
 from types import SimpleNamespace
@@ -82,57 +88,97 @@ def _make_resolver(
     return resolver
 
 
-class TestCascadeInactive:
-    """Without battery/forecast sensors the cascade is inactive."""
+class TestSolarOnly:
+    """Only the solar sensor: classic threshold behaviour, unchanged."""
 
     def test_boost_fires_with_only_solar(self):
         r = _make_resolver(solar_power=1000)
         state = r.resolve()
         assert state["mode"] == EnergyMode.SOLAR_BOOST
-        assert state["cascade_allows_boost"] is True
+        assert state["boost_available"] is True
 
     def test_no_boost_below_solar_threshold(self):
         r = _make_resolver(solar_power=300)
         state = r.resolve()
         assert state["mode"] == EnergyMode.NORMAL
 
+    def test_custom_solar_threshold(self):
+        r = _make_resolver(
+            solar_power=350,
+            options={"solar_boost_threshold": 300},
+        )
+        assert r.resolve()["mode"] == EnergyMode.SOLAR_BOOST
 
-class TestCascadeBatteryOnly:
-    """Only the battery sensor configured: SoC gates the boost."""
 
-    def test_boost_blocked_when_battery_low(self):
+class TestSolarTriggerIndependentOfSoC:
+    """The solar threshold triggers on its own — even when SoC is low.
+
+    This is the v260619 change: SoC no longer gates the solar threshold.
+    """
+
+    def test_high_solar_boosts_even_if_battery_low(self):
         r = _make_resolver(
             solar_power=1000,
             battery_soc=70.0,
             battery_sensor="sensor.akku",
         )
         state = r.resolve()
-        assert state["mode"] == EnergyMode.NORMAL
-        assert state["cascade_allows_boost"] is False
-        assert "70" in state["reason"] or "70" in state["cascade_reason"]
+        assert state["mode"] == EnergyMode.SOLAR_BOOST
+        assert state["active_triggers"]["solar"] is True
+        assert state["active_triggers"]["soc"] is False
 
-    def test_boost_allowed_when_battery_full(self):
+    def test_low_solar_low_battery_no_boost(self):
         r = _make_resolver(
-            solar_power=1000,
+            solar_power=300,
+            battery_soc=70.0,
+            battery_sensor="sensor.akku",
+        )
+        assert r.resolve()["mode"] == EnergyMode.NORMAL
+
+
+class TestSoCTriggerIndependentOfSolar:
+    """The SoC threshold triggers on its own — even with no/low solar.
+
+    SoC works independently of the solar threshold.
+    """
+
+    def test_full_battery_boosts_without_solar_sensor(self):
+        r = _make_resolver(
+            solar_sensor=None,
             battery_soc=95.0,
             battery_sensor="sensor.akku",
         )
         state = r.resolve()
         assert state["mode"] == EnergyMode.SOLAR_BOOST
-        assert state["cascade_allows_boost"] is True
+        assert state["active_triggers"]["soc"] is True
 
-    def test_boost_at_exact_threshold(self):
-        """SoC == threshold should allow boost (>= semantics)."""
+    def test_full_battery_boosts_even_with_low_solar(self):
         r = _make_resolver(
-            solar_power=1000,
+            solar_power=200,
+            battery_soc=95.0,
+            battery_sensor="sensor.akku",
+        )
+        assert r.resolve()["mode"] == EnergyMode.SOLAR_BOOST
+
+    def test_low_battery_no_solar_no_boost(self):
+        r = _make_resolver(
+            solar_sensor=None,
+            battery_soc=70.0,
+            battery_sensor="sensor.akku",
+        )
+        assert r.resolve()["mode"] == EnergyMode.NORMAL
+
+    def test_soc_at_exact_threshold(self):
+        r = _make_resolver(
+            solar_power=0,
             battery_soc=90.0,
             battery_sensor="sensor.akku",
         )
         assert r.resolve()["mode"] == EnergyMode.SOLAR_BOOST
 
-    def test_custom_threshold(self):
+    def test_custom_soc_threshold(self):
         r = _make_resolver(
-            solar_power=1000,
+            solar_power=0,
             battery_soc=80.0,
             battery_sensor="sensor.akku",
             options={"bed_boost_soc_threshold": 75.0},
@@ -140,34 +186,50 @@ class TestCascadeBatteryOnly:
         assert r.resolve()["mode"] == EnergyMode.SOLAR_BOOST
 
 
-class TestCascadeForecastOnly:
-    """Only the forecast sensor configured: remaining kWh gates the boost."""
+class TestForecastTriggerOptional:
+    """The forecast sensor is a purely optional extra trigger."""
 
-    def test_boost_blocked_when_forecast_low(self):
+    def test_forecast_boosts_on_its_own(self):
         r = _make_resolver(
-            solar_power=1000,
-            forecast_kwh=1.0,
+            solar_power=0,
+            forecast_kwh=8.0,
             forecast_sensor="sensor.forecast",
         )
         state = r.resolve()
-        assert state["mode"] == EnergyMode.NORMAL
-        assert "1.0" in state["cascade_reason"]
+        assert state["mode"] == EnergyMode.SOLAR_BOOST
+        assert state["active_triggers"]["forecast"] is True
 
-    def test_boost_allowed_when_forecast_generous(self):
+    def test_low_forecast_no_solar_no_boost(self):
+        r = _make_resolver(
+            solar_power=0,
+            forecast_kwh=1.0,
+            forecast_sensor="sensor.forecast",
+        )
+        assert r.resolve()["mode"] == EnergyMode.NORMAL
+
+    def test_without_forecast_sensor_solar_still_works(self):
+        """Forecast is optional: absence must not change solar behaviour."""
+        r = _make_resolver(solar_power=1000)
+        assert r.resolve()["mode"] == EnergyMode.SOLAR_BOOST
+        assert r.resolve()["active_triggers"]["forecast"] is None
+
+
+class TestTriggersTogether:
+    """All three configured: OR-logic, any single trigger fires the boost."""
+
+    def test_solar_fires_when_others_low(self):
         r = _make_resolver(
             solar_power=1000,
-            forecast_kwh=8.0,
+            battery_soc=60.0,
+            forecast_kwh=0.5,
+            battery_sensor="sensor.akku",
             forecast_sensor="sensor.forecast",
         )
         assert r.resolve()["mode"] == EnergyMode.SOLAR_BOOST
 
-
-class TestCascadeBothSensors:
-    """Both sensors: OR-logic, either condition unblocks the boost."""
-
-    def test_battery_full_unblocks_even_if_forecast_low(self):
+    def test_soc_fires_when_others_low(self):
         r = _make_resolver(
-            solar_power=1000,
+            solar_power=100,
             battery_soc=95.0,
             forecast_kwh=0.5,
             battery_sensor="sensor.akku",
@@ -175,9 +237,9 @@ class TestCascadeBothSensors:
         )
         assert r.resolve()["mode"] == EnergyMode.SOLAR_BOOST
 
-    def test_forecast_generous_unblocks_even_if_battery_low(self):
+    def test_forecast_fires_when_others_low(self):
         r = _make_resolver(
-            solar_power=1000,
+            solar_power=100,
             battery_soc=60.0,
             forecast_kwh=8.0,
             battery_sensor="sensor.akku",
@@ -185,9 +247,9 @@ class TestCascadeBothSensors:
         )
         assert r.resolve()["mode"] == EnergyMode.SOLAR_BOOST
 
-    def test_both_low_blocks_boost(self):
+    def test_all_low_no_boost(self):
         r = _make_resolver(
-            solar_power=1000,
+            solar_power=100,
             battery_soc=60.0,
             forecast_kwh=1.0,
             battery_sensor="sensor.akku",
@@ -197,16 +259,19 @@ class TestCascadeBothSensors:
 
 
 class TestSensorUnavailable:
-    """Sensor configured but state is unavailable / non-numeric."""
+    """Configured-but-unavailable sensors must not block other triggers."""
 
-    def test_both_unavailable_blocks_boost(self):
-        """If both sensors are configured but unavailable, default to safe (block).
-
-        Rationale: if user wired up the cascade, respect the intent —
-        rather wait than push the bed past unknown battery state.
-        """
+    def test_unavailable_soc_does_not_block_solar(self):
         r = _make_resolver(
             solar_power=1000,
+            battery_soc=None,
+            battery_sensor="sensor.akku",
+        )
+        assert r.resolve()["mode"] == EnergyMode.SOLAR_BOOST
+
+    def test_all_unavailable_and_low_solar_no_boost(self):
+        r = _make_resolver(
+            solar_power=200,
             battery_soc=None,
             forecast_kwh=None,
             battery_sensor="sensor.akku",
@@ -214,12 +279,11 @@ class TestSensorUnavailable:
         )
         state = r.resolve()
         assert state["mode"] == EnergyMode.NORMAL
-        assert state["cascade_allows_boost"] is False
+        assert state["boost_available"] is False
 
-    def test_one_unavailable_other_ok_allows_boost(self):
-        """One sensor unavailable, the other green → OR still passes."""
+    def test_unavailable_soc_other_trigger_fires(self):
         r = _make_resolver(
-            solar_power=1000,
+            solar_power=100,
             battery_soc=None,
             forecast_kwh=8.0,
             battery_sensor="sensor.akku",
@@ -229,28 +293,41 @@ class TestSensorUnavailable:
 
 
 class TestHysteresis:
-    """Once cascade allows boost, it stays allowed across a small dip."""
+    """Each trigger keeps the boost on across a small dip."""
+
+    def test_solar_hysteresis_keeps_boost_on(self):
+        r = _make_resolver(solar_power=1000)
+        assert r.resolve()["mode"] == EnergyMode.SOLAR_BOOST
+
+        # Drop to 460W: above off-threshold (500 - 50 = 450)
+        r.hass.states.get = lambda eid: {
+            "sensor.solar": _make_state(460),
+        }.get(eid)
+        assert r.resolve()["mode"] == EnergyMode.SOLAR_BOOST
+
+        # Drop to 400W: below off-threshold
+        r.hass.states.get = lambda eid: {
+            "sensor.solar": _make_state(400),
+        }.get(eid)
+        assert r.resolve()["mode"] == EnergyMode.NORMAL
 
     def test_soc_hysteresis_keeps_boost_on(self):
         r = _make_resolver(
-            solar_power=1000,
+            solar_sensor=None,
             battery_soc=92.0,
             battery_sensor="sensor.akku",
         )
-        # First call: above threshold → cascade allows
         assert r.resolve()["mode"] == EnergyMode.SOLAR_BOOST
-        assert r._cascade_allows is True
 
         # Drop SoC to 86%: still above hysteresis floor (90 - 5 = 85)
         r.hass.states.get = lambda eid: {
-            "sensor.solar": _make_state(1000),
             "sensor.akku": _make_state(86.0),
         }.get(eid)
         assert r.resolve()["mode"] == EnergyMode.SOLAR_BOOST
 
     def test_soc_hysteresis_releases_boost_below_floor(self):
         r = _make_resolver(
-            solar_power=1000,
+            solar_sensor=None,
             battery_soc=92.0,
             battery_sensor="sensor.akku",
         )
@@ -258,14 +335,13 @@ class TestHysteresis:
 
         # Drop to 80%: below hysteresis floor (85)
         r.hass.states.get = lambda eid: {
-            "sensor.solar": _make_state(1000),
             "sensor.akku": _make_state(80.0),
         }.get(eid)
         assert r.resolve()["mode"] == EnergyMode.NORMAL
 
     def test_forecast_hysteresis(self):
         r = _make_resolver(
-            solar_power=1000,
+            solar_sensor=None,
             forecast_kwh=3.5,
             forecast_sensor="sensor.forecast",
         )
@@ -273,38 +349,35 @@ class TestHysteresis:
 
         # Drop to 2.5 kWh: still above hysteresis floor (3 - 1 = 2)
         r.hass.states.get = lambda eid: {
-            "sensor.solar": _make_state(1000),
             "sensor.forecast": _make_state(2.5),
         }.get(eid)
         assert r.resolve()["mode"] == EnergyMode.SOLAR_BOOST
 
         # Drop to 1.5: below floor (2.0)
         r.hass.states.get = lambda eid: {
-            "sensor.solar": _make_state(1000),
             "sensor.forecast": _make_state(1.5),
         }.get(eid)
         assert r.resolve()["mode"] == EnergyMode.NORMAL
 
 
 class TestCheapPriceBypass:
-    """Cheap grid electricity must still trigger boost — cascade only gates PV."""
+    """Cheap grid electricity triggers boost independently of PV triggers."""
 
-    def test_cheap_price_bypasses_cascade(self):
+    def test_cheap_price_triggers_boost(self):
         r = _make_resolver(
             solar_power=100,
             price=0.10,
             battery_soc=50.0,
             battery_sensor="sensor.akku",
         )
-        # Solar is below the W-threshold and cascade would block,
-        # but the cheap price kicks SOLAR_BOOST anyway (grid path).
+        # Solar below threshold and SoC low, but cheap price kicks boost.
         assert r.resolve()["mode"] == EnergyMode.SOLAR_BOOST
 
 
 class TestReasonStrings:
-    """The reason string surfaces cascade context for the UI."""
+    """The reason string surfaces the active triggers for the UI."""
 
-    def test_reason_when_boost_active_includes_cascade(self):
+    def test_reason_lists_solar_and_soc(self):
         r = _make_resolver(
             solar_power=1000,
             battery_soc=92.0,
@@ -312,19 +385,19 @@ class TestReasonStrings:
         )
         state = r.resolve()
         assert "Solar-Boost" in state["reason"]
+        assert "Überschuss" in state["reason"]
         assert "Akku 92" in state["reason"]
 
-    def test_reason_when_blocked_explains_why(self):
+    def test_reason_soc_only(self):
         r = _make_resolver(
-            solar_power=1000,
-            battery_soc=60.0,
+            solar_sensor=None,
+            battery_soc=95.0,
             battery_sensor="sensor.akku",
         )
         state = r.resolve()
-        assert "wartet" in state["reason"]
-        assert "60" in state["reason"]
+        assert "Akku 95" in state["reason"]
 
-    def test_reason_normal_without_solar(self):
+    def test_reason_normal_when_nothing_fires(self):
         r = _make_resolver(solar_power=100)
         assert r.resolve()["reason"] == "✅ Normal-Betrieb"
 
@@ -332,7 +405,7 @@ class TestReasonStrings:
 class TestSwitchInteraction:
     """The user's thermal_battery switch still blocks everything."""
 
-    def test_switch_off_blocks_boost_even_with_cascade_green(self):
+    def test_switch_off_blocks_boost_even_with_triggers_green(self):
         r = _make_resolver(
             solar_power=1000,
             battery_soc=95.0,
@@ -343,9 +416,9 @@ class TestSwitchInteraction:
 
 
 class TestDiagnostics:
-    """Diagnostics dict exposes the cascade state for debugging."""
+    """Diagnostics dict exposes the trigger state for debugging."""
 
-    def test_diagnostics_includes_cascade_keys(self):
+    def test_diagnostics_includes_trigger_keys(self):
         r = _make_resolver(
             solar_power=1000,
             battery_soc=92.0,
@@ -356,6 +429,9 @@ class TestDiagnostics:
         diag = r.get_diagnostics()
         assert diag["battery_soc"] == pytest.approx(92.0)
         assert diag["forecast_remaining_kwh"] == pytest.approx(5.0)
-        assert diag["cascade_allows_boost"] is True
+        assert diag["boost_available"] is True
+        assert diag["active_triggers"]["solar"] is True
+        assert diag["active_triggers"]["soc"] is True
+        assert diag["active_triggers"]["forecast"] is True
         assert diag["thresholds"]["bed_boost_soc_threshold"] == 90.0
         assert diag["thresholds"]["bed_boost_min_forecast_kwh"] == 3.0

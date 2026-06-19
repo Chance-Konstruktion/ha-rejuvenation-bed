@@ -9,7 +9,7 @@
 Biorhythm-based temperature curve, learned bedtime prediction, solar surplus stored as heat, presence detection without extra sensors, and a fail-safe that survives every sensor it depends on. Works with waterbeds, heating pads and heated mattress toppers.
 
 [![HACS](https://img.shields.io/badge/HACS-Default-E8A33D.svg?style=flat-square)](https://github.com/hacs/integration)
-[![Version](https://img.shields.io/badge/version-0.7.2-B47326.svg?style=flat-square)](https://github.com/Chance-Konstruktion/ha-rejuvenation-bed/releases)
+[![Version](https://img.shields.io/badge/version-v260619-B47326.svg?style=flat-square)](https://github.com/Chance-Konstruktion/ha-rejuvenation-bed/releases)
 [![License](https://img.shields.io/badge/license-MIT-7BA968.svg?style=flat-square)](LICENSE)
 [![Home Assistant](https://img.shields.io/badge/Home%20Assistant-2024.6+-41BDF5.svg?style=flat-square)](https://www.home-assistant.io/)
 
