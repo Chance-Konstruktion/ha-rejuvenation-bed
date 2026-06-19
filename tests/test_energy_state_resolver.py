@@ -415,6 +415,84 @@ class TestSwitchInteraction:
         assert r.resolve()["mode"] == EnergyMode.NORMAL
 
 
+class TestBatteryPriority:
+    """Optional battery_priority gates the solar threshold behind SoC/forecast.
+
+    On: solar threshold only fires when the battery/forecast also release it
+    (the classic AND gating). Off (default): independent OR-triggers.
+    """
+
+    def test_high_solar_low_battery_blocked_when_priority_on(self):
+        r = _make_resolver(
+            solar_power=1000,
+            battery_soc=70.0,
+            battery_sensor="sensor.akku",
+            options={"battery_priority": True},
+        )
+        state = r.resolve()
+        assert state["mode"] == EnergyMode.NORMAL
+        assert state["boost_waiting"] is True
+        assert "wartet" in state["reason"]
+        assert "70" in state["reason"]
+
+    def test_high_solar_full_battery_boosts_when_priority_on(self):
+        r = _make_resolver(
+            solar_power=1000,
+            battery_soc=95.0,
+            battery_sensor="sensor.akku",
+            options={"battery_priority": True},
+        )
+        assert r.resolve()["mode"] == EnergyMode.SOLAR_BOOST
+
+    def test_soc_alone_does_not_boost_when_priority_on(self):
+        """With priority on, a full battery but low solar must NOT boost."""
+        r = _make_resolver(
+            solar_power=200,
+            battery_soc=95.0,
+            battery_sensor="sensor.akku",
+            options={"battery_priority": True},
+        )
+        assert r.resolve()["mode"] == EnergyMode.NORMAL
+
+    def test_forecast_generous_unblocks_when_priority_on(self):
+        r = _make_resolver(
+            solar_power=1000,
+            battery_soc=60.0,
+            forecast_kwh=8.0,
+            battery_sensor="sensor.akku",
+            forecast_sensor="sensor.forecast",
+            options={"battery_priority": True},
+        )
+        assert r.resolve()["mode"] == EnergyMode.SOLAR_BOOST
+
+    def test_priority_on_without_reserve_sensor_is_classic_solar(self):
+        """No battery/forecast sensor → priority has no effect (classic)."""
+        r = _make_resolver(
+            solar_power=1000,
+            options={"battery_priority": True},
+        )
+        assert r.resolve()["mode"] == EnergyMode.SOLAR_BOOST
+
+    def test_default_is_independent_or(self):
+        """Without the option, high solar + low battery still boosts."""
+        r = _make_resolver(
+            solar_power=1000,
+            battery_soc=70.0,
+            battery_sensor="sensor.akku",
+        )
+        assert r.resolve()["mode"] == EnergyMode.SOLAR_BOOST
+
+    def test_cheap_price_bypasses_priority_gate(self):
+        r = _make_resolver(
+            solar_power=100,
+            price=0.10,
+            battery_soc=50.0,
+            battery_sensor="sensor.akku",
+            options={"battery_priority": True},
+        )
+        assert r.resolve()["mode"] == EnergyMode.SOLAR_BOOST
+
+
 class TestDiagnostics:
     """Diagnostics dict exposes the trigger state for debugging."""
 
@@ -430,6 +508,7 @@ class TestDiagnostics:
         assert diag["battery_soc"] == pytest.approx(92.0)
         assert diag["forecast_remaining_kwh"] == pytest.approx(5.0)
         assert diag["boost_available"] is True
+        assert diag["battery_priority"] is False
         assert diag["active_triggers"]["solar"] is True
         assert diag["active_triggers"]["soc"] is True
         assert diag["active_triggers"]["forecast"] is True
