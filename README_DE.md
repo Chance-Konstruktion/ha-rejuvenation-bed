@@ -3,7 +3,7 @@
 **Intelligente Bett-Heizungssteuerung für Home Assistant**
 
 [![HACS Badge](https://img.shields.io/badge/HACS-Default-orange.svg)](https://github.com/hacs/integration)
-[![Version](https://img.shields.io/badge/version-0.7.1-blue.svg)](https://github.com/Chance-Konstruktion/ha-rejuvenation-bed/releases)
+[![Version](https://img.shields.io/badge/version-v260619-blue.svg)](https://github.com/Chance-Konstruktion/ha-rejuvenation-bed/releases)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
 > ### → [**Zur gerenderten Editorial-README**](https://chance-konstruktion.github.io/ha-rejuvenation-bed/)
