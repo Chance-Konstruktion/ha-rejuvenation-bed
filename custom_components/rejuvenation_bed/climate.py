@@ -15,6 +15,7 @@ Presets:
 """
 
 import logging
+from datetime import timedelta
 from homeassistant.components.climate import (
     ClimateEntity,
     ClimateEntityFeature,
@@ -30,7 +31,7 @@ from homeassistant.const import (
     UnitOfTemperature,
 )
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
-from .const import DOMAIN, ABSOLUTE_MAX_TEMP
+from .const import DOMAIN, ABSOLUTE_MAX_TEMP, MANUAL_TARGET_TTL_HOURS, local_now
 from .device_info import get_zone_device_info
 
 _LOGGER = logging.getLogger(__name__)
@@ -217,6 +218,13 @@ class RejuvenationBedClimate(CoordinatorEntity, ClimateEntity):
             self.coordinator.manual_hvac_mode = {}
         
         self.coordinator.manual_hvac_mode[self._zone_idx] = hvac_mode
+
+        # #4: Zurück auf AUTO/HEAT → manuellen Slider-Wert verwerfen,
+        # damit die Biorhythmus-Automatik wieder übernimmt.
+        if hvac_mode in (HVACMode.AUTO, HVACMode.HEAT):
+            if hasattr(self.coordinator, "clear_manual_target"):
+                self.coordinator.clear_manual_target(self._zone_idx)
+
         await self.coordinator.async_request_refresh()
 
     async def async_set_temperature(self, **kwargs):
@@ -228,8 +236,14 @@ class RejuvenationBedClimate(CoordinatorEntity, ClimateEntity):
         
         if not hasattr(self.coordinator, "manual_target_temp"):
             self.coordinator.manual_target_temp = {}
-        
+        if not hasattr(self.coordinator, "manual_target_until"):
+            self.coordinator.manual_target_until = {}
+
         self.coordinator.manual_target_temp[self._zone_idx] = temp
+        # #4: TTL setzen — der manuelle Wert verfällt automatisch
+        self.coordinator.manual_target_until[self._zone_idx] = (
+            local_now() + timedelta(hours=MANUAL_TARGET_TTL_HOURS)
+        )
         await self.coordinator.async_request_refresh()
 
     async def async_set_preset_mode(self, preset_mode: str):
