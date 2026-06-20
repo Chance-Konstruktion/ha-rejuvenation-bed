@@ -211,6 +211,9 @@ async def _async_setup_services(hass: HomeAssistant, entry: ConfigEntry):
             coordinator.manual_preset[zone_idx] = PRESET_NONE
             if hasattr(coordinator, 'boost_until'):
                 coordinator.boost_until[zone_idx] = None
+            # #4: manuelle Zieltemperatur ebenfalls verwerfen → zurück zur Kurve
+            if hasattr(coordinator, "clear_manual_target"):
+                coordinator.clear_manual_target(zone_idx)
         
         # Vacation zurücksetzen
         coordinator.vacation_mode_enabled = False
@@ -238,9 +241,11 @@ async def _async_setup_services(hass: HomeAssistant, entry: ConfigEntry):
         
         for zone_idx in range(len(entry.data.get("zones", []))):
             coordinator.manual_target_temp[zone_idx] = target_temp
-            coordinator.preheat_until = coordinator.preheat_until if hasattr(coordinator, 'preheat_until') else {}
-            coordinator.preheat_until[zone_idx] = local_now() + timedelta(minutes=duration)
-        
+            # #5: gemeinsame TTL nutzen — Vorheizen verfällt nach 'duration'
+            if not hasattr(coordinator, "manual_target_until"):
+                coordinator.manual_target_until = {}
+            coordinator.manual_target_until[zone_idx] = local_now() + timedelta(minutes=duration)
+
         _LOGGER.info(f"Vorheizen auf {target_temp}°C für {duration} Minuten")
         await coordinator.async_request_refresh()
     

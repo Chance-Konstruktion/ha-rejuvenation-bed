@@ -6,12 +6,19 @@
 > Reihenfolge = empfohlene PR-Batches. Jede Zeile: Befund → Ursache → Fix → Test.
 
 ## Status-Checkliste
-- [ ] Tier 1 — Safety (#1 #2 #3)
-- [ ] Tier 2 — UX/Funktions-Bugs (#4 #5 #7 #8)
+- [x] Tier 1 — Safety (#1 #2 #3) ✅ PR A
+- [~] Tier 2 — UX/Funktions-Bugs (#4 ✅ #5 ✅ | #7 ⬜ #8 ⬜)
 - [ ] Tier 3 — Multi-Instanz/Targeting (#6) + manifest
 - [ ] Tier 4 — CI härten
 - [ ] Tier 5 — Refactor/Optimierung (#9 #10 #11 #12 + O1..O9)
 - [ ] Release-Tag `v260619` setzen
+
+> **Erledigt (PR A):** #1 Safety-Engine verdrahtet (Emergency-Latch +
+> Zonen-Safety nach Heiz-Entscheidung), #2 Fail-Safe je Bett-Typ +
+> Max-ON-Timeout (90 min → Degraded-Duty), #3 Urlaubs-Temp-Clamp,
+> #4 manual_target TTL (8 h + Clear bei AUTO/Cancel), #5 totes
+> `preheat_until` durch gemeinsame TTL ersetzt. Tests:
+> `tests/test_safety_manager.py` (10), `tests/test_coordinator.py` (7).
 
 ---
 
