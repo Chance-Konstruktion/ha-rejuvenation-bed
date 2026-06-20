@@ -115,8 +115,14 @@ class EnergyStateResolver:
 
     @property
     def solar_boost_off_w(self) -> float:
-        """Solar-Aus-Schwellwert = Ein-Schwellwert minus 50W Hysterese."""
-        return self.solar_boost_on_w - 50
+        """
+        Solar-Aus-Schwellwert mit RELATIVER Hysterese (O5).
+
+        10% unter dem Ein-Schwellwert — proportional statt fix 50W. Bei 500W
+        identisch zu früher (450W), bei kleinen Schwellen (z.B. 150W) aber ein
+        engeres, sinnvolleres Band (135W statt 100W).
+        """
+        return self.solar_boost_on_w * 0.9
 
     # ───────────────────────────────────────────────────────────────────────
     # Unabhängige Solar-Boost-Trigger: Hausakku-SoC und PV-Forecast

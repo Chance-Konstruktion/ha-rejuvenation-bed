@@ -24,6 +24,9 @@ from .const import (
     BED_TYPE_HEATING_PAD,
     BOOST_MAX_TEMP,
     FAILSAFE_MAX_ON_MINUTES,
+    STARTUP_GRACE_SECONDS,
+    HEATING_EFFICIENCY_WINDOW_SECONDS,
+    HEATING_EFFICIENCY_MIN_RISE_C,
     local_now,
 )
 from .safety_manager import SafetyManager
@@ -106,9 +109,10 @@ class RejuvenationBedCoordinator(DataUpdateCoordinator):
         # FIX: Startup-Grace-Period (ESP-Sensoren brauchen Zeit nach HA-Restart)
         # ═══════════════════════════════════════════════════════════════════════
         self._startup_time = local_now()
-        self._startup_grace_seconds = 180  # 3 Minuten Geduld für ESP-Boot
+        self._startup_grace_seconds = STARTUP_GRACE_SECONDS  # Geduld für ESP-Boot
         self._sensor_failure_notified = {}  # Nur einmal pro Zone benachrichtigen
         self._failsafe_on_since = {}  # NEU: Start des Dauer-AN bei Sensor-Ausfall (#2)
+        self._sensor_warn_at = {}  # O2: Throttle für Sensor-Warnungen (je Entity)
         
         # ═══════════════════════════════════════════════════════════════════════
         # FIX: Alle Mode-Attribute initialisieren (für switch.py!)
@@ -207,25 +211,40 @@ class RejuvenationBedCoordinator(DataUpdateCoordinator):
         
         try:
             state = self.hass.states.get(entity_id)
-            
+
             if state is None:
-                _LOGGER.warning(f"Sensor {entity_id} nicht gefunden!")
+                self._warn_sensor_throttled(entity_id, f"Sensor {entity_id} nicht gefunden!")
                 return default
-            
+
             if state.state in ["unknown", "unavailable", "none", None]:
                 _LOGGER.debug(f"Sensor {entity_id} nicht verfügbar: {state.state}")
                 return default
-            
+
             if value_type == "float":
                 return float(state.state)
             elif value_type == "bool":
                 return state.state.lower() in ["on", "true", "1", "yes"]
             else:
                 return state.state
-                
+
         except (ValueError, TypeError, AttributeError) as e:
-            _LOGGER.warning(f"Fehler beim Lesen von {entity_id}: {e}")
+            self._warn_sensor_throttled(entity_id, f"Fehler beim Lesen von {entity_id}: {e}")
             return default
+
+    def _warn_sensor_throttled(self, entity_id: str, message: str):
+        """
+        Loggt eine Sensor-Warnung höchstens einmal pro Stunde je Entity (O2).
+
+        Verhindert WARNING-Spam im 60s-Loop bei dauerhaft fehlendem Sensor —
+        erste Meldung als WARNING, weitere innerhalb der Stunde nur DEBUG.
+        """
+        now = local_now()
+        last = self._sensor_warn_at.get(entity_id)
+        if last is None or (now - last).total_seconds() >= 3600:
+            self._sensor_warn_at[entity_id] = now
+            _LOGGER.warning(message)
+        else:
+            _LOGGER.debug(message)
 
     # ═══════════════════════════════════════════════════════════════════════════
     # FIX: Mode-Auswertung
@@ -1130,9 +1149,9 @@ class RejuvenationBedCoordinator(DataUpdateCoordinator):
             return
 
         duration = (local_now() - self._heating_start_time[zone_index]).total_seconds()
-        if duration > 2700: 
+        if duration > HEATING_EFFICIENCY_WINDOW_SECONDS:
             temp_diff = current_temp - self._heating_start_temp[zone_index]
-            if temp_diff < 0.2:
+            if temp_diff < HEATING_EFFICIENCY_MIN_RISE_C:
                 _LOGGER.warning(
                     f"Zone {zone_index + 1}: Geringe Heizleistung erkannt. "
                     "Prüfen Sie auf Wärmeverlust oder Defekt."

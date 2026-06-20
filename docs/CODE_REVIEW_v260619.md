@@ -10,7 +10,7 @@
 - [x] Tier 2 — UX/Funktions-Bugs (#4 #5 ✅ PR A · #7 #8 ✅ PR B)
 - [x] Tier 3 — Multi-Instanz/Targeting (#6) + manifest ✅ PR B
 - [ ] Tier 4 — CI härten
-- [~] Tier 5 — Refactor/Optimierung: #9 ✅ #10 ✅ #11 ✅ #12 ✅ · O6/O7 ✅ — offen: O1–O5, O8, O9
+- [~] Tier 5 — Refactor/Optimierung: #9–#12 ✅ · O2 O3 O5 O6 O7 O9 ✅ — offen: O1 (Save-Debounce), O4 (Zone-Keys), O8 (Typing)
 - [ ] Release-Tag `v260619` setzen
 
 > **Erledigt (PR C):** #12 `detect_hardware_level` als einzige Quelle in
