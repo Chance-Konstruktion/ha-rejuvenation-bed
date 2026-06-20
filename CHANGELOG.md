@@ -4,6 +4,36 @@ Alle Änderungen am Rejuvenation Bed Projekt.
 
 ## [Unreleased]
 
+## [v260620] - 2026-06-20
+
+### Sicherheit
+- **Software-Safety-Engine verdrahtet (#1):** `async_check_zone_safety` wird
+  jetzt pro Zone ausgewertet (Klebe-Relais, Sensor-Defekt, Übertemperatur).
+  Bei >36 °C greift ein Emergency-Latch (Heizung bleibt AUS bis manueller Reset).
+- **Fail-Safe je Bett-Typ (#2):** Wasserbett heizt bei Sensor-Ausfall weiter,
+  aber mit Max-ON-Timeout (90 min → 30 % Degraded-Duty); Heizmatte schaltet AUS.
+- **Urlaubs-Temperatur (#3):** für Wasserbetten auf `min_temp` (24 °C) geklemmt.
+
+### Funktion / UX
+- **Manuelle Zieltemperatur mit TTL (#4/#5):** Slider/Service verfällt nach 8 h
+  zurück zur Kurve; Vorheizen (`preheat_bed`) verfällt nach seiner Dauer.
+- **Services & Multi-Instanz (#6):** `single_config_entry`, Services einmalig
+  global registriert, Coordinator zur Laufzeit aufgelöst.
+- **Tarif-Status korrekt (#7):** Resolver liefert echte `solar_active` /
+  `price_status` (cheap/expensive/normal).
+- **Boost vereinheitlicht (#8/#11):** feste `boost_target_temp` (Option → Zone →
+  34 °C), kein Offset-Stapeln; tote DRY/COMFORT-Presets entfernt.
+
+### Refactor / Qualität
+- **#9** Coordinator-Monolith zerlegt (`_process_zone`, `_async_sync_hardware_once`,
+  `_finalize_energy`) + erste Coordinator-Integrationstests.
+- **#10** Zeitzonen über `local_now()` (HA-Zeit) vereinheitlicht.
+- **#12** Hardware-Level-Erkennung dedupliziert (`device_info.detect_hardware_level`).
+- **O1** BedIntelligence-Saves entprellt; **O2** Sensor-Warnungen gedrosselt;
+  **O3** Magic Numbers → const; **O5** Solar-Hysterese relativ (10 %);
+  **O9** totes `comfort_offset` entfernt.
+- CI: Black auf `custom_components/` erweitert. Test-Suite 178 → 225.
+
 ## [v260619] - 2026-06-19
 
 ### Bugfixes
