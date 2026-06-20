@@ -152,10 +152,10 @@ HEATING_EFFICIENCY_MIN_RISE_C = 0.2
 # die Solar-Schwelle hinter SoC/Forecast (UND) — klassisches Gating, gibt
 # Akku/Boiler Vorrang auf den PV-Überschuss.
 
-DEFAULT_BED_BOOST_SOC_THRESHOLD = 90.0   # %SoC ab dem der SoC-Trigger auslöst
+DEFAULT_BED_BOOST_SOC_THRESHOLD = 90.0  # %SoC ab dem der SoC-Trigger auslöst
 DEFAULT_BED_BOOST_MIN_FORECAST_KWH = 3.0  # kWh Rest-Tag ab denen Forecast auslöst
-BED_BOOST_SOC_HYSTERESIS = 5.0            # %SoC Hysterese (an: 90%, aus: 85%)
-BED_BOOST_FORECAST_HYSTERESIS_KWH = 1.0   # kWh Hysterese (an: 3, aus: 2)
+BED_BOOST_SOC_HYSTERESIS = 5.0  # %SoC Hysterese (an: 90%, aus: 85%)
+BED_BOOST_FORECAST_HYSTERESIS_KWH = 1.0  # kWh Hysterese (an: 3, aus: 2)
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # PRÄSENZ-ERKENNUNG (Varianz-basiert, kalibriert Apr 2026)

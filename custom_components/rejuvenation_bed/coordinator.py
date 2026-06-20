@@ -53,23 +53,23 @@ class RejuvenationBedCoordinator(DataUpdateCoordinator):
             name="Rejuvenation Bed",
             update_interval=timedelta(seconds=UPDATE_INTERVAL),
         )
-        
+
         self.config_entry = config_entry
         self.hass = hass
-        
+
         # ═══════════════════════════════════════════════════════════════════════
         # BETT-TYP KONFIGURATION
         # ═══════════════════════════════════════════════════════════════════════
         global_conf = config_entry.data.get("global", {})
         self.bed_type = global_conf.get("bed_type", BED_TYPE_WATERBED)
         self.bed_config = get_bed_config(self.bed_type)
-        
+
         _LOGGER.info(
             f"Rejuvenation Bed initialisiert: Typ={self.bed_type}, "
             f"Min={self.bed_config['min_temp']}°C, Max={self.bed_config['max_temp']}°C, "
             f"Rampen={'aktiv' if self.bed_config['ramp_enabled'] else 'deaktiviert'}"
         )
-        
+
         # Sub-Manager initialisieren (MIT Bett-Typ!)
         self.safety_manager = SafetyManager(hass, config_entry, self.bed_config)
         self.temperature_calculator = TemperatureCalculator(hass, config_entry, self.bed_config)
@@ -80,7 +80,7 @@ class RejuvenationBedCoordinator(DataUpdateCoordinator):
         self.presence_detector = PresenceDetector()
         self.sleep_score_calculator = SleepScoreCalculator(hass, config_entry)
         self.bed_intelligence = BedIntelligence(hass, config_entry)
-        
+
         # Ramp Controller (nur bei Wasserbett aktiv!)
         if self.bed_config["ramp_enabled"]:
             self.ramp_controller = RampController(
@@ -89,22 +89,22 @@ class RejuvenationBedCoordinator(DataUpdateCoordinator):
             )
         else:
             self.ramp_controller = None
-        
+
         # CO2 Sensor (optional)
         # CO2-Sensor: Zuerst aus Zone-Config, dann Options, dann global (Rückwärtskompatibilität)
         self.co2_sensor = None  # Wird pro Zone gelesen
-        
+
         # Speicher für Zustände
         self._decision_log = deque(maxlen=100)
         self._heater_states = {}
-        
+
         # ═══════════════════════════════════════════════════════════════════════
         # FIX: Hardware-Sync Flag
         # ═══════════════════════════════════════════════════════════════════════
         self._hardware_synced = False
         self._last_successful_update = None
         self._consecutive_failures = 0
-        
+
         # ═══════════════════════════════════════════════════════════════════════
         # FIX: Startup-Grace-Period (ESP-Sensoren brauchen Zeit nach HA-Restart)
         # ═══════════════════════════════════════════════════════════════════════
@@ -113,7 +113,7 @@ class RejuvenationBedCoordinator(DataUpdateCoordinator):
         self._sensor_failure_notified = {}  # Nur einmal pro Zone benachrichtigen
         self._failsafe_on_since = {}  # NEU: Start des Dauer-AN bei Sensor-Ausfall (#2)
         self._sensor_warn_at = {}  # O2: Throttle für Sensor-Warnungen (je Entity)
-        
+
         # ═══════════════════════════════════════════════════════════════════════
         # FIX: Alle Mode-Attribute initialisieren (für switch.py!)
         # ═══════════════════════════════════════════════════════════════════════
@@ -130,20 +130,20 @@ class RejuvenationBedCoordinator(DataUpdateCoordinator):
         self.vacation_mode_enabled = False  # NEU: Urlaub-Modus Default AUS
         self.vacation_until = None  # NEU: Urlaub-Ende
         self.vacation_temp_override = None  # Optional per Service gesetzt
-        
+
         # Präsenz-Tracking für Biorhythmus-Aktivierung
-        self._presence_detected_at = {}   # Wann Präsenz erstmals erkannt
-        self._curve_active = {}           # Kurve läuft für diese Zone
-        self._actual_bedtime = {}         # ECHTE Einschlafzeit (nicht konfigurierte!)
-        self._presence_left_at = {}       # Wann Bett verlassen (für Toiletten-Check)
+        self._presence_detected_at = {}  # Wann Präsenz erstmals erkannt
+        self._curve_active = {}  # Kurve läuft für diese Zone
+        self._actual_bedtime = {}  # ECHTE Einschlafzeit (nicht konfigurierte!)
+        self._presence_left_at = {}  # Wann Bett verlassen (für Toiletten-Check)
         self._night_tracking_active = {}
         self._last_presence_state = {}
-        self._post_alarm_mode = {}        # Nach Wecker: Warmhalten statt Kurve
-        
+        self._post_alarm_mode = {}  # Nach Wecker: Warmhalten statt Kurve
+
         # Tracker für Performance-Überwachung
         self._heating_start_time = {}
         self._heating_start_temp = {}
-        
+
         # Schwitz-Erkennung & Leckage-Tracking
         self._moisture_start_time = {}
 
@@ -151,7 +151,7 @@ class RejuvenationBedCoordinator(DataUpdateCoordinator):
     def is_waterbed(self) -> bool:
         """Gibt True zurück wenn es ein Wasserbett ist."""
         return self.bed_type == BED_TYPE_WATERBED
-    
+
     @property
     def is_heating_pad(self) -> bool:
         """Gibt True zurück wenn es eine Heizmatte ist."""
@@ -173,10 +173,7 @@ class RejuvenationBedCoordinator(DataUpdateCoordinator):
         if until is not None and local_now() > until:
             self.manual_target_temp.pop(zone_index, None)
             self.manual_target_until.pop(zone_index, None)
-            _LOGGER.info(
-                f"Zone {zone_index}: Manuelle Zieltemperatur abgelaufen "
-                f"→ zurück zur Automatik"
-            )
+            _LOGGER.info(f"Zone {zone_index}: Manuelle Zieltemperatur abgelaufen " f"→ zurück zur Automatik")
             return None
 
         return temp
@@ -189,26 +186,21 @@ class RejuvenationBedCoordinator(DataUpdateCoordinator):
     # ═══════════════════════════════════════════════════════════════════════════
     # FIX: Robustes Sensor-Lesen
     # ═══════════════════════════════════════════════════════════════════════════
-    def _safe_get_sensor_value(
-        self, 
-        entity_id: str, 
-        default: float = None,
-        value_type: str = "float"
-    ):
+    def _safe_get_sensor_value(self, entity_id: str, default: float = None, value_type: str = "float"):
         """
         Liest einen Sensor SICHER aus - crasht NICHT bei Fehlern!
-        
+
         Args:
             entity_id: Entity-ID des Sensors
             default: Fallback-Wert bei Fehler
             value_type: "float", "bool", oder "str"
-        
+
         Returns:
             Sensor-Wert oder default
         """
         if not entity_id:
             return default
-        
+
         try:
             state = self.hass.states.get(entity_id)
 
@@ -252,13 +244,13 @@ class RejuvenationBedCoordinator(DataUpdateCoordinator):
     def _apply_mode_adjustments(self, zone_index: int, base_temp: float) -> tuple:
         """
         Wendet aktive Modi auf die Temperatur an.
-        
+
         Priorität:
         1. Urlaub-Modus (niedrigste Temperatur)
         2. Krank-Modus (konstant hoch)
         3. Boost-Modus (erhöht)
         4. Tarifmodus (strompreis-abhängig)
-        
+
         Returns:
             (adjusted_temp, active_mode, reason)
         """
@@ -267,7 +259,7 @@ class RejuvenationBedCoordinator(DataUpdateCoordinator):
         # ═══════════════════════════════════════════════════════════════════
         if self.vacation_mode_enabled:
             vacation_until = self.vacation_until
-            
+
             # Prüfe ob Urlaub abgelaufen
             if vacation_until and local_now() > vacation_until:
                 self.vacation_mode_enabled = False
@@ -279,8 +271,7 @@ class RejuvenationBedCoordinator(DataUpdateCoordinator):
                     away_temp = float(
                         self.vacation_temp_override
                         if self.vacation_temp_override is not None
-                        else self.config_entry.options.get("away_temp")
-                        or self.bed_config.get("away_temp", 24.0)
+                        else self.config_entry.options.get("away_temp") or self.bed_config.get("away_temp", 24.0)
                     )
                     # #3 Kondensationsschutz: Wasserbett NIE unter min_temp
                     min_temp = self.bed_config.get("min_temp", 24.0)
@@ -293,7 +284,7 @@ class RejuvenationBedCoordinator(DataUpdateCoordinator):
                     return away_temp, "vacation", f"✈️ Urlaub-Modus ({away_temp}°C Frostschutz)"
                 else:
                     return 0.0, "vacation", "✈️ Urlaub-Modus (Heizmatte AUS)"
-        
+
         # ═══════════════════════════════════════════════════════════════════
         # PRIORITÄT 2: Krank-Modus
         # ═══════════════════════════════════════════════════════════════════
@@ -301,7 +292,7 @@ class RejuvenationBedCoordinator(DataUpdateCoordinator):
         if sick_until and local_now() < sick_until:
             sick_temp = self.sick_mode_temp.get(zone_index, 30.0)
             return sick_temp, "sick", f"🤒 Krank-Modus ({sick_temp}°C konstant)"
-        
+
         # ═══════════════════════════════════════════════════════════════════
         # PRIORITÄT 3: Boost-Modus (#11: feste Zieltemperatur, absolut)
         # Der Wert kommt aus dem TemperatureCalculator (boost_target_temp) und
@@ -319,13 +310,13 @@ class RejuvenationBedCoordinator(DataUpdateCoordinator):
             else:
                 boost_temp = min(base_temp, BOOST_MAX_TEMP)  # Safety: max 34°C
                 return boost_temp, "boost", f"🔥 Schnellheizen ({boost_temp:.1f}°C konstant)"
-        
+
         # ═══════════════════════════════════════════════════════════════════
         # PRIORITÄT 4: Tarifmodus → wird jetzt durch EnergyStateResolver
         # als temperature_offset auf die Kurve angewandt (nicht hier)
         # eco_mode_enabled wird vom Switch gesetzt und vom Resolver gelesen
         # ═══════════════════════════════════════════════════════════════════
-        
+
         # ═══════════════════════════════════════════════════════════════════
         # KEIN SPEZIAL-MODUS: Normale Kurve
         # ═══════════════════════════════════════════════════════════════════
@@ -468,13 +459,8 @@ class RejuvenationBedCoordinator(DataUpdateCoordinator):
                 if heater_state:
                     actual_on = heater_state.state == "on"
                     self._heater_states[heater_entity] = actual_on
-                    self.anti_short_cycle_manager.sync_with_hardware(
-                        heater_entity, actual_on
-                    )
-                    _LOGGER.info(
-                        f"Zone {zone_idx}: Heizung ist "
-                        f"{'AN' if actual_on else 'AUS'} (Hardware-Sync)"
-                    )
+                    self.anti_short_cycle_manager.sync_with_hardware(heater_entity, actual_on)
+                    _LOGGER.info(f"Zone {zone_idx}: Heizung ist " f"{'AN' if actual_on else 'AUS'} (Hardware-Sync)")
                 else:
                     _LOGGER.warning(f"Zone {zone_idx}: Heizung {heater_entity} nicht gefunden!")
         self._hardware_synced = True
@@ -486,42 +472,41 @@ class RejuvenationBedCoordinator(DataUpdateCoordinator):
                 "timestamp": local_now().isoformat(),
                 "zones": {},
                 "global_state": {"energy": {}, "status": "OK"},
-                "errors": []
+                "errors": [],
             }
-            
+
             # FIX: Hardware-Sync beim ersten Update (#9: ausgelagert)
             zones = self.config_entry.data.get("zones", [])
             await self._async_sync_hardware_once(zones)
 
             # 1. SICHERHEIT (Prio 1: Überhitzung & Sensor-Check)
             safety_check = await self.safety_manager.async_check_all()
-            
+
             # KRITISCH: Emergency Shutdown (nur bei Überhitzung!)
             if not safety_check["is_safe"]:
                 await self._async_emergency_shutdown(safety_check["reason"])
                 decision["global_state"]["status"] = "EMERGENCY_SHUTDOWN"
                 decision["reason"] = safety_check["reason"]
                 return decision
-            
+
             # NEU: Degraded Mode (Sensor-Ausfall)
             is_degraded_mode = safety_check.get("mode") == "degraded"
             degraded_zones = safety_check.get("degraded_zones", [])
-            
+
             if is_degraded_mode:
                 duty_pct = safety_check.get("duty_cycle", 0.30)
                 _LOGGER.warning(
-                    f"System im Degraded Mode: {safety_check['reason']} "
-                    f"(Duty-Cycle: {duty_pct*100:.0f}%)"
+                    f"System im Degraded Mode: {safety_check['reason']} " f"(Duty-Cycle: {duty_pct*100:.0f}%)"
                 )
                 decision["global_state"]["status"] = "DEGRADED_MODE"
                 decision["global_state"]["degraded_reason"] = safety_check["reason"]
-            
+
             # 2. VETO-CHECKS (Sommer-Modus & Präsenz)
             veto_result = await self._async_check_vetos()
-            
+
             # 3. ENERGIE-LOGIK (Solar-Verfügbarkeit & Strompreise)
             energy_state = self.energy_calculator.resolve()
-            
+
             # 4. ZONEN-STEUERUNG
             total_current_power = 0.0
 
@@ -545,11 +530,11 @@ class RejuvenationBedCoordinator(DataUpdateCoordinator):
             self._last_successful_update = local_now()
             self._consecutive_failures = 0
             return decision
-        
+
         except Exception as err:
             self._consecutive_failures += 1
             _LOGGER.error(f"Coordinator Fehler (#{self._consecutive_failures}): {err}", exc_info=True)
-            
+
             # Nach 3 Fehlern: Fail-Safe aktivieren (Richtung je Bett-Typ, #2)
             if self._consecutive_failures >= 3:
                 fail_state = self.is_waterbed
@@ -561,7 +546,7 @@ class RejuvenationBedCoordinator(DataUpdateCoordinator):
                     heater_entity = zone_config.get("heater")
                     if heater_entity:
                         await self._async_control_heater(heater_entity, fail_state)
-            
+
             raise UpdateFailed(f"Update fehlgeschlagen: {err}")
 
     async def _process_zone(
@@ -606,9 +591,7 @@ class RejuvenationBedCoordinator(DataUpdateCoordinator):
                         return current_watt
                     else:
                         # Grace-Period vorbei → FAIL-SAFE!
-                        fail_safe_result = await self._async_handle_sensor_failure(
-                            zone_index, zone_config
-                        )
+                        fail_safe_result = await self._async_handle_sensor_failure(zone_index, zone_config)
                         decision["zones"][zone_name] = fail_safe_result
                         self._sensor_failure_notified[zone_index] = True
                         return current_watt
@@ -622,8 +605,7 @@ class RejuvenationBedCoordinator(DataUpdateCoordinator):
                 # ═══════════════════════════════════════════════════
                 if self._sensor_failure_notified.get(zone_index, False):
                     _LOGGER.info(
-                        f"✅ Zone {zone_index}: Sensor RECOVERED! "
-                        f"({current_temp:.1f}°C) → zurück zu Auto-Modus"
+                        f"✅ Zone {zone_index}: Sensor RECOVERED! " f"({current_temp:.1f}°C) → zurück zu Auto-Modus"
                     )
                     # Manuellen HVAC-Override löschen (war evtl. auf OFF)
                     self.manual_hvac_mode.pop(zone_index, None)
@@ -637,7 +619,7 @@ class RejuvenationBedCoordinator(DataUpdateCoordinator):
                             f"Zone {zone_index + 1}: Temperatursensor ist wieder online "
                             f"({current_temp:.1f}°C). Normalbetrieb wiederhergestellt."
                         ),
-                        notification_id=f"rejuvenation_bed_sensor_failure_{zone_index}"
+                        notification_id=f"rejuvenation_bed_sensor_failure_{zone_index}",
                     )
 
             # ═══════════════════════════════════════════════════════════
@@ -646,6 +628,7 @@ class RejuvenationBedCoordinator(DataUpdateCoordinator):
             # ═══════════════════════════════════════════════════════════
             if self.safety_manager.is_emergency_shutdown(zone_index):
                 from homeassistant.components.climate.const import HVACMode as _HVACMode
+
                 heater_entity = zone_config.get("heater")
                 await self._async_control_heater(heater_entity, False)
                 self._heater_states[heater_entity] = False
@@ -667,6 +650,7 @@ class RejuvenationBedCoordinator(DataUpdateCoordinator):
                 target_temp = 27.0
 
                 from homeassistant.components.climate.const import HVACMode as _HVACMode
+
                 decision["zones"][zone_name] = {
                     "target": round(target_temp, 1),
                     "current": round(current_temp, 1) if current_temp else "unknown",
@@ -674,7 +658,7 @@ class RejuvenationBedCoordinator(DataUpdateCoordinator):
                     "watt": round(current_watt, 1),
                     "mode": "degraded",
                     "hvac_mode": _HVACMode.HEAT,
-                    "reason": "⚠️ Degraded Mode: Sensor ausgefallen (30% Duty-Cycle)"
+                    "reason": "⚠️ Degraded Mode: Sensor ausgefallen (30% Duty-Cycle)",
                 }
 
                 heater_entity = zone_config.get("heater")
@@ -691,38 +675,26 @@ class RejuvenationBedCoordinator(DataUpdateCoordinator):
             # Feuchtigkeit als numerischen Wert lesen (SHT41)
             humidity_value = None
             if moisture_sensor:
-                humidity_value = self._safe_get_sensor_value(
-                    moisture_sensor, default=None
-                )
+                humidity_value = self._safe_get_sensor_value(moisture_sensor, default=None)
 
             # Luft-Temp lesen (SHT41 oben auf Kern)
             # PRIORITÄT: 1. Konfigurierter air_temp_sensor, 2. Namenstrick vom Feuchtesensor
             air_temp = None
             air_temp_entity = zone_config.get("air_temp_sensor")
             if air_temp_entity:
-                air_temp = self._safe_get_sensor_value(
-                    air_temp_entity, default=None
-                )
+                air_temp = self._safe_get_sensor_value(air_temp_entity, default=None)
             elif moisture_sensor:
                 # Fallback: SHT41 Luft-Temp über Entity-Namensableitung
-                air_temp_entity = moisture_sensor.replace(
-                    "feuchtigkeit", "lufttemp"
-                ).replace("humidity", "temperature")
-                air_temp = self._safe_get_sensor_value(
-                    air_temp_entity, default=None
-                )
+                air_temp_entity = moisture_sensor.replace("feuchtigkeit", "lufttemp").replace("humidity", "temperature")
+                air_temp = self._safe_get_sensor_value(air_temp_entity, default=None)
 
             # Dedizierter Präsenz-Sensor (optional)
             presence_state = None
             if presence_sensor:
-                presence_state = self._safe_get_sensor_value(
-                    presence_sensor, default=None, value_type="bool"
-                )
+                presence_state = self._safe_get_sensor_value(presence_sensor, default=None, value_type="bool")
 
             # Power für Duty-Cycle
-            heater_active = self._heater_states.get(
-                zone_config.get("heater"), False
-            )
+            heater_active = self._heater_states.get(zone_config.get("heater"), False)
 
             # Kalibrierte Schwellwerte anwenden (wenn verfügbar)
             if self.bed_intelligence.calibration.is_calibrated:
@@ -731,22 +703,18 @@ class RejuvenationBedCoordinator(DataUpdateCoordinator):
                 )
 
             try:
-                is_present, presence_confidence, presence_reason = (
-                    self.presence_detector.detect_presence(
-                        zone_index=zone_index,
-                        water_temp=current_temp,
-                        air_temp=air_temp,
-                        humidity=humidity_value,
-                        power_watts=current_watt,
-                        heater_active=heater_active,
-                        presence_sensor_state=presence_state,
-                        is_heating_pad=self.is_heating_pad,
-                    )
+                is_present, presence_confidence, presence_reason = self.presence_detector.detect_presence(
+                    zone_index=zone_index,
+                    water_temp=current_temp,
+                    air_temp=air_temp,
+                    humidity=humidity_value,
+                    power_watts=current_watt,
+                    heater_active=heater_active,
+                    presence_sensor_state=presence_state,
+                    is_heating_pad=self.is_heating_pad,
                 )
             except Exception as pres_err:
-                _LOGGER.warning(
-                    f"Zone {zone_index}: Präsenz-Erkennung Fehler (Fallback): {pres_err}"
-                )
+                _LOGGER.warning(f"Zone {zone_index}: Präsenz-Erkennung Fehler (Fallback): {pres_err}")
                 # Fallback: Externer Sensor oder "nicht anwesend"
                 is_present = presence_state if presence_state is not None else False
                 presence_confidence = 0.0
@@ -770,13 +738,12 @@ class RejuvenationBedCoordinator(DataUpdateCoordinator):
             opts = self.config_entry.options
             zone_prefix = f"zone_{zone_index}_"
             wake_str = (
-                opts.get(f"{zone_prefix}warm_until")
-                or opts.get("warm_until")
-                or global_c.get("warm_until", "07:00")
+                opts.get(f"{zone_prefix}warm_until") or opts.get("warm_until") or global_c.get("warm_until", "07:00")
             )
             wp = wake_str.split(":")
             wake_h, wake_m = int(wp[0]), int(wp[1]) if len(wp) > 1 else 0
             from datetime import time as dt_time
+
             wake_t = dt_time(wake_h, wake_m)
             now_t = local_now().time()
 
@@ -805,9 +772,7 @@ class RejuvenationBedCoordinator(DataUpdateCoordinator):
                         away_min = (local_now() - left_at).total_seconds() / 60
                         if away_min >= 5 and self._night_tracking_active.get(zone_index, False):
                             # >5 Min weg = echte Unterbrechung → Score-Malus
-                            self.sleep_score_calculator.record_interruption(
-                                zone_index, away_min
-                            )
+                            self.sleep_score_calculator.record_interruption(zone_index, away_min)
                     _LOGGER.debug(f"Zone {zone_index}: Zurück im Bett")
 
                 # Toiletten-Timer löschen
@@ -844,9 +809,7 @@ class RejuvenationBedCoordinator(DataUpdateCoordinator):
 
                     # Bedtime Learning: Nur wenn Session >2h (echter Schlaf)
                     if session_bedtime and session_duration_h >= 2.0:
-                        self.bed_intelligence.record_bedtime(
-                            zone_index, session_bedtime
-                        )
+                        self.bed_intelligence.record_bedtime(zone_index, session_bedtime)
                         _LOGGER.info(
                             f"Zone {zone_index}: Schlaf-Session beendet nach "
                             f"{session_duration_h:.1f}h → Bedtime Learning gespeichert"
@@ -865,35 +828,31 @@ class RejuvenationBedCoordinator(DataUpdateCoordinator):
                 elif gone_min >= 5 and self._night_tracking_active.get(zone_index, False):
                     # 5-60 Min weg: Unterbrechung registrieren
                     # Score-Tracking läuft weiter, aber Unterbrechung wird gezählt
-                    if not hasattr(self, '_interruption_logged'):
+                    if not hasattr(self, "_interruption_logged"):
                         self._interruption_logged = {}
                     left_at = self._presence_left_at.get(zone_index)
                     if left_at and zone_index not in self._interruption_logged:
                         self._interruption_logged[zone_index] = True
-                        _LOGGER.debug(
-                            f"Zone {zone_index}: Schlaf-Unterbrechung ({gone_min:.0f} Min)"
-                        )
+                        _LOGGER.debug(f"Zone {zone_index}: Schlaf-Unterbrechung ({gone_min:.0f} Min)")
 
             # Zurück im Bett → Unterbrechungs-Flag resetten
-            if is_present and not was_present and hasattr(self, '_interruption_logged'):
+            if is_present and not was_present and hasattr(self, "_interruption_logged"):
                 self._interruption_logged.pop(zone_index, None)
 
             # Wecker-Check: Nach Wecker-Zeit → Post-Alarm-Modus
             if actual_bedtime and self._curve_active.get(zone_index):
                 if past_wake and not post_alarm:
                     self._post_alarm_mode[zone_index] = True
-                    _LOGGER.info(
-                        f"Zone {zone_index}: Wecker-Zeit ({wake_str}) vorbei → Post-Alarm Warmhalten"
-                    )
+                    _LOGGER.info(f"Zone {zone_index}: Wecker-Zeit ({wake_str}) vorbei → Post-Alarm Warmhalten")
 
             self._last_presence_state[zone_index] = is_present
 
             # Zieltemperatur berechnen
             self.temperature_calculator.update_trend_data(zone_index, current_temp)
             desired_temp = await self.temperature_calculator.async_calculate_target(
-                zone_index, 
-                energy_state, 
-                veto_result, 
+                zone_index,
+                energy_state,
+                veto_result,
                 coordinator=self,
                 is_present=is_present,
                 has_presence_sensor=has_presence_sensor,
@@ -904,9 +863,7 @@ class RejuvenationBedCoordinator(DataUpdateCoordinator):
             # ═══════════════════════════════════════════════════════════
             # FIX: Mode-Auswertung HIER!
             # ═══════════════════════════════════════════════════════════
-            final_temp, active_mode, mode_reason = self._apply_mode_adjustments(
-                zone_index, desired_temp
-            )
+            final_temp, active_mode, mode_reason = self._apply_mode_adjustments(zone_index, desired_temp)
 
             # Wenn Spezial-Modus aktiv, diese Temperatur verwenden
             if active_mode != "normal":
@@ -924,14 +881,14 @@ class RejuvenationBedCoordinator(DataUpdateCoordinator):
 
                 if ramp_state.ramp_active:
                     _LOGGER.debug(
-                        f"Zone {zone_index}: Rampe aktiv - "
-                        f"Ziel: {desired_temp:.1f}°C, Aktuell: {target_temp:.1f}°C"
+                        f"Zone {zone_index}: Rampe aktiv - " f"Ziel: {desired_temp:.1f}°C, Aktuell: {target_temp:.1f}°C"
                     )
             else:
                 target_temp = desired_temp
 
             # HVAC OFF CHECK
             from homeassistant.components.climate.const import HVACMode
+
             manual_hvac = self.manual_hvac_mode.get(zone_index)
 
             if manual_hvac == HVACMode.OFF:
@@ -950,14 +907,12 @@ class RejuvenationBedCoordinator(DataUpdateCoordinator):
                     "hvac_mode": HVACMode.OFF,
                     "preset_mode": "none",
                     "is_present": is_present,
-                    "reason": "🔴 Manuell ausgeschaltet (HVAC OFF)"
+                    "reason": "🔴 Manuell ausgeschaltet (HVAC OFF)",
                 }
                 return current_watt
 
             # Heiz-Entscheidung mit Hysterese
-            should_heat = await self._async_decide_heating(
-                zone_index, target_temp, current_temp
-            )
+            should_heat = await self._async_decide_heating(zone_index, target_temp, current_temp)
 
             # Anti-Short-Cycle-Prüfung
             # BEI BOOST/KRANK: Sofort schalten, kein Anti-Short-Cycle!
@@ -994,16 +949,12 @@ class RejuvenationBedCoordinator(DataUpdateCoordinator):
             # Setzt ggf. Emergency-Latch (>36°C). Hat das LETZTE Wort vor
             # dem Schalten — kann should_heat nur AUSschalten, nie AN.
             # ═══════════════════════════════════════════════════════════
-            is_safe, safety_status, safety_notif = (
-                await self.safety_manager.async_check_zone_safety(
-                    zone_index, current_temp, target_temp, should_heat
-                )
+            is_safe, safety_status, safety_notif = await self.safety_manager.async_check_zone_safety(
+                zone_index, current_temp, target_temp, should_heat
             )
             if not is_safe:
                 should_heat = False
-                _LOGGER.warning(
-                    f"Zone {zone_index}: Safety-Veto ({safety_status}) → Heizung AUS"
-                )
+                _LOGGER.warning(f"Zone {zone_index}: Safety-Veto ({safety_status}) → Heizung AUS")
             if safety_notif:
                 await self._async_send_notification(
                     title=f"🛡️ Sicherheit Zone {zone_index + 1}",
@@ -1024,8 +975,7 @@ class RejuvenationBedCoordinator(DataUpdateCoordinator):
                 is_leaking = self.presence_detector.is_potential_leak(zone_index)
                 if is_leaking:
                     _LOGGER.warning(
-                        f"⚠️ Zone {zone_index}: LECKAGE-VERDACHT! "
-                        f"Feuchtigkeit >85% seit über 3 Stunden!"
+                        f"⚠️ Zone {zone_index}: LECKAGE-VERDACHT! " f"Feuchtigkeit >85% seit über 3 Stunden!"
                     )
             except Exception as leak_err:
                 _LOGGER.debug(f"Zone {zone_index}: Leak-Check Fehler: {leak_err}")
@@ -1067,17 +1017,13 @@ class RejuvenationBedCoordinator(DataUpdateCoordinator):
                             f"Δ(Wasser-Luft) = {isolation.delta_water_air:.1f}°C. "
                             f"Bitte zudecken um Energie zu sparen!"
                         ),
-                        notification_id=f"rejuvenation_bed_isolation_{zone_index}"
+                        notification_id=f"rejuvenation_bed_isolation_{zone_index}",
                     )
             except Exception as intel_err:
-                _LOGGER.warning(
-                    f"Zone {zone_index}: BedIntelligence-Fehler (Heizung läuft weiter): {intel_err}"
-                )
+                _LOGGER.warning(f"Zone {zone_index}: BedIntelligence-Fehler (Heizung läuft weiter): {intel_err}")
 
             # HVAC-Modus bestimmen
-            hvac_mode, preset_mode = self._determine_hvac_mode(
-                zone_index, is_present, zone_config
-            )
+            hvac_mode, preset_mode = self._determine_hvac_mode(zone_index, is_present, zone_config)
 
             decision["zones"][zone_name] = {
                 "target": round(target_temp, 1),
@@ -1086,8 +1032,12 @@ class RejuvenationBedCoordinator(DataUpdateCoordinator):
                 "watt": round(current_watt, 1),
                 "hvac_mode": hvac_mode,
                 "preset_mode": preset_mode,
-                "reason": mode_reason if active_mode != "normal" else await self.temperature_calculator.async_get_decision_reason(
-                    zone_index, target_temp, current_temp, should_heat, energy_state, coordinator=self
+                "reason": (
+                    mode_reason
+                    if active_mode != "normal"
+                    else await self.temperature_calculator.async_get_decision_reason(
+                        zone_index, target_temp, current_temp, should_heat, energy_state, coordinator=self
+                    )
                 ),
                 "is_present": is_present,
                 "presence_confidence": presence_confidence,
@@ -1107,7 +1057,7 @@ class RejuvenationBedCoordinator(DataUpdateCoordinator):
                 is_present=is_present,
                 current_temp=current_temp,
                 target_temp=target_temp,
-                should_heat=should_heat
+                should_heat=should_heat,
             )
 
             return current_watt
@@ -1130,9 +1080,7 @@ class RejuvenationBedCoordinator(DataUpdateCoordinator):
                 "error": str(zone_error),
                 "heater_state": fail_state,
                 "reason": (
-                    "⚠️ Fehler - Heizung AN (Sicherheit)"
-                    if fail_state
-                    else "⚠️ Fehler - Heizmatte AUS (Sicherheit)"
+                    "⚠️ Fehler - Heizung AN (Sicherheit)" if fail_state else "⚠️ Fehler - Heizmatte AUS (Sicherheit)"
                 ),
             }
         return current_watt
@@ -1153,30 +1101,25 @@ class RejuvenationBedCoordinator(DataUpdateCoordinator):
             temp_diff = current_temp - self._heating_start_temp[zone_index]
             if temp_diff < HEATING_EFFICIENCY_MIN_RISE_C:
                 _LOGGER.warning(
-                    f"Zone {zone_index + 1}: Geringe Heizleistung erkannt. "
-                    "Prüfen Sie auf Wärmeverlust oder Defekt."
+                    f"Zone {zone_index + 1}: Geringe Heizleistung erkannt. " "Prüfen Sie auf Wärmeverlust oder Defekt."
                 )
-    
+
     async def _async_update_sleep_tracking(
-        self,
-        zone_index: int,
-        is_present: bool,
-        current_temp: float,
-        target_temp: float,
-        should_heat: bool
+        self, zone_index: int, is_present: bool, current_temp: float, target_temp: float, should_heat: bool
     ):
         """Aktualisiert das Sleep-Score-Tracking basierend auf Präsenz."""
         # Präsenz-Tracking passiert jetzt im Haupt-Loop (oben)
         # Hier nur noch: Sleep-Score Daten aufzeichnen
-        
+
         actual_bedtime = self._actual_bedtime.get(zone_index)
-        
+
         if is_present and actual_bedtime and not self._night_tracking_active.get(zone_index, False):
             # Erstes Hinlegen → Sleep-Score Tracking starten
             global_conf = self.config_entry.data.get("global", {})
             options = self.config_entry.options
-            
+
             from datetime import time as dt_time
+
             z_prefix = f"zone_{zone_index}_"
             wake_str = (
                 options.get(f"{z_prefix}warm_until")
@@ -1188,32 +1131,32 @@ class RejuvenationBedCoordinator(DataUpdateCoordinator):
             planned_wake = datetime.combine(local_now().date(), dt_time(wh, wm))
             if planned_wake <= actual_bedtime:
                 planned_wake += timedelta(days=1)
-            
+
             self.sleep_score_calculator.start_night_tracking(
-                zone_index=zone_index,
-                planned_bedtime=actual_bedtime,
-                planned_wake=planned_wake
+                zone_index=zone_index, planned_bedtime=actual_bedtime, planned_wake=planned_wake
             )
             self._night_tracking_active[zone_index] = True
-            
+
             was_warm = abs(current_temp - target_temp) < 1.0
             self.sleep_score_calculator.record_bed_warm_at_bedtime(zone_index, was_warm)
             _LOGGER.info(f"Zone {zone_index}: Schlaf-Score Tracking gestartet")
-        
+
         # Tracking beenden wenn Kurve beendet (>15 Min weg, im Haupt-Loop gesetzt)
-        if (not self._curve_active.get(zone_index, False)
+        if (
+            not self._curve_active.get(zone_index, False)
             and self._night_tracking_active.get(zone_index, False)
-            and actual_bedtime is None):
-            
+            and actual_bedtime is None
+        ):
+
             score = self.sleep_score_calculator.end_night_tracking(zone_index)
             self._night_tracking_active[zone_index] = False
             if score:
                 _LOGGER.info(f"Zone {zone_index}: Schlaf-Score = {score.total_score}/100")
-        
+
         # Laufende Aufzeichnung
         if self._night_tracking_active.get(zone_index, False):
             self.sleep_score_calculator.record_temperature(zone_index, current_temp, target_temp)
-            
+
             # CO2: Zuerst aus Zone, dann Options, dann global (Rückwärtskompatibilität)
             zones = self.config_entry.data.get("zones", [])
             zone_conf = zones[zone_index] if zone_index < len(zones) else {}
@@ -1232,13 +1175,13 @@ class RejuvenationBedCoordinator(DataUpdateCoordinator):
         global_cfg = self.config_entry.data.get("global", {})
         outdoor_sensor = global_cfg.get("outdoor_sensor")
         summer_limit = global_cfg.get("summer_threshold", 25)
-        
+
         is_summer = False
         if outdoor_sensor:
             temp = self._safe_get_sensor_value(outdoor_sensor, default=None)
             if temp and temp > summer_limit:
                 is_summer = True
-        
+
         return {"is_summer": is_summer}
 
     async def _async_decide_heating(self, zone_index, target, current) -> bool:
@@ -1246,17 +1189,17 @@ class RejuvenationBedCoordinator(DataUpdateCoordinator):
         zone_config = self.config_entry.data["zones"][zone_index]
         heater = zone_config.get("heater")
         is_active = self._heater_states.get(heater, False)
-        
+
         if is_active:
             should_heat = current < target
         else:
             should_heat = current < (target - 0.3)
-        
+
         _LOGGER.debug(
             f"Zone {zone_index}: {'AN bleiben' if is_active and should_heat else 'EINSCHALTEN' if should_heat else 'AUSSCHALTEN' if is_active else 'AUS bleiben'} - "
             f"Aktuell: {current:.1f}°C, Ziel: {target:.1f}°C"
         )
-        
+
         return should_heat
 
     def _get_zone_power(self, zone_config) -> float:
@@ -1266,7 +1209,7 @@ class RejuvenationBedCoordinator(DataUpdateCoordinator):
             val = self._safe_get_sensor_value(p_sensor, default=None)
             if val is not None:
                 return val
-        
+
         h_state = self.hass.states.get(zone_config.get("heater"))
         if h_state and h_state.state == "on":
             return float(zone_config.get("power_rating", 250))
@@ -1280,29 +1223,24 @@ class RejuvenationBedCoordinator(DataUpdateCoordinator):
         """Direkte Schaltung der HA-Entität (Switch oder Plug)."""
         if not entity:
             return
-            
+
         domain = entity.split(".")[0]
         service = "turn_on" if should_heat else "turn_off"
-        
+
         # Prüfe ob sich der Zustand wirklich ändert
         current_state = self.hass.states.get(entity)
         if current_state:
             current_on = current_state.state == "on"
             if current_on == should_heat:
                 return  # Keine Änderung nötig
-        
+
         try:
             _LOGGER.info(f"🔌 SCHALTE {entity}: {'AUS→AN' if should_heat else 'AN→AUS'}")
             await self.hass.services.async_call(domain, service, {"entity_id": entity})
         except Exception as e:
             _LOGGER.error(f"❌ Hardware-Fehler beim Schalten von {entity}: {e}")
-    
-    def _determine_hvac_mode(
-        self,
-        zone_index: int,
-        is_present: bool,
-        zone_config: dict
-    ) -> tuple:
+
+    def _determine_hvac_mode(self, zone_index: int, is_present: bool, zone_config: dict) -> tuple:
         """Bestimmt HVAC-Modus und Preset."""
         from homeassistant.components.climate.const import (
             HVACMode,
@@ -1310,31 +1248,31 @@ class RejuvenationBedCoordinator(DataUpdateCoordinator):
             PRESET_AWAY,
             PRESET_BOOST,
         )
-        
+
         hardware_level = zone_config.get("hardware_level", "A")
         manual_hvac = self.manual_hvac_mode.get(zone_index)
         manual_preset = self.manual_preset.get(zone_index, PRESET_NONE)
         manual_boost = self.manual_boost.get(zone_index, False)
-        
+
         if manual_hvac is not None:
             return manual_hvac, manual_preset
-        
+
         if manual_boost:
             return HVACMode.HEAT, PRESET_BOOST
-        
+
         if self.vacation_mode_enabled:
             return HVACMode.AUTO, PRESET_AWAY
-        
+
         sick_until = self.sick_mode_until.get(zone_index)
         if sick_until and local_now() < sick_until:
             return HVACMode.HEAT, PRESET_NONE  # Krank wird über Status-Sensor angezeigt
-        
+
         if self.eco_mode_enabled:
             return HVACMode.AUTO, PRESET_NONE  # Eco wird über Status-Sensor angezeigt
-        
+
         if hardware_level in ["E", "D", "C", "B+", "B"]:
             return (HVACMode.HEAT, PRESET_NONE) if is_present else (HVACMode.AUTO, PRESET_NONE)
-        
+
         return HVACMode.HEAT, PRESET_NONE
 
     async def _async_emergency_shutdown(self, reason):
@@ -1346,21 +1284,11 @@ class RejuvenationBedCoordinator(DataUpdateCoordinator):
     @callback
     def get_last_decision(self) -> Optional[Dict]:
         return self._decision_log[-1] if self._decision_log else None
-    
-    async def _async_send_notification(
-        self,
-        title: str,
-        message: str,
-        notification_id: Optional[str] = None
-    ):
+
+    async def _async_send_notification(self, title: str, message: str, notification_id: Optional[str] = None):
         """Sendet eine persistente Notification an den User."""
         try:
-            result = notify_create(
-                self.hass,
-                message,
-                title=title,
-                notification_id=notification_id
-            )
+            result = notify_create(self.hass, message, title=title, notification_id=notification_id)
             # HA-Version Kompatibilität: async_create kann sync oder async sein
             if result is not None:
                 await result
