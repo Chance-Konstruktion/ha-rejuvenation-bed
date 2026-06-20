@@ -144,45 +144,72 @@ async def _async_register_device(hass: HomeAssistant, entry: ConfigEntry):
     return True
 
 
+def _get_coordinator(hass: HomeAssistant):
+    """
+    Holt den (einzigen) aktiven Coordinator (#6).
+
+    Die Integration ist `single_config_entry`, daher existiert höchstens ein
+    Eintrag. Services werden global registriert und lösen den Coordinator zur
+    Laufzeit auf, statt einen festen Entry-Closure zu verwenden (der bei
+    Reload/Unload veralten würde).
+    """
+    for value in hass.data.get(DOMAIN, {}).values():
+        if isinstance(value, RejuvenationBedCoordinator):
+            return value
+    return None
+
+
 async def _async_setup_services(hass: HomeAssistant, entry: ConfigEntry):
-    """Registriert die Custom Services."""
-    
+    """Registriert die Custom Services (einmalig, global)."""
+
+    # #6: Nur einmal registrieren — nicht pro Config-Entry
+    if hass.services.has_service(DOMAIN, "set_boost"):
+        return
+
     async def handle_set_boost(call: ServiceCall):
         """Handle set_boost service."""
-        coordinator = hass.data[DOMAIN][entry.entry_id]
+        coordinator = _get_coordinator(hass)
+        if coordinator is None:
+            _LOGGER.warning("set_boost: kein aktiver Coordinator")
+            return
         duration = call.data.get("duration_minutes", 30)
-        
-        # Aktiviere Boost für alle Zonen (oder spezifische via entity_id)
-        for zone_idx in range(len(entry.data.get("zones", []))):
+
+        for zone_idx in range(len(coordinator.config_entry.data.get("zones", []))):
             coordinator.manual_boost[zone_idx] = True
             coordinator.boost_until = coordinator.boost_until if hasattr(coordinator, 'boost_until') else {}
             coordinator.boost_until[zone_idx] = local_now() + timedelta(minutes=duration)
-        
+
         _LOGGER.info(f"Boost aktiviert für {duration} Minuten")
         await coordinator.async_request_refresh()
-    
+
     async def handle_set_sick_mode(call: ServiceCall):
         """Handle set_sick_mode service."""
-        coordinator = hass.data[DOMAIN][entry.entry_id]
+        coordinator = _get_coordinator(hass)
+        if coordinator is None:
+            _LOGGER.warning("set_sick_mode: kein aktiver Coordinator")
+            return
         temperature = call.data.get("temperature", 30)
         days = call.data.get("days", 3)
-        
-        for zone_idx in range(len(entry.data.get("zones", []))):
+
+        for zone_idx in range(len(coordinator.config_entry.data.get("zones", []))):
             coordinator.sick_mode_until[zone_idx] = local_now() + timedelta(days=days)
             coordinator.sick_mode_temp = coordinator.sick_mode_temp if hasattr(coordinator, 'sick_mode_temp') else {}
             coordinator.sick_mode_temp[zone_idx] = temperature
-        
+
         _LOGGER.info(f"Krank-Modus aktiviert: {temperature}°C für {days} Tage")
         await coordinator.async_request_refresh()
-    
+
     async def handle_set_vacation(call: ServiceCall):
         """Handle set_vacation_mode service."""
-        coordinator = hass.data[DOMAIN][entry.entry_id]
+        coordinator = _get_coordinator(hass)
+        if coordinator is None:
+            _LOGGER.warning("set_vacation_mode: kein aktiver Coordinator")
+            return
         end_date = call.data.get("end_date")
         temperature = call.data.get("temperature")
-        
+
         from homeassistant.components.climate.const import PRESET_AWAY
-        
+
         coordinator.vacation_mode_enabled = True
         coordinator.vacation_temp_override = temperature
         if end_date:
@@ -190,22 +217,25 @@ async def _async_setup_services(hass: HomeAssistant, entry: ConfigEntry):
         else:
             # Default: 14 Tage
             coordinator.vacation_until = local_now() + timedelta(days=14)
-        
-        for zone_idx in range(len(entry.data.get("zones", []))):
+
+        for zone_idx in range(len(coordinator.config_entry.data.get("zones", []))):
             coordinator.manual_preset[zone_idx] = PRESET_AWAY
-        
+
         _LOGGER.info(
             f"Urlaub-Modus aktiviert bis {coordinator.vacation_until.strftime('%d.%m.%Y')}"
         )
         await coordinator.async_request_refresh()
-    
+
     async def handle_cancel_special_mode(call: ServiceCall):
         """Handle cancel_special_mode service."""
-        coordinator = hass.data[DOMAIN][entry.entry_id]
-        
+        coordinator = _get_coordinator(hass)
+        if coordinator is None:
+            _LOGGER.warning("cancel_special_mode: kein aktiver Coordinator")
+            return
+
         from homeassistant.components.climate.const import PRESET_NONE
-        
-        for zone_idx in range(len(entry.data.get("zones", []))):
+
+        for zone_idx in range(len(coordinator.config_entry.data.get("zones", []))):
             coordinator.manual_boost[zone_idx] = False
             coordinator.sick_mode_until[zone_idx] = None
             coordinator.manual_preset[zone_idx] = PRESET_NONE
@@ -214,32 +244,38 @@ async def _async_setup_services(hass: HomeAssistant, entry: ConfigEntry):
             # #4: manuelle Zieltemperatur ebenfalls verwerfen → zurück zur Kurve
             if hasattr(coordinator, "clear_manual_target"):
                 coordinator.clear_manual_target(zone_idx)
-        
+
         # Vacation zurücksetzen
         coordinator.vacation_mode_enabled = False
         coordinator.vacation_until = None
         coordinator.vacation_temp_override = None
-        
+
         _LOGGER.info("Alle Sonder-Modi beendet")
         await coordinator.async_request_refresh()
-    
+
     async def handle_reset_energy_budget(call: ServiceCall):
         """Handle reset_energy_budget service."""
         if not call.data.get("confirm", False):
             _LOGGER.warning("Energie-Budget Reset abgebrochen (keine Bestätigung)")
             return
-        
-        coordinator = hass.data[DOMAIN][entry.entry_id]
+
+        coordinator = _get_coordinator(hass)
+        if coordinator is None:
+            _LOGGER.warning("reset_energy_budget: kein aktiver Coordinator")
+            return
         coordinator.diagnostics_manager.reset_energy_budget()
         _LOGGER.info("Energie-Budget zurückgesetzt")
-    
+
     async def handle_preheat(call: ServiceCall):
         """Handle preheat_bed service."""
-        coordinator = hass.data[DOMAIN][entry.entry_id]
+        coordinator = _get_coordinator(hass)
+        if coordinator is None:
+            _LOGGER.warning("preheat_bed: kein aktiver Coordinator")
+            return
         target_temp = call.data.get("target_temperature", 29)
         duration = call.data.get("duration_minutes", 30)
-        
-        for zone_idx in range(len(entry.data.get("zones", []))):
+
+        for zone_idx in range(len(coordinator.config_entry.data.get("zones", []))):
             coordinator.manual_target_temp[zone_idx] = target_temp
             # #5: gemeinsame TTL nutzen — Vorheizen verfällt nach 'duration'
             if not hasattr(coordinator, "manual_target_until"):
@@ -248,7 +284,7 @@ async def _async_setup_services(hass: HomeAssistant, entry: ConfigEntry):
 
         _LOGGER.info(f"Vorheizen auf {target_temp}°C für {duration} Minuten")
         await coordinator.async_request_refresh()
-    
+
     # Services registrieren
     hass.services.async_register(
         DOMAIN, "set_boost", handle_set_boost, schema=SERVICE_SET_BOOST_SCHEMA
@@ -274,23 +310,28 @@ async def _async_setup_services(hass: HomeAssistant, entry: ConfigEntry):
 
 async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     """Sicheres Entladen der Integration."""
-    
-    # Not-Aus beim Entladen/Neustart: Wir holen den Coordinator
+
+    # Heizungen werden beim Entladen BEWUSST nicht abgeschaltet: Für ein
+    # Wasserbett wäre Auskühlen riskanter als Weiterlaufen, und der
+    # Hardware-Thermostat bleibt unabhängig vom HA-Zustand als Schutz aktiv.
     coordinator = hass.data[DOMAIN].get(entry.entry_id)
     if coordinator:
-        _LOGGER.info("Entlade Integration: Schalte Heizungen zur Sicherheit aus.")
-        # Optional: Hier könnte man einen finalen Turn-Off Befehl senden
-    
+        _LOGGER.info("Entlade Integration (Heizungen laufen abgesichert weiter).")
+
     # Plattformen entladen
     unload_ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
-    
-    # Services entfernen
-    for service in ["set_boost", "set_sick_mode", "set_vacation_mode", 
-                    "cancel_special_mode", "reset_energy_budget", "preheat_bed"]:
-        hass.services.async_remove(DOMAIN, service)
-    
+
     # Speicher bereinigen
     if unload_ok:
-        hass.data[DOMAIN].pop(entry.entry_id)
+        hass.data[DOMAIN].pop(entry.entry_id, None)
+
+    # #6: Globale Services nur entfernen, wenn kein Coordinator mehr übrig ist
+    if not any(
+        isinstance(v, RejuvenationBedCoordinator)
+        for v in hass.data.get(DOMAIN, {}).values()
+    ):
+        for service in ["set_boost", "set_sick_mode", "set_vacation_mode",
+                        "cancel_special_mode", "reset_energy_budget", "preheat_bed"]:
+            hass.services.async_remove(DOMAIN, service)
 
     return unload_ok

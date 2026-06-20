@@ -7,10 +7,10 @@
 
 ## Status-Checkliste
 - [x] Tier 1 — Safety (#1 #2 #3) ✅ PR A
-- [~] Tier 2 — UX/Funktions-Bugs (#4 ✅ #5 ✅ | #7 ⬜ #8 ⬜)
-- [ ] Tier 3 — Multi-Instanz/Targeting (#6) + manifest
+- [x] Tier 2 — UX/Funktions-Bugs (#4 #5 ✅ PR A · #7 #8 ✅ PR B)
+- [x] Tier 3 — Multi-Instanz/Targeting (#6) + manifest ✅ PR B
 - [ ] Tier 4 — CI härten
-- [ ] Tier 5 — Refactor/Optimierung (#9 #10 #11 #12 + O1..O9)
+- [ ] Tier 5 — Refactor/Optimierung (#9 #10 #11 #12 + O1..O9) — O7 ✅ (PR B)
 - [ ] Release-Tag `v260619` setzen
 
 > **Erledigt (PR A):** #1 Safety-Engine verdrahtet (Emergency-Latch +
@@ -19,6 +19,14 @@
 > #4 manual_target TTL (8 h + Clear bei AUTO/Cancel), #5 totes
 > `preheat_until` durch gemeinsame TTL ersetzt. Tests:
 > `tests/test_safety_manager.py` (10), `tests/test_coordinator.py` (7).
+>
+> **Erledigt (PR B):** #6 Services global+einmalig registriert, Coordinator
+> zur Laufzeit aufgelöst, `single_config_entry: true`, Unload entfernt
+> Services erst beim letzten Entry. #7 Resolver liefert echte
+> `solar_active`/`price_status` (Tarif-Status korrekt). #8 nicht-funktionale
+> DRY/COMFORT-Presets entfernt (Krank läuft über Service). O7 irreführender
+> Unload-Kommentar korrigiert. Tests: +6 in `test_energy_state_resolver.py`.
+> Gesamt 215 grün.
 
 ---
 
