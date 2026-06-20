@@ -508,563 +508,17 @@ class RejuvenationBedCoordinator(DataUpdateCoordinator):
 
             for zone_index, zone_config in enumerate(zones):
                 zone_name = f"Zone {zone_index + 1}"
-                
-                try:
-                    # ═══════════════════════════════════════════════════════════
-                    # FIX: Robustes Sensor-Lesen mit Fail-Safe
-                    # ═══════════════════════════════════════════════════════════
-                    temp_sensor = zone_config.get("temp_sensor")
-                    current_temp = self._safe_get_sensor_value(temp_sensor, default=None)
-                    current_watt = self._get_zone_power(zone_config)
-                    total_current_power += current_watt
-                    
-                    # FAIL-SAFE: Kein Temperatur-Sensor oder -Wert?
-                    if current_temp is None:
-                        if temp_sensor:
-                            # Sensor konfiguriert aber nicht verfügbar
-                            elapsed = (local_now() - self._startup_time).total_seconds()
-                            
-                            if elapsed < self._startup_grace_seconds:
-                                # STARTUP GRACE: ESP noch nicht bereit, warten
-                                _LOGGER.info(
-                                    f"Zone {zone_index}: Sensor noch nicht verfügbar "
-                                    f"(Startup {elapsed:.0f}s/{self._startup_grace_seconds}s) - warte..."
-                                )
-                                decision["zones"][zone_name] = {
-                                    "status": "STARTUP_WAIT",
-                                    "reason": f"⏳ Warte auf Sensor ({self._startup_grace_seconds - elapsed:.0f}s)",
-                                }
-                                self._sensor_failure_notified[zone_index] = True
-                                continue
-                            else:
-                                # Grace-Period vorbei → FAIL-SAFE!
-                                fail_safe_result = await self._async_handle_sensor_failure(
-                                    zone_index, zone_config
-                                )
-                                decision["zones"][zone_name] = fail_safe_result
-                                self._sensor_failure_notified[zone_index] = True
-                                continue
-                        else:
-                            # Kein Sensor konfiguriert → Basic-Modus
-                            _LOGGER.debug(f"Zone {zone_index}: Kein Temp-Sensor, Basic-Modus")
-                            current_temp = 27.0  # Annahme für Basic-Modus
-                    else:
-                        # ═══════════════════════════════════════════════════
-                        # RECOVERY: Sensor ist (wieder) da!
-                        # ═══════════════════════════════════════════════════
-                        if self._sensor_failure_notified.get(zone_index, False):
-                            _LOGGER.info(
-                                f"✅ Zone {zone_index}: Sensor RECOVERED! "
-                                f"({current_temp:.1f}°C) → zurück zu Auto-Modus"
-                            )
-                            # Manuellen HVAC-Override löschen (war evtl. auf OFF)
-                            self.manual_hvac_mode.pop(zone_index, None)
-                            self._sensor_failure_notified[zone_index] = False
-                            self._failsafe_on_since.pop(zone_index, None)  # #2 Timeout-Reset
-                            
-                            # Recovery-Notification
-                            await self._async_send_notification(
-                                title="✅ Sensor wieder da!",
-                                message=(
-                                    f"Zone {zone_index + 1}: Temperatursensor ist wieder online "
-                                    f"({current_temp:.1f}°C). Normalbetrieb wiederhergestellt."
-                                ),
-                                notification_id=f"rejuvenation_bed_sensor_failure_{zone_index}"
-                            )
-                    
-                    # ═══════════════════════════════════════════════════════════
-                    # #1 EMERGENCY-LATCH: Hält Not-Aus bis manuell zurückgesetzt
-                    # (SafetyManager setzt das Flag bei >36°C = Relais-Verdacht)
-                    # ═══════════════════════════════════════════════════════════
-                    if self.safety_manager.is_emergency_shutdown(zone_index):
-                        from homeassistant.components.climate.const import HVACMode as _HVACMode
-                        heater_entity = zone_config.get("heater")
-                        await self._async_control_heater(heater_entity, False)
-                        self._heater_states[heater_entity] = False
-                        emergency_reason = self.safety_manager.get_emergency_reason(zone_index)
-                        decision["zones"][zone_name] = {
-                            "target": round(current_temp, 1) if current_temp else "unknown",
-                            "current": round(current_temp, 1) if current_temp else "unknown",
-                            "active": False,
-                            "watt": 0.0,
-                            "mode": "emergency",
-                            "hvac_mode": _HVACMode.OFF,
-                            "reason": f"🚨 NOT-AUS aktiv: {emergency_reason} — Stecker prüfen, dann Reset!",
-                        }
-                        continue
-
-                    # NEU: Degraded Mode Override
-                    if is_degraded_mode and zone_index in degraded_zones:
-                        should_heat = self.safety_manager.should_heat_in_degraded_mode(zone_index)
-                        target_temp = 27.0
-                        
-                        from homeassistant.components.climate.const import HVACMode as _HVACMode
-                        decision["zones"][zone_name] = {
-                            "target": round(target_temp, 1),
-                            "current": round(current_temp, 1) if current_temp else "unknown",
-                            "active": should_heat,
-                            "watt": round(current_watt, 1),
-                            "mode": "degraded",
-                            "hvac_mode": _HVACMode.HEAT,
-                            "reason": "⚠️ Degraded Mode: Sensor ausgefallen (30% Duty-Cycle)"
-                        }
-                        
-                        heater_entity = zone_config.get("heater")
-                        await self._async_control_heater(heater_entity, should_heat)
-                        self._heater_states[heater_entity] = should_heat
-                        continue
-
-                    # ═══════════════════════════════════════════════════════════
-                    # Präsenz-Erkennung (Sensor-Fusion)
-                    # ═══════════════════════════════════════════════════════════
-                    moisture_sensor = zone_config.get("moisture_sensor")
-                    presence_sensor = zone_config.get("presence_sensor")
-                    
-                    # Feuchtigkeit als numerischen Wert lesen (SHT41)
-                    humidity_value = None
-                    if moisture_sensor:
-                        humidity_value = self._safe_get_sensor_value(
-                            moisture_sensor, default=None
-                        )
-                    
-                    # Luft-Temp lesen (SHT41 oben auf Kern)
-                    # PRIORITÄT: 1. Konfigurierter air_temp_sensor, 2. Namenstrick vom Feuchtesensor
-                    air_temp = None
-                    air_temp_entity = zone_config.get("air_temp_sensor")
-                    if air_temp_entity:
-                        air_temp = self._safe_get_sensor_value(
-                            air_temp_entity, default=None
-                        )
-                    elif moisture_sensor:
-                        # Fallback: SHT41 Luft-Temp über Entity-Namensableitung
-                        air_temp_entity = moisture_sensor.replace(
-                            "feuchtigkeit", "lufttemp"
-                        ).replace("humidity", "temperature")
-                        air_temp = self._safe_get_sensor_value(
-                            air_temp_entity, default=None
-                        )
-                    
-                    # Dedizierter Präsenz-Sensor (optional)
-                    presence_state = None
-                    if presence_sensor:
-                        presence_state = self._safe_get_sensor_value(
-                            presence_sensor, default=None, value_type="bool"
-                        )
-                    
-                    # Power für Duty-Cycle
-                    heater_active = self._heater_states.get(
-                        zone_config.get("heater"), False
-                    )
-                    
-                    # Kalibrierte Schwellwerte anwenden (wenn verfügbar)
-                    if self.bed_intelligence.calibration.is_calibrated:
-                        self.presence_detector.thresholds.water_variance_threshold = (
-                            self.bed_intelligence.calibration.water_std_threshold
-                        )
-                    
-                    try:
-                        is_present, presence_confidence, presence_reason = (
-                            self.presence_detector.detect_presence(
-                                zone_index=zone_index,
-                                water_temp=current_temp,
-                                air_temp=air_temp,
-                                humidity=humidity_value,
-                                power_watts=current_watt,
-                                heater_active=heater_active,
-                                presence_sensor_state=presence_state,
-                                is_heating_pad=self.is_heating_pad,
-                            )
-                        )
-                    except Exception as pres_err:
-                        _LOGGER.warning(
-                            f"Zone {zone_index}: Präsenz-Erkennung Fehler (Fallback): {pres_err}"
-                        )
-                        # Fallback: Externer Sensor oder "nicht anwesend"
-                        is_present = presence_state if presence_state is not None else False
-                        presence_confidence = 0.0
-                        presence_reason = "Fallback (Erkennung fehlgeschlagen)"
-                    
-                    # has_presence_sensor: True wenn IRGENDEINE Präsenz-Erkennung aktiv
-                    # - Externer Sensor (Druckmatte, mmWave)
-                    # - ODER interner Varianz-Detektor (braucht Wasser-Temp-Sensor, Level C+)
-                    has_temp_sensor = zone_config.get("temp_sensor") is not None
-                    has_presence_sensor = (presence_sensor is not None) or has_temp_sensor
-                    
-                    # ═══════════════════════════════════════════════════
-                    # SCHLAF-TRACKING: Echten Einschlafzeitpunkt ermitteln
-                    # ═══════════════════════════════════════════════════
-                    was_present = self._last_presence_state.get(zone_index, False)
-                    actual_bedtime = self._actual_bedtime.get(zone_index)
-                    post_alarm = self._post_alarm_mode.get(zone_index, False)
-                    
-                    # Weckzeit ermitteln (pro Zone!)
-                    global_c = self.config_entry.data.get("global", {})
-                    opts = self.config_entry.options
-                    zone_prefix = f"zone_{zone_index}_"
-                    wake_str = (
-                        opts.get(f"{zone_prefix}warm_until")
-                        or opts.get("warm_until")
-                        or global_c.get("warm_until", "07:00")
-                    )
-                    wp = wake_str.split(":")
-                    wake_h, wake_m = int(wp[0]), int(wp[1]) if len(wp) > 1 else 0
-                    from datetime import time as dt_time
-                    wake_t = dt_time(wake_h, wake_m)
-                    now_t = local_now().time()
-                    
-                    # Sind wir NACH der Weckzeit? (zwischen Wecker und 14:00)
-                    past_wake = now_t >= wake_t and now_t < dt_time(14, 0)
-                    
-                    if is_present and not was_present:
-                        # Person kommt ins Bett
-                        if actual_bedtime is None:
-                            # Neue Schlaf-Session → Einschlafzeit merken
-                            self._actual_bedtime[zone_index] = local_now()
-                            self._curve_active[zone_index] = True
-                            self._post_alarm_mode[zone_index] = False
-                            _LOGGER.info(
-                                f"Zone {zone_index}: Schlaf-Session gestartet um "
-                                f"{self._actual_bedtime[zone_index].strftime('%H:%M')}"
-                            )
-                            # Bedtime-Learning: Noch NICHT aufzeichnen!
-                            # Wird erst beim Session-Ende gespeichert,
-                            # aber nur wenn die Session >2h war (echter Schlaf).
-                            # → Schichtarbeiter, Nickerchen, Fehlpräsenz werden korrekt behandelt.
-                        else:
-                            # Zurück im Bett — war es eine Unterbrechung?
-                            left_at = self._presence_left_at.get(zone_index)
-                            if left_at:
-                                away_min = (local_now() - left_at).total_seconds() / 60
-                                if away_min >= 5 and self._night_tracking_active.get(zone_index, False):
-                                    # >5 Min weg = echte Unterbrechung → Score-Malus
-                                    self.sleep_score_calculator.record_interruption(
-                                        zone_index, away_min
-                                    )
-                            _LOGGER.debug(f"Zone {zone_index}: Zurück im Bett")
-                        
-                        # Toiletten-Timer löschen
-                        self._presence_left_at.pop(zone_index, None)
-                    
-                    elif not is_present and was_present:
-                        # Person verlässt Bett
-                        self._presence_left_at[zone_index] = local_now()
-                        if past_wake:
-                            _LOGGER.debug(f"Zone {zone_index}: Bett verlassen (nach Weckzeit)")
-                        else:
-                            _LOGGER.debug(f"Zone {zone_index}: Bett verlassen (Nacht – Kurve läuft weiter)")
-                    
-                    # ═══════════════════════════════════════════════════
-                    # AUFSTEH-ERKENNUNG (Session-basiert)
-                    #
-                    # Zwei Phasen:
-                    # 1. Kurze Unterbrechung (<60 Min): Kurve läuft weiter
-                    #    → Toilette, Kind, Trinken. Score wird nicht beendet
-                    #    aber die Unterbrechung fließt negativ in den Score.
-                    # 2. Lange Abwesenheit (≥60 Min): Session beendet
-                    #    → Echtes Aufstehen. Score wird finalisiert.
-                    #    Bedtime-Learning: Nur wenn Session >2h war.
-                    # ═══════════════════════════════════════════════════
-                    if not is_present and zone_index in self._presence_left_at:
-                        gone_min = (local_now() - self._presence_left_at[zone_index]).total_seconds() / 60
-                        
-                        if gone_min >= 60:
-                            # ≥60 Min weg = Session beendet
-                            session_bedtime = self._actual_bedtime.get(zone_index)
-                            session_duration_h = 0
-                            if session_bedtime:
-                                session_duration_h = (local_now() - session_bedtime).total_seconds() / 3600
-                            
-                            # Bedtime Learning: Nur wenn Session >2h (echter Schlaf)
-                            if session_bedtime and session_duration_h >= 2.0:
-                                self.bed_intelligence.record_bedtime(
-                                    zone_index, session_bedtime
-                                )
-                                _LOGGER.info(
-                                    f"Zone {zone_index}: Schlaf-Session beendet nach "
-                                    f"{session_duration_h:.1f}h → Bedtime Learning gespeichert"
-                                )
-                            else:
-                                _LOGGER.info(
-                                    f"Zone {zone_index}: Kurze Session ({session_duration_h:.1f}h) "
-                                    f"→ Nicht für Learning gespeichert"
-                                )
-                            
-                            self._curve_active[zone_index] = False
-                            self._actual_bedtime.pop(zone_index, None)
-                            self._post_alarm_mode.pop(zone_index, None)
-                            self._presence_left_at.pop(zone_index, None)
-                        
-                        elif gone_min >= 5 and self._night_tracking_active.get(zone_index, False):
-                            # 5-60 Min weg: Unterbrechung registrieren
-                            # Score-Tracking läuft weiter, aber Unterbrechung wird gezählt
-                            if not hasattr(self, '_interruption_logged'):
-                                self._interruption_logged = {}
-                            left_at = self._presence_left_at.get(zone_index)
-                            if left_at and zone_index not in self._interruption_logged:
-                                self._interruption_logged[zone_index] = True
-                                _LOGGER.debug(
-                                    f"Zone {zone_index}: Schlaf-Unterbrechung ({gone_min:.0f} Min)"
-                                )
-                    
-                    # Zurück im Bett → Unterbrechungs-Flag resetten
-                    if is_present and not was_present and hasattr(self, '_interruption_logged'):
-                        self._interruption_logged.pop(zone_index, None)
-                    
-                    # Wecker-Check: Nach Wecker-Zeit → Post-Alarm-Modus
-                    if actual_bedtime and self._curve_active.get(zone_index):
-                        if past_wake and not post_alarm:
-                            self._post_alarm_mode[zone_index] = True
-                            _LOGGER.info(
-                                f"Zone {zone_index}: Wecker-Zeit ({wake_str}) vorbei → Post-Alarm Warmhalten"
-                            )
-                    
-                    self._last_presence_state[zone_index] = is_present
-                    
-                    # Zieltemperatur berechnen
-                    self.temperature_calculator.update_trend_data(zone_index, current_temp)
-                    desired_temp = await self.temperature_calculator.async_calculate_target(
-                        zone_index, 
-                        energy_state, 
-                        veto_result, 
-                        coordinator=self,
-                        is_present=is_present,
-                        has_presence_sensor=has_presence_sensor,
-                        actual_bedtime=self._actual_bedtime.get(zone_index),
-                        post_alarm=self._post_alarm_mode.get(zone_index, False),
-                    )
-                    
-                    # ═══════════════════════════════════════════════════════════
-                    # FIX: Mode-Auswertung HIER!
-                    # ═══════════════════════════════════════════════════════════
-                    final_temp, active_mode, mode_reason = self._apply_mode_adjustments(
-                        zone_index, desired_temp
-                    )
-                    
-                    # Wenn Spezial-Modus aktiv, diese Temperatur verwenden
-                    if active_mode != "normal":
-                        desired_temp = final_temp
-                        _LOGGER.debug(f"Zone {zone_index}: {mode_reason}")
-                    
-                    # MATERIALSCHUTZ: Sanfte Rampen (nur Wasserbett!)
-                    # ABER: Boost und Sick umgehen die Rampe!
-                    if self.ramp_controller is not None and active_mode not in ("boost", "sick"):
-                        target_temp, ramp_state = self.ramp_controller.calculate_ramped_setpoint(
-                            zone_index=zone_index,
-                            desired_temp=desired_temp,
-                            current_temp=current_temp,
-                        )
-                        
-                        if ramp_state.ramp_active:
-                            _LOGGER.debug(
-                                f"Zone {zone_index}: Rampe aktiv - "
-                                f"Ziel: {desired_temp:.1f}°C, Aktuell: {target_temp:.1f}°C"
-                            )
-                    else:
-                        target_temp = desired_temp
-                    
-                    # HVAC OFF CHECK
-                    from homeassistant.components.climate.const import HVACMode
-                    manual_hvac = self.manual_hvac_mode.get(zone_index)
-                    
-                    if manual_hvac == HVACMode.OFF:
-                        should_heat = False
-                        target_temp = self.bed_config.get("min_temp", 24.0)
-                        
-                        heater_entity = zone_config.get("heater")
-                        await self._async_control_heater(heater_entity, False)
-                        self._heater_states[heater_entity] = False
-                        
-                        decision["zones"][zone_name] = {
-                            "target": round(target_temp, 1),
-                            "current": round(current_temp, 1),
-                            "active": False,
-                            "watt": 0.0,
-                            "hvac_mode": HVACMode.OFF,
-                            "preset_mode": "none",
-                            "is_present": is_present,
-                            "reason": "🔴 Manuell ausgeschaltet (HVAC OFF)"
-                        }
-                        continue
-                    
-                    # Heiz-Entscheidung mit Hysterese
-                    should_heat = await self._async_decide_heating(
-                        zone_index, target_temp, current_temp
-                    )
-                    
-                    # Anti-Short-Cycle-Prüfung
-                    # BEI BOOST/KRANK: Sofort schalten, kein Anti-Short-Cycle!
-                    heater_entity = zone_config.get("heater")
-                    current_heater_state = self._heater_states.get(heater_entity, False)
-                    
-                    if active_mode in ("boost", "sick"):
-                        # Sofort schalten bei Sonder-Modi
-                        allowed_to_switch = True
-                        cycle_reason = f"Sonder-Modus '{active_mode}' umgeht Anti-Short-Cycle"
-                    else:
-                        # Hole echten Hardware-Zustand für bessere Entscheidung
-                        actual_hw_state = None
-                        hw_state_obj = self.hass.states.get(heater_entity)
-                        if hw_state_obj:
-                            actual_hw_state = hw_state_obj.state == "on"
-                        
-                        allowed_to_switch, cycle_reason = self.anti_short_cycle_manager.can_switch(
-                            heater_id=heater_entity,
-                            current_state=current_heater_state,
-                            desired_state=should_heat,
-                            current_temp=current_temp,
-                            target_temp=target_temp,
-                            actual_hardware_state=actual_hw_state,
-                        )
-                    
-                    if not allowed_to_switch:
-                        should_heat = current_heater_state
-                        _LOGGER.debug(f"Zone {zone_index}: Short-Cycle verhindert - {cycle_reason}")
-
-                    # ═══════════════════════════════════════════════════════════
-                    # #1 ERWEITERTE ZONEN-SAFETY (zweite Verteidigungslinie):
-                    # Klebe-Relais, Sensor-Defekt (3h ohne Anstieg), Übertemperatur.
-                    # Setzt ggf. Emergency-Latch (>36°C). Hat das LETZTE Wort vor
-                    # dem Schalten — kann should_heat nur AUSschalten, nie AN.
-                    # ═══════════════════════════════════════════════════════════
-                    is_safe, safety_status, safety_notif = (
-                        await self.safety_manager.async_check_zone_safety(
-                            zone_index, current_temp, target_temp, should_heat
-                        )
-                    )
-                    if not is_safe:
-                        should_heat = False
-                        _LOGGER.warning(
-                            f"Zone {zone_index}: Safety-Veto ({safety_status}) → Heizung AUS"
-                        )
-                    if safety_notif:
-                        await self._async_send_notification(
-                            title=f"🛡️ Sicherheit Zone {zone_index + 1}",
-                            message=safety_notif,
-                            notification_id=f"rejuvenation_bed_safety_{zone_index}",
-                        )
-
-                    # Effizienz-Check
-                    await self._async_check_heating_efficiency(zone_index, current_temp, should_heat)
-                    
-                    # Hardware schalten
-                    await self._async_control_heater(heater_entity, should_heat)
-                    self._heater_states[heater_entity] = should_heat
-                    
-                    # Schwitz-Erkennung & Leckage-Detection (über PresenceDetector)
-                    is_leaking = False  # Default falls Leak-Check crasht
-                    try:
-                        is_leaking = self.presence_detector.is_potential_leak(zone_index)
-                        if is_leaking:
-                            _LOGGER.warning(
-                                f"⚠️ Zone {zone_index}: LECKAGE-VERDACHT! "
-                                f"Feuchtigkeit >85% seit über 3 Stunden!"
-                            )
-                    except Exception as leak_err:
-                        _LOGGER.debug(f"Zone {zone_index}: Leak-Check Fehler: {leak_err}")
-                    
-                    # ═══════════════════════════════════════════════════
-                    # BedIntelligence: Kalibrierung + Isolation + Schwitz 2.0
-                    # NICHT-KRITISCH: Crash hier darf Heizung NIE lahmlegen!
-                    # ═══════════════════════════════════════════════════
-                    is_sweating = False  # Default falls Intelligence crasht
-                    sweat_status = None  # Default falls Intelligence crasht
-                    isolation = None  # Default falls Intelligence crasht
-                    try:
-                        water_std = self.presence_detector._last_water_std.get(zone_index, 0.0)
-                        
-                        # Heizungsstatus für Isolation-Korrektur übergeben
-                        heater_entity = zone_config.get("heater")
-                        self.bed_intelligence._heater_heating[zone_index] = self._heater_states.get(heater_entity, False)
-                        
-                        self.bed_intelligence.update(
-                            zone_index=zone_index,
-                            water_temp=current_temp,
-                            air_temp=air_temp,
-                            humidity=humidity_value,
-                            is_present=is_present,
-                            water_std=water_std,
-                        )
-                        
-                        # Schwitz 2.0 (aus BedIntelligence statt PresenceDetector)
-                        sweat_status = self.bed_intelligence.get_sweat_status(zone_index)
-                        is_sweating = sweat_status.is_sweating or sweat_status.is_moist
-                        
-                        # Isolations-Check
-                        isolation = self.bed_intelligence.get_isolation_status(zone_index)
-                        if isolation.energy_waste_warning:
-                            await self._async_send_notification(
-                                title="🛏️ Bett offen!",
-                                message=(
-                                    f"Dein Bett ist seit {isolation.uncovered_minutes:.0f} Min offen. "
-                                    f"Δ(Wasser-Luft) = {isolation.delta_water_air:.1f}°C. "
-                                    f"Bitte zudecken um Energie zu sparen!"
-                                ),
-                                notification_id=f"rejuvenation_bed_isolation_{zone_index}"
-                            )
-                    except Exception as intel_err:
-                        _LOGGER.warning(
-                            f"Zone {zone_index}: BedIntelligence-Fehler (Heizung läuft weiter): {intel_err}"
-                        )
-                    
-                    # HVAC-Modus bestimmen
-                    hvac_mode, preset_mode = self._determine_hvac_mode(
-                        zone_index, is_present, zone_config
-                    )
-                    
-                    decision["zones"][zone_name] = {
-                        "target": round(target_temp, 1),
-                        "current": round(current_temp, 1),
-                        "active": should_heat,
-                        "watt": round(current_watt, 1),
-                        "hvac_mode": hvac_mode,
-                        "preset_mode": preset_mode,
-                        "reason": mode_reason if active_mode != "normal" else await self.temperature_calculator.async_get_decision_reason(
-                            zone_index, target_temp, current_temp, should_heat, energy_state, coordinator=self
-                        ),
-                        "is_present": is_present,
-                        "presence_confidence": presence_confidence,
-                        "presence_reason": presence_reason,
-                        "is_sweating": is_sweating,
-                        "is_leaking": is_leaking,
-                        "humidity_level": sweat_status.humidity_level if sweat_status else None,
-                        "sweat_cause": sweat_status.cause if sweat_status else None,
-                        "isolation_level": isolation.level if isolation else None,
-                        "isolation_delta": isolation.delta_water_air if isolation else None,
-                        "active_mode": active_mode,
-                    }
-                    
-                    # Sleep Score Tracking
-                    await self._async_update_sleep_tracking(
-                        zone_index=zone_index,
-                        is_present=is_present,
-                        current_temp=current_temp,
-                        target_temp=target_temp,
-                        should_heat=should_heat
-                    )
-                    
-                except Exception as zone_error:
-                    # ═══════════════════════════════════════════════════════════
-                    # FIX: Bei JEDEM Fehler → Heizung AN (Fail-Safe!)
-                    # ═══════════════════════════════════════════════════════════
-                    _LOGGER.error(f"Fehler in Zone {zone_index}: {zone_error}", exc_info=True)
-
-                    # #2 Fail-Safe-Richtung je Bett-Typ: Wasserbett AN, Heizmatte AUS
-                    fail_state = self.is_waterbed
-                    heater_entity = zone_config.get("heater")
-                    if heater_entity:
-                        await self._async_control_heater(heater_entity, fail_state)
-                        self._heater_states[heater_entity] = fail_state
-
-                    decision["zones"][zone_name] = {
-                        "status": "ERROR",
-                        "error": str(zone_error),
-                        "heater_state": fail_state,
-                        "reason": (
-                            "⚠️ Fehler - Heizung AN (Sicherheit)"
-                            if fail_state
-                            else "⚠️ Fehler - Heizmatte AUS (Sicherheit)"
-                        ),
-                    }
+                watt = await self._process_zone(
+                    zone_index,
+                    zone_config,
+                    zone_name,
+                    decision,
+                    energy_state,
+                    veto_result,
+                    is_degraded_mode,
+                    degraded_zones,
+                )
+                total_current_power += watt
 
             self._finalize_energy(decision, total_current_power, energy_state)
 
@@ -1090,6 +544,579 @@ class RejuvenationBedCoordinator(DataUpdateCoordinator):
                         await self._async_control_heater(heater_entity, fail_state)
             
             raise UpdateFailed(f"Update fehlgeschlagen: {err}")
+
+    async def _process_zone(
+        self,
+        zone_index,
+        zone_config,
+        zone_name,
+        decision,
+        energy_state,
+        veto_result,
+        is_degraded_mode,
+        degraded_zones,
+    ):
+        """Verarbeitet eine einzelne Zone und gibt die aktuelle Leistung (W)
+        zurück (#9: aus dem Haupt-Loop ausgelagert)."""
+        current_watt = 0.0
+        try:
+            # ═══════════════════════════════════════════════════════════
+            # FIX: Robustes Sensor-Lesen mit Fail-Safe
+            # ═══════════════════════════════════════════════════════════
+            temp_sensor = zone_config.get("temp_sensor")
+            current_temp = self._safe_get_sensor_value(temp_sensor, default=None)
+            current_watt = self._get_zone_power(zone_config)
+
+            # FAIL-SAFE: Kein Temperatur-Sensor oder -Wert?
+            if current_temp is None:
+                if temp_sensor:
+                    # Sensor konfiguriert aber nicht verfügbar
+                    elapsed = (local_now() - self._startup_time).total_seconds()
+
+                    if elapsed < self._startup_grace_seconds:
+                        # STARTUP GRACE: ESP noch nicht bereit, warten
+                        _LOGGER.info(
+                            f"Zone {zone_index}: Sensor noch nicht verfügbar "
+                            f"(Startup {elapsed:.0f}s/{self._startup_grace_seconds}s) - warte..."
+                        )
+                        decision["zones"][zone_name] = {
+                            "status": "STARTUP_WAIT",
+                            "reason": f"⏳ Warte auf Sensor ({self._startup_grace_seconds - elapsed:.0f}s)",
+                        }
+                        self._sensor_failure_notified[zone_index] = True
+                        return current_watt
+                    else:
+                        # Grace-Period vorbei → FAIL-SAFE!
+                        fail_safe_result = await self._async_handle_sensor_failure(
+                            zone_index, zone_config
+                        )
+                        decision["zones"][zone_name] = fail_safe_result
+                        self._sensor_failure_notified[zone_index] = True
+                        return current_watt
+                else:
+                    # Kein Sensor konfiguriert → Basic-Modus
+                    _LOGGER.debug(f"Zone {zone_index}: Kein Temp-Sensor, Basic-Modus")
+                    current_temp = 27.0  # Annahme für Basic-Modus
+            else:
+                # ═══════════════════════════════════════════════════
+                # RECOVERY: Sensor ist (wieder) da!
+                # ═══════════════════════════════════════════════════
+                if self._sensor_failure_notified.get(zone_index, False):
+                    _LOGGER.info(
+                        f"✅ Zone {zone_index}: Sensor RECOVERED! "
+                        f"({current_temp:.1f}°C) → zurück zu Auto-Modus"
+                    )
+                    # Manuellen HVAC-Override löschen (war evtl. auf OFF)
+                    self.manual_hvac_mode.pop(zone_index, None)
+                    self._sensor_failure_notified[zone_index] = False
+                    self._failsafe_on_since.pop(zone_index, None)  # #2 Timeout-Reset
+
+                    # Recovery-Notification
+                    await self._async_send_notification(
+                        title="✅ Sensor wieder da!",
+                        message=(
+                            f"Zone {zone_index + 1}: Temperatursensor ist wieder online "
+                            f"({current_temp:.1f}°C). Normalbetrieb wiederhergestellt."
+                        ),
+                        notification_id=f"rejuvenation_bed_sensor_failure_{zone_index}"
+                    )
+
+            # ═══════════════════════════════════════════════════════════
+            # #1 EMERGENCY-LATCH: Hält Not-Aus bis manuell zurückgesetzt
+            # (SafetyManager setzt das Flag bei >36°C = Relais-Verdacht)
+            # ═══════════════════════════════════════════════════════════
+            if self.safety_manager.is_emergency_shutdown(zone_index):
+                from homeassistant.components.climate.const import HVACMode as _HVACMode
+                heater_entity = zone_config.get("heater")
+                await self._async_control_heater(heater_entity, False)
+                self._heater_states[heater_entity] = False
+                emergency_reason = self.safety_manager.get_emergency_reason(zone_index)
+                decision["zones"][zone_name] = {
+                    "target": round(current_temp, 1) if current_temp else "unknown",
+                    "current": round(current_temp, 1) if current_temp else "unknown",
+                    "active": False,
+                    "watt": 0.0,
+                    "mode": "emergency",
+                    "hvac_mode": _HVACMode.OFF,
+                    "reason": f"🚨 NOT-AUS aktiv: {emergency_reason} — Stecker prüfen, dann Reset!",
+                }
+                return current_watt
+
+            # NEU: Degraded Mode Override
+            if is_degraded_mode and zone_index in degraded_zones:
+                should_heat = self.safety_manager.should_heat_in_degraded_mode(zone_index)
+                target_temp = 27.0
+
+                from homeassistant.components.climate.const import HVACMode as _HVACMode
+                decision["zones"][zone_name] = {
+                    "target": round(target_temp, 1),
+                    "current": round(current_temp, 1) if current_temp else "unknown",
+                    "active": should_heat,
+                    "watt": round(current_watt, 1),
+                    "mode": "degraded",
+                    "hvac_mode": _HVACMode.HEAT,
+                    "reason": "⚠️ Degraded Mode: Sensor ausgefallen (30% Duty-Cycle)"
+                }
+
+                heater_entity = zone_config.get("heater")
+                await self._async_control_heater(heater_entity, should_heat)
+                self._heater_states[heater_entity] = should_heat
+                return current_watt
+
+            # ═══════════════════════════════════════════════════════════
+            # Präsenz-Erkennung (Sensor-Fusion)
+            # ═══════════════════════════════════════════════════════════
+            moisture_sensor = zone_config.get("moisture_sensor")
+            presence_sensor = zone_config.get("presence_sensor")
+
+            # Feuchtigkeit als numerischen Wert lesen (SHT41)
+            humidity_value = None
+            if moisture_sensor:
+                humidity_value = self._safe_get_sensor_value(
+                    moisture_sensor, default=None
+                )
+
+            # Luft-Temp lesen (SHT41 oben auf Kern)
+            # PRIORITÄT: 1. Konfigurierter air_temp_sensor, 2. Namenstrick vom Feuchtesensor
+            air_temp = None
+            air_temp_entity = zone_config.get("air_temp_sensor")
+            if air_temp_entity:
+                air_temp = self._safe_get_sensor_value(
+                    air_temp_entity, default=None
+                )
+            elif moisture_sensor:
+                # Fallback: SHT41 Luft-Temp über Entity-Namensableitung
+                air_temp_entity = moisture_sensor.replace(
+                    "feuchtigkeit", "lufttemp"
+                ).replace("humidity", "temperature")
+                air_temp = self._safe_get_sensor_value(
+                    air_temp_entity, default=None
+                )
+
+            # Dedizierter Präsenz-Sensor (optional)
+            presence_state = None
+            if presence_sensor:
+                presence_state = self._safe_get_sensor_value(
+                    presence_sensor, default=None, value_type="bool"
+                )
+
+            # Power für Duty-Cycle
+            heater_active = self._heater_states.get(
+                zone_config.get("heater"), False
+            )
+
+            # Kalibrierte Schwellwerte anwenden (wenn verfügbar)
+            if self.bed_intelligence.calibration.is_calibrated:
+                self.presence_detector.thresholds.water_variance_threshold = (
+                    self.bed_intelligence.calibration.water_std_threshold
+                )
+
+            try:
+                is_present, presence_confidence, presence_reason = (
+                    self.presence_detector.detect_presence(
+                        zone_index=zone_index,
+                        water_temp=current_temp,
+                        air_temp=air_temp,
+                        humidity=humidity_value,
+                        power_watts=current_watt,
+                        heater_active=heater_active,
+                        presence_sensor_state=presence_state,
+                        is_heating_pad=self.is_heating_pad,
+                    )
+                )
+            except Exception as pres_err:
+                _LOGGER.warning(
+                    f"Zone {zone_index}: Präsenz-Erkennung Fehler (Fallback): {pres_err}"
+                )
+                # Fallback: Externer Sensor oder "nicht anwesend"
+                is_present = presence_state if presence_state is not None else False
+                presence_confidence = 0.0
+                presence_reason = "Fallback (Erkennung fehlgeschlagen)"
+
+            # has_presence_sensor: True wenn IRGENDEINE Präsenz-Erkennung aktiv
+            # - Externer Sensor (Druckmatte, mmWave)
+            # - ODER interner Varianz-Detektor (braucht Wasser-Temp-Sensor, Level C+)
+            has_temp_sensor = zone_config.get("temp_sensor") is not None
+            has_presence_sensor = (presence_sensor is not None) or has_temp_sensor
+
+            # ═══════════════════════════════════════════════════
+            # SCHLAF-TRACKING: Echten Einschlafzeitpunkt ermitteln
+            # ═══════════════════════════════════════════════════
+            was_present = self._last_presence_state.get(zone_index, False)
+            actual_bedtime = self._actual_bedtime.get(zone_index)
+            post_alarm = self._post_alarm_mode.get(zone_index, False)
+
+            # Weckzeit ermitteln (pro Zone!)
+            global_c = self.config_entry.data.get("global", {})
+            opts = self.config_entry.options
+            zone_prefix = f"zone_{zone_index}_"
+            wake_str = (
+                opts.get(f"{zone_prefix}warm_until")
+                or opts.get("warm_until")
+                or global_c.get("warm_until", "07:00")
+            )
+            wp = wake_str.split(":")
+            wake_h, wake_m = int(wp[0]), int(wp[1]) if len(wp) > 1 else 0
+            from datetime import time as dt_time
+            wake_t = dt_time(wake_h, wake_m)
+            now_t = local_now().time()
+
+            # Sind wir NACH der Weckzeit? (zwischen Wecker und 14:00)
+            past_wake = now_t >= wake_t and now_t < dt_time(14, 0)
+
+            if is_present and not was_present:
+                # Person kommt ins Bett
+                if actual_bedtime is None:
+                    # Neue Schlaf-Session → Einschlafzeit merken
+                    self._actual_bedtime[zone_index] = local_now()
+                    self._curve_active[zone_index] = True
+                    self._post_alarm_mode[zone_index] = False
+                    _LOGGER.info(
+                        f"Zone {zone_index}: Schlaf-Session gestartet um "
+                        f"{self._actual_bedtime[zone_index].strftime('%H:%M')}"
+                    )
+                    # Bedtime-Learning: Noch NICHT aufzeichnen!
+                    # Wird erst beim Session-Ende gespeichert,
+                    # aber nur wenn die Session >2h war (echter Schlaf).
+                    # → Schichtarbeiter, Nickerchen, Fehlpräsenz werden korrekt behandelt.
+                else:
+                    # Zurück im Bett — war es eine Unterbrechung?
+                    left_at = self._presence_left_at.get(zone_index)
+                    if left_at:
+                        away_min = (local_now() - left_at).total_seconds() / 60
+                        if away_min >= 5 and self._night_tracking_active.get(zone_index, False):
+                            # >5 Min weg = echte Unterbrechung → Score-Malus
+                            self.sleep_score_calculator.record_interruption(
+                                zone_index, away_min
+                            )
+                    _LOGGER.debug(f"Zone {zone_index}: Zurück im Bett")
+
+                # Toiletten-Timer löschen
+                self._presence_left_at.pop(zone_index, None)
+
+            elif not is_present and was_present:
+                # Person verlässt Bett
+                self._presence_left_at[zone_index] = local_now()
+                if past_wake:
+                    _LOGGER.debug(f"Zone {zone_index}: Bett verlassen (nach Weckzeit)")
+                else:
+                    _LOGGER.debug(f"Zone {zone_index}: Bett verlassen (Nacht – Kurve läuft weiter)")
+
+            # ═══════════════════════════════════════════════════
+            # AUFSTEH-ERKENNUNG (Session-basiert)
+            #
+            # Zwei Phasen:
+            # 1. Kurze Unterbrechung (<60 Min): Kurve läuft weiter
+            #    → Toilette, Kind, Trinken. Score wird nicht beendet
+            #    aber die Unterbrechung fließt negativ in den Score.
+            # 2. Lange Abwesenheit (≥60 Min): Session beendet
+            #    → Echtes Aufstehen. Score wird finalisiert.
+            #    Bedtime-Learning: Nur wenn Session >2h war.
+            # ═══════════════════════════════════════════════════
+            if not is_present and zone_index in self._presence_left_at:
+                gone_min = (local_now() - self._presence_left_at[zone_index]).total_seconds() / 60
+
+                if gone_min >= 60:
+                    # ≥60 Min weg = Session beendet
+                    session_bedtime = self._actual_bedtime.get(zone_index)
+                    session_duration_h = 0
+                    if session_bedtime:
+                        session_duration_h = (local_now() - session_bedtime).total_seconds() / 3600
+
+                    # Bedtime Learning: Nur wenn Session >2h (echter Schlaf)
+                    if session_bedtime and session_duration_h >= 2.0:
+                        self.bed_intelligence.record_bedtime(
+                            zone_index, session_bedtime
+                        )
+                        _LOGGER.info(
+                            f"Zone {zone_index}: Schlaf-Session beendet nach "
+                            f"{session_duration_h:.1f}h → Bedtime Learning gespeichert"
+                        )
+                    else:
+                        _LOGGER.info(
+                            f"Zone {zone_index}: Kurze Session ({session_duration_h:.1f}h) "
+                            f"→ Nicht für Learning gespeichert"
+                        )
+
+                    self._curve_active[zone_index] = False
+                    self._actual_bedtime.pop(zone_index, None)
+                    self._post_alarm_mode.pop(zone_index, None)
+                    self._presence_left_at.pop(zone_index, None)
+
+                elif gone_min >= 5 and self._night_tracking_active.get(zone_index, False):
+                    # 5-60 Min weg: Unterbrechung registrieren
+                    # Score-Tracking läuft weiter, aber Unterbrechung wird gezählt
+                    if not hasattr(self, '_interruption_logged'):
+                        self._interruption_logged = {}
+                    left_at = self._presence_left_at.get(zone_index)
+                    if left_at and zone_index not in self._interruption_logged:
+                        self._interruption_logged[zone_index] = True
+                        _LOGGER.debug(
+                            f"Zone {zone_index}: Schlaf-Unterbrechung ({gone_min:.0f} Min)"
+                        )
+
+            # Zurück im Bett → Unterbrechungs-Flag resetten
+            if is_present and not was_present and hasattr(self, '_interruption_logged'):
+                self._interruption_logged.pop(zone_index, None)
+
+            # Wecker-Check: Nach Wecker-Zeit → Post-Alarm-Modus
+            if actual_bedtime and self._curve_active.get(zone_index):
+                if past_wake and not post_alarm:
+                    self._post_alarm_mode[zone_index] = True
+                    _LOGGER.info(
+                        f"Zone {zone_index}: Wecker-Zeit ({wake_str}) vorbei → Post-Alarm Warmhalten"
+                    )
+
+            self._last_presence_state[zone_index] = is_present
+
+            # Zieltemperatur berechnen
+            self.temperature_calculator.update_trend_data(zone_index, current_temp)
+            desired_temp = await self.temperature_calculator.async_calculate_target(
+                zone_index, 
+                energy_state, 
+                veto_result, 
+                coordinator=self,
+                is_present=is_present,
+                has_presence_sensor=has_presence_sensor,
+                actual_bedtime=self._actual_bedtime.get(zone_index),
+                post_alarm=self._post_alarm_mode.get(zone_index, False),
+            )
+
+            # ═══════════════════════════════════════════════════════════
+            # FIX: Mode-Auswertung HIER!
+            # ═══════════════════════════════════════════════════════════
+            final_temp, active_mode, mode_reason = self._apply_mode_adjustments(
+                zone_index, desired_temp
+            )
+
+            # Wenn Spezial-Modus aktiv, diese Temperatur verwenden
+            if active_mode != "normal":
+                desired_temp = final_temp
+                _LOGGER.debug(f"Zone {zone_index}: {mode_reason}")
+
+            # MATERIALSCHUTZ: Sanfte Rampen (nur Wasserbett!)
+            # ABER: Boost und Sick umgehen die Rampe!
+            if self.ramp_controller is not None and active_mode not in ("boost", "sick"):
+                target_temp, ramp_state = self.ramp_controller.calculate_ramped_setpoint(
+                    zone_index=zone_index,
+                    desired_temp=desired_temp,
+                    current_temp=current_temp,
+                )
+
+                if ramp_state.ramp_active:
+                    _LOGGER.debug(
+                        f"Zone {zone_index}: Rampe aktiv - "
+                        f"Ziel: {desired_temp:.1f}°C, Aktuell: {target_temp:.1f}°C"
+                    )
+            else:
+                target_temp = desired_temp
+
+            # HVAC OFF CHECK
+            from homeassistant.components.climate.const import HVACMode
+            manual_hvac = self.manual_hvac_mode.get(zone_index)
+
+            if manual_hvac == HVACMode.OFF:
+                should_heat = False
+                target_temp = self.bed_config.get("min_temp", 24.0)
+
+                heater_entity = zone_config.get("heater")
+                await self._async_control_heater(heater_entity, False)
+                self._heater_states[heater_entity] = False
+
+                decision["zones"][zone_name] = {
+                    "target": round(target_temp, 1),
+                    "current": round(current_temp, 1),
+                    "active": False,
+                    "watt": 0.0,
+                    "hvac_mode": HVACMode.OFF,
+                    "preset_mode": "none",
+                    "is_present": is_present,
+                    "reason": "🔴 Manuell ausgeschaltet (HVAC OFF)"
+                }
+                return current_watt
+
+            # Heiz-Entscheidung mit Hysterese
+            should_heat = await self._async_decide_heating(
+                zone_index, target_temp, current_temp
+            )
+
+            # Anti-Short-Cycle-Prüfung
+            # BEI BOOST/KRANK: Sofort schalten, kein Anti-Short-Cycle!
+            heater_entity = zone_config.get("heater")
+            current_heater_state = self._heater_states.get(heater_entity, False)
+
+            if active_mode in ("boost", "sick"):
+                # Sofort schalten bei Sonder-Modi
+                allowed_to_switch = True
+                cycle_reason = f"Sonder-Modus '{active_mode}' umgeht Anti-Short-Cycle"
+            else:
+                # Hole echten Hardware-Zustand für bessere Entscheidung
+                actual_hw_state = None
+                hw_state_obj = self.hass.states.get(heater_entity)
+                if hw_state_obj:
+                    actual_hw_state = hw_state_obj.state == "on"
+
+                allowed_to_switch, cycle_reason = self.anti_short_cycle_manager.can_switch(
+                    heater_id=heater_entity,
+                    current_state=current_heater_state,
+                    desired_state=should_heat,
+                    current_temp=current_temp,
+                    target_temp=target_temp,
+                    actual_hardware_state=actual_hw_state,
+                )
+
+            if not allowed_to_switch:
+                should_heat = current_heater_state
+                _LOGGER.debug(f"Zone {zone_index}: Short-Cycle verhindert - {cycle_reason}")
+
+            # ═══════════════════════════════════════════════════════════
+            # #1 ERWEITERTE ZONEN-SAFETY (zweite Verteidigungslinie):
+            # Klebe-Relais, Sensor-Defekt (3h ohne Anstieg), Übertemperatur.
+            # Setzt ggf. Emergency-Latch (>36°C). Hat das LETZTE Wort vor
+            # dem Schalten — kann should_heat nur AUSschalten, nie AN.
+            # ═══════════════════════════════════════════════════════════
+            is_safe, safety_status, safety_notif = (
+                await self.safety_manager.async_check_zone_safety(
+                    zone_index, current_temp, target_temp, should_heat
+                )
+            )
+            if not is_safe:
+                should_heat = False
+                _LOGGER.warning(
+                    f"Zone {zone_index}: Safety-Veto ({safety_status}) → Heizung AUS"
+                )
+            if safety_notif:
+                await self._async_send_notification(
+                    title=f"🛡️ Sicherheit Zone {zone_index + 1}",
+                    message=safety_notif,
+                    notification_id=f"rejuvenation_bed_safety_{zone_index}",
+                )
+
+            # Effizienz-Check
+            await self._async_check_heating_efficiency(zone_index, current_temp, should_heat)
+
+            # Hardware schalten
+            await self._async_control_heater(heater_entity, should_heat)
+            self._heater_states[heater_entity] = should_heat
+
+            # Schwitz-Erkennung & Leckage-Detection (über PresenceDetector)
+            is_leaking = False  # Default falls Leak-Check crasht
+            try:
+                is_leaking = self.presence_detector.is_potential_leak(zone_index)
+                if is_leaking:
+                    _LOGGER.warning(
+                        f"⚠️ Zone {zone_index}: LECKAGE-VERDACHT! "
+                        f"Feuchtigkeit >85% seit über 3 Stunden!"
+                    )
+            except Exception as leak_err:
+                _LOGGER.debug(f"Zone {zone_index}: Leak-Check Fehler: {leak_err}")
+
+            # ═══════════════════════════════════════════════════
+            # BedIntelligence: Kalibrierung + Isolation + Schwitz 2.0
+            # NICHT-KRITISCH: Crash hier darf Heizung NIE lahmlegen!
+            # ═══════════════════════════════════════════════════
+            is_sweating = False  # Default falls Intelligence crasht
+            sweat_status = None  # Default falls Intelligence crasht
+            isolation = None  # Default falls Intelligence crasht
+            try:
+                water_std = self.presence_detector._last_water_std.get(zone_index, 0.0)
+
+                # Heizungsstatus für Isolation-Korrektur übergeben
+                heater_entity = zone_config.get("heater")
+                self.bed_intelligence._heater_heating[zone_index] = self._heater_states.get(heater_entity, False)
+
+                self.bed_intelligence.update(
+                    zone_index=zone_index,
+                    water_temp=current_temp,
+                    air_temp=air_temp,
+                    humidity=humidity_value,
+                    is_present=is_present,
+                    water_std=water_std,
+                )
+
+                # Schwitz 2.0 (aus BedIntelligence statt PresenceDetector)
+                sweat_status = self.bed_intelligence.get_sweat_status(zone_index)
+                is_sweating = sweat_status.is_sweating or sweat_status.is_moist
+
+                # Isolations-Check
+                isolation = self.bed_intelligence.get_isolation_status(zone_index)
+                if isolation.energy_waste_warning:
+                    await self._async_send_notification(
+                        title="🛏️ Bett offen!",
+                        message=(
+                            f"Dein Bett ist seit {isolation.uncovered_minutes:.0f} Min offen. "
+                            f"Δ(Wasser-Luft) = {isolation.delta_water_air:.1f}°C. "
+                            f"Bitte zudecken um Energie zu sparen!"
+                        ),
+                        notification_id=f"rejuvenation_bed_isolation_{zone_index}"
+                    )
+            except Exception as intel_err:
+                _LOGGER.warning(
+                    f"Zone {zone_index}: BedIntelligence-Fehler (Heizung läuft weiter): {intel_err}"
+                )
+
+            # HVAC-Modus bestimmen
+            hvac_mode, preset_mode = self._determine_hvac_mode(
+                zone_index, is_present, zone_config
+            )
+
+            decision["zones"][zone_name] = {
+                "target": round(target_temp, 1),
+                "current": round(current_temp, 1),
+                "active": should_heat,
+                "watt": round(current_watt, 1),
+                "hvac_mode": hvac_mode,
+                "preset_mode": preset_mode,
+                "reason": mode_reason if active_mode != "normal" else await self.temperature_calculator.async_get_decision_reason(
+                    zone_index, target_temp, current_temp, should_heat, energy_state, coordinator=self
+                ),
+                "is_present": is_present,
+                "presence_confidence": presence_confidence,
+                "presence_reason": presence_reason,
+                "is_sweating": is_sweating,
+                "is_leaking": is_leaking,
+                "humidity_level": sweat_status.humidity_level if sweat_status else None,
+                "sweat_cause": sweat_status.cause if sweat_status else None,
+                "isolation_level": isolation.level if isolation else None,
+                "isolation_delta": isolation.delta_water_air if isolation else None,
+                "active_mode": active_mode,
+            }
+
+            # Sleep Score Tracking
+            await self._async_update_sleep_tracking(
+                zone_index=zone_index,
+                is_present=is_present,
+                current_temp=current_temp,
+                target_temp=target_temp,
+                should_heat=should_heat
+            )
+
+            return current_watt
+
+        except Exception as zone_error:
+            # ═══════════════════════════════════════════════════════════
+            # FIX: Bei JEDEM Fehler → Heizung AN (Fail-Safe!)
+            # ═══════════════════════════════════════════════════════════
+            _LOGGER.error(f"Fehler in Zone {zone_index}: {zone_error}", exc_info=True)
+
+            # #2 Fail-Safe-Richtung je Bett-Typ: Wasserbett AN, Heizmatte AUS
+            fail_state = self.is_waterbed
+            heater_entity = zone_config.get("heater")
+            if heater_entity:
+                await self._async_control_heater(heater_entity, fail_state)
+                self._heater_states[heater_entity] = fail_state
+
+            decision["zones"][zone_name] = {
+                "status": "ERROR",
+                "error": str(zone_error),
+                "heater_state": fail_state,
+                "reason": (
+                    "⚠️ Fehler - Heizung AN (Sicherheit)"
+                    if fail_state
+                    else "⚠️ Fehler - Heizmatte AUS (Sicherheit)"
+                ),
+            }
+        return current_watt
 
     async def _async_check_heating_efficiency(self, zone_index, current_temp, should_heat):
         """Prüft, ob die Heizung effektiv arbeitet."""
