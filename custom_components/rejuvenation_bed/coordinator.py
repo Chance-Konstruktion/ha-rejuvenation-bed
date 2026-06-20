@@ -284,22 +284,22 @@ class RejuvenationBedCoordinator(DataUpdateCoordinator):
             return sick_temp, "sick", f"🤒 Krank-Modus ({sick_temp}°C konstant)"
         
         # ═══════════════════════════════════════════════════════════════════
-        # PRIORITÄT 3: Boost-Modus (relativ zur aktuellen Zieltemperatur!)
+        # PRIORITÄT 3: Boost-Modus (#11: feste Zieltemperatur, absolut)
+        # Der Wert kommt aus dem TemperatureCalculator (boost_target_temp) und
+        # liegt bereits in base_temp. Hier NUR Ablauf-Logik + Safety-Cap — kein
+        # zweites Aufrechnen eines Offsets mehr (das war die Dopplung).
         # ═══════════════════════════════════════════════════════════════════
         boost_active = self.manual_boost.get(zone_index, False)
         boost_until = self.boost_until.get(zone_index)
-        
+
         if boost_active:
             # Prüfe ob Boost abgelaufen
             if boost_until and local_now() > boost_until:
                 self.manual_boost[zone_index] = False
                 _LOGGER.info(f"Boost für Zone {zone_index} automatisch beendet.")
             else:
-                # Boost = Basis + Offset (nicht feste Temperatur!)
-                options = self.config_entry.options
-                boost_offset = float(options.get("boost_offset", 2.0))
-                boost_temp = min(base_temp + boost_offset, BOOST_MAX_TEMP)  # Safety: max 34°C
-                return boost_temp, "boost", f"🔥 Schnellheizen ({base_temp:.1f} + {boost_offset}°C = {boost_temp:.1f}°C)"
+                boost_temp = min(base_temp, BOOST_MAX_TEMP)  # Safety: max 34°C
+                return boost_temp, "boost", f"🔥 Schnellheizen ({boost_temp:.1f}°C konstant)"
         
         # ═══════════════════════════════════════════════════════════════════
         # PRIORITÄT 4: Tarifmodus → wird jetzt durch EnergyStateResolver

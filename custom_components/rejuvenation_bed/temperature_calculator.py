@@ -144,10 +144,13 @@ class TemperatureCalculator:
             _LOGGER.debug(f"Zone {zone_index}: Krank-Modus aktiv ({sick_temp}°C)")
             return float(min(sick_temp, ABSOLUTE_MAX_TEMP))
         
-        # Schritt 2: Prüfe auf Boost-Switch
+        # Schritt 2: Prüfe auf Boost-Switch (#11: feste Zieltemp, einzige Quelle)
+        # Vorrang: globale Option → Zone-Config → 34°C
         if boost_active:
             zones_config = self.config_entry.data.get("zones", [])
-            boost_target = zones_config[zone_index].get("boost_target_temp", 34)
+            boost_target = self.config_entry.options.get("boost_target_temp") or zones_config[zone_index].get(
+                "boost_target_temp", 34
+            )
             _LOGGER.debug(f"Zone {zone_index}: Boost-Modus aktiv ({boost_target}°C)")
             return float(min(boost_target, ABSOLUTE_MAX_TEMP))
         
