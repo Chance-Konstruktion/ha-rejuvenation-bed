@@ -67,3 +67,34 @@ class TestChargeStandbyTemp:
         calc = _make_calc(WATERBED_CONFIG)
         result = calc._charge_standby_temp(26.0, None, 0)
         assert result == pytest.approx(26.0)
+
+
+class TestBoostTargetTemp:
+    """#11: Boost = feste Zieltemperatur (absolut), Vorrang Option → Zone → 34."""
+
+    @staticmethod
+    def _boost_calc(options, zone_boost):
+        hass = MagicMock()
+        config_entry = SimpleNamespace(
+            options=options,
+            data={"global": {}, "zones": [{"boost_target_temp": zone_boost}]},
+        )
+        return TemperatureCalculator(hass, config_entry, WATERBED_CONFIG.copy())
+
+    @staticmethod
+    def _coord():
+        return SimpleNamespace(manual_boost={0: True}, manual_target_temp={}, sick_mode_until={})
+
+    def test_boost_uses_zone_target_when_no_option(self):
+        import asyncio
+
+        calc = self._boost_calc(options={}, zone_boost=34)
+        temp = asyncio.run(calc.async_calculate_target(0, {}, {}, coordinator=self._coord()))
+        assert temp == 34.0
+
+    def test_option_overrides_zone_target(self):
+        import asyncio
+
+        calc = self._boost_calc(options={"boost_target_temp": 30.0}, zone_boost=34)
+        temp = asyncio.run(calc.async_calculate_target(0, {}, {}, coordinator=self._coord()))
+        assert temp == 30.0

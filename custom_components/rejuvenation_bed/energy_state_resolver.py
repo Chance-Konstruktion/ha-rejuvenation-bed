@@ -31,45 +31,42 @@ _LOGGER = logging.getLogger(__name__)
 
 class EnergyMode(Enum):
     """Energie-Betriebsmodi des Betts."""
-    NORMAL = "normal"               # Standard-Biorhythmus
-    SOLAR_BOOST = "solar_boost"     # Überschuss-Energie nutzen
-    ECO_MODE = "eco_mode"           # Energie sparen (teurer Strom)
-    GRID_CRITICAL = "grid_critical" # Netz-Engpass (sehr selten)
+
+    NORMAL = "normal"  # Standard-Biorhythmus
+    SOLAR_BOOST = "solar_boost"  # Überschuss-Energie nutzen
+    ECO_MODE = "eco_mode"  # Energie sparen (teurer Strom)
+    GRID_CRITICAL = "grid_critical"  # Netz-Engpass (sehr selten)
 
 
 class EnergyStateResolver:
     """
     Entscheidet, wie Energie-Verfügbarkeit die Temperatur beeinflusst.
-    
+
     Arbeitet mit dem EnergyCalculator zusammen, aber fügt Logik hinzu.
     NEU: Mit Hysterese für stabiles Schaltverhalten!
     """
-    
+
     # Schwellenwerte MIT Hysterese (verhindert Flattern!)
-    SOLAR_BOOST_ON_W = 500       # Einschalten bei >= 500W
-    SOLAR_BOOST_OFF_W = 450      # Ausschalten bei < 450W (Hysterese!)
-    
-    ECO_PRICE_ON_EUR = 0.35      # Eco einschalten bei >= 35ct
-    ECO_PRICE_OFF_EUR = 0.32     # Eco ausschalten bei < 32ct (Hysterese!)
-    
+    SOLAR_BOOST_ON_W = 500  # Einschalten bei >= 500W
+    SOLAR_BOOST_OFF_W = 450  # Ausschalten bei < 450W (Hysterese!)
+
+    ECO_PRICE_ON_EUR = 0.35  # Eco einschalten bei >= 35ct
+    ECO_PRICE_OFF_EUR = 0.32  # Eco ausschalten bei < 32ct (Hysterese!)
+
     CHEAP_PRICE_THRESHOLD_EUR = 0.15  # Unter 15 ct/kWh → wie Solar
-    
+
     # Temperatur-Offsets (additiv zur Biorhythmus-Kurve)
-    SOLAR_BOOST_OFFSET = +1.5   # Solar-Überschuss → +1.5°C
-    ECO_OFFSET = -2.0           # Teurer Strom → -2.0°C
-    CRITICAL_OFFSET = -3.0      # Netz-Notfall → -3.0°C (sehr selten)
-    
+    SOLAR_BOOST_OFFSET = +1.5  # Solar-Überschuss → +1.5°C
+    ECO_OFFSET = -2.0  # Teurer Strom → -2.0°C
+    CRITICAL_OFFSET = -3.0  # Netz-Notfall → -3.0°C (sehr selten)
+
     # Anti-Kalt-Garantie: Absolutes Minimum
-    ABSOLUTE_MIN_TEMP = 25.0    # Niemals unter 25°C, egal was passiert!
-    
-    def __init__(
-        self,
-        hass: HomeAssistant,
-        config_entry
-    ):
+    ABSOLUTE_MIN_TEMP = 25.0  # Niemals unter 25°C, egal was passiert!
+
+    def __init__(self, hass: HomeAssistant, config_entry):
         """
         Initialisiert den Energy-State-Resolver.
-        
+
         Args:
             hass: Home Assistant Instanz
             config_entry: ConfigEntry mit globalen Einstellungen
@@ -89,34 +86,35 @@ class EnergyStateResolver:
 
         # Referenz zum Coordinator (wird gesetzt nach init)
         self._coordinator = None
-    
+
     @property
     def solar_sensor(self) -> str:
         """Solar-Sensor frisch aus Options lesen (damit Änderungen sofort wirken)."""
-        return self.config_entry.options.get(
-            "solar_sensor", self.global_config.get("solar_sensor")
-        )
-    
+        return self.config_entry.options.get("solar_sensor", self.global_config.get("solar_sensor"))
+
     @property
     def price_sensor(self) -> str:
         """Preis-Sensor frisch aus Options lesen."""
-        return self.config_entry.options.get(
-            "price_sensor", self.global_config.get("price_sensor")
-        )
+        return self.config_entry.options.get("price_sensor", self.global_config.get("price_sensor"))
 
     @property
     def solar_boost_on_w(self) -> float:
         """Solar-Schwellwert aus Options lesen (Default: 500W)."""
         val = self.config_entry.options.get(
-            "solar_boost_threshold",
-            self.global_config.get("solar_boost_threshold", 500)
+            "solar_boost_threshold", self.global_config.get("solar_boost_threshold", 500)
         )
         return float(val)
 
     @property
     def solar_boost_off_w(self) -> float:
-        """Solar-Aus-Schwellwert = Ein-Schwellwert minus 50W Hysterese."""
-        return self.solar_boost_on_w - 50
+        """
+        Solar-Aus-Schwellwert mit RELATIVER Hysterese (O5).
+
+        10% unter dem Ein-Schwellwert — proportional statt fix 50W. Bei 500W
+        identisch zu früher (450W), bei kleinen Schwellen (z.B. 150W) aber ein
+        engeres, sinnvolleres Band (135W statt 100W).
+        """
+        return self.solar_boost_on_w * 0.9
 
     # ───────────────────────────────────────────────────────────────────────
     # Unabhängige Solar-Boost-Trigger: Hausakku-SoC und PV-Forecast
@@ -125,25 +123,19 @@ class EnergyStateResolver:
     @property
     def battery_soc_sensor(self) -> str:
         """Hausakku-SoC-Sensor (optional). Eigenständiger Boost-Trigger."""
-        return self.config_entry.options.get(
-            "battery_soc_sensor", self.global_config.get("battery_soc_sensor")
-        )
+        return self.config_entry.options.get("battery_soc_sensor", self.global_config.get("battery_soc_sensor"))
 
     @property
     def forecast_sensor(self) -> str:
         """PV-Forecast-Sensor (Rest-Tag in kWh, z.B. Solcast)."""
-        return self.config_entry.options.get(
-            "forecast_sensor", self.global_config.get("forecast_sensor")
-        )
+        return self.config_entry.options.get("forecast_sensor", self.global_config.get("forecast_sensor"))
 
     @property
     def bed_boost_soc_threshold(self) -> float:
         """SoC-Schwelle ab der der SoC-Trigger Boost auslöst (Default 90%)."""
         val = self.config_entry.options.get(
             "bed_boost_soc_threshold",
-            self.global_config.get(
-                "bed_boost_soc_threshold", DEFAULT_BED_BOOST_SOC_THRESHOLD
-            ),
+            self.global_config.get("bed_boost_soc_threshold", DEFAULT_BED_BOOST_SOC_THRESHOLD),
         )
         return float(val)
 
@@ -152,9 +144,7 @@ class EnergyStateResolver:
         """Forecast-Rest-Tag-Schwelle in kWh ab der der Forecast-Trigger auslöst (Default 3)."""
         val = self.config_entry.options.get(
             "bed_boost_min_forecast_kwh",
-            self.global_config.get(
-                "bed_boost_min_forecast_kwh", DEFAULT_BED_BOOST_MIN_FORECAST_KWH
-            ),
+            self.global_config.get("bed_boost_min_forecast_kwh", DEFAULT_BED_BOOST_MIN_FORECAST_KWH),
         )
         return float(val)
 
@@ -179,11 +169,11 @@ class EnergyStateResolver:
     def resolve(self) -> dict:
         """
         Hauptfunktion: Ermittelt den aktuellen Energie-Zustand.
-        
+
         Berücksichtigt jetzt:
         - Solar/Eco SWITCHES (User kann Solar-Boost und Eco deaktivieren!)
         - Tibber Auto-Detect (€/kWh vs. ct/kWh)
-        
+
         Returns:
             Dict mit:
             - mode: EnergyMode
@@ -195,23 +185,23 @@ class EnergyStateResolver:
         # Schritt 1: Aktuelle Werte auslesen
         solar_power = self._read_solar_power()
         current_price = self._read_energy_price()
-        
+
         # Schritt 1b: Switch-Status vom Coordinator prüfen
         solar_enabled = True
         eco_enabled = False
         if self._coordinator:
             solar_enabled = getattr(self._coordinator, "thermal_battery_enabled", True)
             eco_enabled = getattr(self._coordinator, "eco_mode_enabled", False)
-        
+
         # Schritt 2: Modus ermitteln (mit Switch-Checks!)
         mode = self._determine_mode(solar_power, current_price, solar_enabled, eco_enabled)
-        
+
         # Schritt 3: Temperatur-Offset berechnen
         temp_offset = self._calculate_offset(mode)
-        
+
         # Schritt 4: Erklärung generieren
         reason = self._generate_reason(mode, solar_power, current_price)
-        
+
         return {
             "mode": mode,
             "temperature_offset": temp_offset,
@@ -229,88 +219,79 @@ class EnergyStateResolver:
             "battery_soc": self._read_battery_soc(),
             "forecast_remaining_kwh": self._read_forecast_remaining_kwh(),
         }
-    
+
     def _read_solar_power(self) -> float:
         """
         Liest die aktuelle Solar-Leistung aus dem Sensor.
-        
+
         Returns:
             Leistung in Watt (0.0 wenn nicht verfügbar)
         """
         if not self.solar_sensor:
             return 0.0
-        
+
         state = self.hass.states.get(self.solar_sensor)
-        
+
         if not state or state.state in ["unknown", "unavailable"]:
             return 0.0
-        
+
         try:
             return float(state.state)
         except (ValueError, TypeError):
-            _LOGGER.warning(
-                f"Konnte Solar-Sensor '{self.solar_sensor}' nicht als Zahl lesen: "
-                f"{state.state}"
-            )
+            _LOGGER.warning(f"Konnte Solar-Sensor '{self.solar_sensor}' nicht als Zahl lesen: " f"{state.state}")
             return 0.0
-    
+
     @property
     def _fallback_price(self) -> float:
         """Konfigurierter Strompreis als Fallback (ct/kWh → EUR/kWh)."""
         # Aus Options oder Config lesen, Default 30 ct/kWh
         ct_price = (
-            self.config_entry.options.get("electricity_price")
-            or self.global_config.get("electricity_price")
-            or 30.0
+            self.config_entry.options.get("electricity_price") or self.global_config.get("electricity_price") or 30.0
         )
         return float(ct_price) / 100.0
 
     def _read_energy_price(self) -> float:
         """
         Liest den aktuellen Strompreis aus dem Sensor.
-        
+
         Priorität:
         1. Dynamischer Preis-Sensor (Tibber, aWATTar, ENTSO-E)
         2. Manuell konfigurierter Festpreis
-        
+
         Auto-Detect: Tibber/ENTSO-E liefern €/kWh (z.B. 0.2543),
         manche Custom-Sensoren liefern ct/kWh (z.B. 25.43).
         Werte > 1.0 werden als ct/kWh interpretiert und konvertiert.
-        
+
         Returns:
             Preis in EUR/kWh
         """
         if not self.price_sensor:
             return self._fallback_price
-        
+
         state = self.hass.states.get(self.price_sensor)
-        
+
         if not state or state.state in ["unknown", "unavailable"]:
             return self._fallback_price
-        
+
         try:
             price = float(state.state)
-            
+
             # Auto-Detect: Werte > 1.0 sind vermutlich ct/kWh
             if price > 1.0:
                 price = price / 100.0
                 _LOGGER.debug(f"Strompreis Auto-Detect: {state.state} → {price:.4f} €/kWh")
-            
+
             # Plausibilitäts-Check: Negative Preise möglich (Börse), aber > 2€ ist Fehler
             if price > 2.0:
                 _LOGGER.warning(
-                    f"Strompreis unplausibel hoch: {price:.2f} €/kWh "
-                    f"→ Fallback {self._fallback_price:.2f}"
+                    f"Strompreis unplausibel hoch: {price:.2f} €/kWh " f"→ Fallback {self._fallback_price:.2f}"
                 )
                 return self._fallback_price
-            
+
             return price
-            
+
         except (ValueError, TypeError):
-            _LOGGER.warning(
-                f"Konnte Preis-Sensor '{self.price_sensor}' nicht als Zahl lesen: "
-                f"{state.state}"
-            )
+            _LOGGER.warning(f"Konnte Preis-Sensor '{self.price_sensor}' nicht als Zahl lesen: " f"{state.state}")
             return self._fallback_price
 
     def _read_battery_soc(self) -> Optional[float]:
@@ -331,8 +312,7 @@ class EnergyStateResolver:
             return float(state.state)
         except (ValueError, TypeError):
             _LOGGER.warning(
-                f"Konnte Akku-SoC-Sensor '{self.battery_soc_sensor}' nicht "
-                f"als Zahl lesen: {state.state}"
+                f"Konnte Akku-SoC-Sensor '{self.battery_soc_sensor}' nicht " f"als Zahl lesen: {state.state}"
             )
             return None
 
@@ -356,10 +336,7 @@ class EnergyStateResolver:
         try:
             return float(state.state)
         except (ValueError, TypeError):
-            _LOGGER.warning(
-                f"Konnte Forecast-Sensor '{self.forecast_sensor}' nicht "
-                f"als Zahl lesen: {state.state}"
-            )
+            _LOGGER.warning(f"Konnte Forecast-Sensor '{self.forecast_sensor}' nicht " f"als Zahl lesen: {state.state}")
             return None
 
     def _evaluate_boost_triggers(self, solar_power: float) -> dict:
@@ -393,9 +370,7 @@ class EnergyStateResolver:
 
         # ── Trigger 1: Solar-Schwelle ───────────────────────────────────
         if self.solar_sensor:
-            threshold = (
-                self.solar_boost_off_w if already_boost else self.solar_boost_on_w
-            )
+            threshold = self.solar_boost_off_w if already_boost else self.solar_boost_on_w
             triggers["solar"] = (
                 solar_power >= threshold,
                 f"{solar_power:.0f}W Überschuss",
@@ -444,9 +419,7 @@ class EnergyStateResolver:
         forecast_active = triggers["forecast"][0] is True
 
         reserve_active = soc_active or forecast_active
-        reserve_configured = (
-            triggers["soc"][0] is not None or triggers["forecast"][0] is not None
-        )
+        reserve_configured = triggers["soc"][0] is not None or triggers["forecast"][0] is not None
 
         if self.battery_priority and reserve_configured:
             boost = solar_active and reserve_active
@@ -454,11 +427,7 @@ class EnergyStateResolver:
             boost = solar_active or soc_active or forecast_active
 
         if boost:
-            parts = [
-                triggers[k][1]
-                for k in ("solar", "soc", "forecast")
-                if triggers[k][0] is True
-            ]
+            parts = [triggers[k][1] for k in ("solar", "soc", "forecast") if triggers[k][0] is True]
             self._boost_reason = " · ".join(parts)
             return True
 
@@ -469,14 +438,10 @@ class EnergyStateResolver:
             wait_parts = []
             soc = self._read_battery_soc()
             if triggers["soc"][0] is not None and soc is not None:
-                wait_parts.append(
-                    f"Akku {soc:.0f}% < {self.bed_boost_soc_threshold:.0f}%"
-                )
+                wait_parts.append(f"Akku {soc:.0f}% < {self.bed_boost_soc_threshold:.0f}%")
             forecast = self._read_forecast_remaining_kwh()
             if triggers["forecast"][0] is not None and forecast is not None:
-                wait_parts.append(
-                    f"Forecast {forecast:.1f} < {self.bed_boost_min_forecast_kwh:.1f} kWh"
-                )
+                wait_parts.append(f"Forecast {forecast:.1f} < {self.bed_boost_min_forecast_kwh:.1f} kWh")
             self._boost_reason = " · ".join(wait_parts)
         return False
 
@@ -489,11 +454,11 @@ class EnergyStateResolver:
     ) -> EnergyMode:
         """
         Entscheidet basierend auf Solar + Preis + Switches den Betriebsmodus.
-        
+
         NEU: Switches werden respektiert!
         - thermal_battery_enabled=False → Solar-Boost blockiert
         - eco_mode_enabled=False → Eco blockiert
-        
+
         Priorität (höchste zuerst):
         1. Solar-Boost (viel Überschuss + Switch AN)
         2. Günstiger Strom (wie Solar behandeln + Switch AN)
@@ -528,11 +493,11 @@ class EnergyStateResolver:
                 if price >= self.ECO_PRICE_ON_EUR:
                     self._current_mode = EnergyMode.ECO_MODE
                     return EnergyMode.ECO_MODE
-        
+
         # Default: Normal
         self._current_mode = EnergyMode.NORMAL
         return EnergyMode.NORMAL
-    
+
     def _classify_price(self, price: float) -> str:
         """
         Klassifiziert den Strompreis als 'cheap' / 'expensive' / 'normal' (#7).
@@ -552,7 +517,7 @@ class EnergyStateResolver:
     def _calculate_offset(self, mode: EnergyMode) -> float:
         """
         Berechnet den Temperatur-Offset basierend auf dem Modus.
-        
+
         WICHTIG: Offset wird zur Biorhythmus-Kurve ADDIERT,
         aber NIEMALS unter ABSOLUTE_MIN_TEMP!
         """
@@ -562,15 +527,10 @@ class EnergyStateResolver:
             EnergyMode.ECO_MODE: self.ECO_OFFSET,
             EnergyMode.GRID_CRITICAL: self.CRITICAL_OFFSET,
         }
-        
+
         return offsets.get(mode, 0.0)
-    
-    def _generate_reason(
-        self,
-        mode: EnergyMode,
-        solar_power: float,
-        price: float
-    ) -> str:
+
+    def _generate_reason(self, mode: EnergyMode, solar_power: float, price: float) -> str:
         """
         Generiert eine menschenlesbare Erklärung für das UI.
         """
@@ -592,13 +552,13 @@ class EnergyStateResolver:
             if self._boost_waiting and self._boost_reason:
                 return f"⏸ Boost wartet (Akku-Vorrang) — {self._boost_reason}"
             return "✅ Normal-Betrieb"
-    
+
     def get_diagnostics(self) -> dict:
         """
         Gibt Debug-Informationen zurück.
         """
         state = self.resolve()
-        
+
         return {
             "mode": state["mode"].value,
             "temperature_offset": state["temperature_offset"],

@@ -32,7 +32,7 @@ from homeassistant.const import (
 )
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from .const import DOMAIN, ABSOLUTE_MAX_TEMP, MANUAL_TARGET_TTL_HOURS, local_now
-from .device_info import get_zone_device_info
+from .device_info import get_zone_device_info, detect_hardware_level
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -62,7 +62,7 @@ class RejuvenationBedClimate(CoordinatorEntity, ClimateEntity):
 
     _attr_has_entity_name = True
     _attr_temperature_unit = UnitOfTemperature.CELSIUS
-    
+
     # Tatsächlich unterstützte HVAC-Modi (Krank läuft über Service, nicht DRY)
     _attr_hvac_modes = [
         HVACMode.OFF,
@@ -76,17 +76,17 @@ class RejuvenationBedClimate(CoordinatorEntity, ClimateEntity):
         PRESET_AWAY,
         PRESET_BOOST,
     ]
-    
+
     # Grenzwerte
     _attr_min_temp = 24.0
     _attr_max_temp = ABSOLUTE_MAX_TEMP
     _attr_target_temperature_step = 0.1  # NEU: 0.1°C Schritte!
-    
+
     _attr_supported_features = (
-        ClimateEntityFeature.TARGET_TEMPERATURE | 
-        ClimateEntityFeature.TURN_ON | 
-        ClimateEntityFeature.TURN_OFF |
-        ClimateEntityFeature.PRESET_MODE
+        ClimateEntityFeature.TARGET_TEMPERATURE
+        | ClimateEntityFeature.TURN_ON
+        | ClimateEntityFeature.TURN_OFF
+        | ClimateEntityFeature.PRESET_MODE
     )
 
     def __init__(self, coordinator, zone_index, display_name):
@@ -96,43 +96,21 @@ class RejuvenationBedClimate(CoordinatorEntity, ClimateEntity):
         self._attr_name = f"Thermostat{display_name}"
         self._attr_unique_id = f"{coordinator.config_entry.entry_id}_zone{zone_index}_climate"
         self._attr_device_info = get_zone_device_info(coordinator, zone_index)
-        
+
         # Min-Temp aus Bed-Config (Heizmatte: 0°C, Wasserbett: 24°C)
         self._attr_min_temp = coordinator.bed_config.get("min_temp", 24.0)
-        
+
         # Ermittle Hardware-Level
         zones_config = coordinator.config_entry.data.get("zones", [])
         if zone_index < len(zones_config):
             zone_conf = zones_config[zone_index]
-            self._hardware_level = self._detect_hardware_level(zone_conf)
+            self._hardware_level = detect_hardware_level(zone_conf)
         else:
             self._hardware_level = "A"
-        
+
         # Passe verfügbare Modi an Hardware an
         self._adjust_modes_for_hardware()
 
-    def _detect_hardware_level(self, zone_conf) -> str:
-        """
-        Erkennt Hardware-Level: A/B/B+/C/D/E
-        """
-        has_temp = zone_conf.get("temp_sensor") is not None
-        has_power = zone_conf.get("power_sensor") is not None
-        has_air = zone_conf.get("air_temp_sensor") is not None
-        has_moisture = zone_conf.get("moisture_sensor") is not None
-
-        if has_temp and has_power and has_air and has_moisture:
-            return "E"  # Premium
-        elif has_temp and has_power and (has_air or has_moisture):
-            return "D"  # Erweitert
-        elif has_temp and has_power:
-            return "C"  # Vollausstattung
-        elif has_temp:
-            return "B+"  # Temperatur - Kurve ja, Energie nein
-        elif has_power:
-            return "B"  # Smart - Energie ja, Kurve nein
-        else:
-            return "A"  # Basic
-    
     def _adjust_modes_for_hardware(self):
         """Passt Modi an Hardware an."""
         if self._hardware_level == "A":
@@ -148,10 +126,10 @@ class RejuvenationBedClimate(CoordinatorEntity, ClimateEntity):
         data = self.coordinator.data
         if not data or "zones" not in data:
             return HVACMode.OFF
-        
+
         zone_name = f"Zone {self._zone_idx + 1}"
         zone_data = data["zones"].get(zone_name, {})
-        
+
         return zone_data.get("hvac_mode", HVACMode.OFF)
 
     @property
@@ -160,10 +138,10 @@ class RejuvenationBedClimate(CoordinatorEntity, ClimateEntity):
         data = self.coordinator.data
         if not data or "zones" not in data:
             return HVACAction.OFF
-        
+
         zone_name = f"Zone {self._zone_idx + 1}"
         zone_data = data["zones"].get(zone_name, {})
-        
+
         if zone_data.get("active", False):
             return HVACAction.HEATING
         else:
@@ -175,10 +153,10 @@ class RejuvenationBedClimate(CoordinatorEntity, ClimateEntity):
         data = self.coordinator.data
         if not data or "zones" not in data:
             return None
-        
+
         zone_name = f"Zone {self._zone_idx + 1}"
         zone_data = data["zones"].get(zone_name, {})
-        
+
         current = zone_data.get("current")
         if current == "unknown":
             return None
@@ -190,10 +168,10 @@ class RejuvenationBedClimate(CoordinatorEntity, ClimateEntity):
         data = self.coordinator.data
         if not data or "zones" not in data:
             return None
-        
+
         zone_name = f"Zone {self._zone_idx + 1}"
         zone_data = data["zones"].get(zone_name, {})
-        
+
         return zone_data.get("target")
 
     @property
@@ -202,19 +180,19 @@ class RejuvenationBedClimate(CoordinatorEntity, ClimateEntity):
         data = self.coordinator.data
         if not data or "zones" not in data:
             return PRESET_NONE
-        
+
         zone_name = f"Zone {self._zone_idx + 1}"
         zone_data = data["zones"].get(zone_name, {})
-        
+
         return zone_data.get("preset_mode", PRESET_NONE)
 
     async def async_set_hvac_mode(self, hvac_mode: HVACMode):
         """Setzt HVAC-Modus."""
         _LOGGER.info(f"Zone {self._zone_idx}: HVAC → {hvac_mode}")
-        
+
         if not hasattr(self.coordinator, "manual_hvac_mode"):
             self.coordinator.manual_hvac_mode = {}
-        
+
         self.coordinator.manual_hvac_mode[self._zone_idx] = hvac_mode
 
         # #4: Zurück auf AUTO/HEAT → manuellen Slider-Wert verwerfen,
@@ -229,9 +207,9 @@ class RejuvenationBedClimate(CoordinatorEntity, ClimateEntity):
         """Setzt Zieltemperatur."""
         if (temp := kwargs.get(ATTR_TEMPERATURE)) is None:
             return
-        
+
         _LOGGER.info(f"Zone {self._zone_idx}: Temp → {temp}°C")
-        
+
         if not hasattr(self.coordinator, "manual_target_temp"):
             self.coordinator.manual_target_temp = {}
         if not hasattr(self.coordinator, "manual_target_until"):
@@ -239,25 +217,23 @@ class RejuvenationBedClimate(CoordinatorEntity, ClimateEntity):
 
         self.coordinator.manual_target_temp[self._zone_idx] = temp
         # #4: TTL setzen — der manuelle Wert verfällt automatisch
-        self.coordinator.manual_target_until[self._zone_idx] = (
-            local_now() + timedelta(hours=MANUAL_TARGET_TTL_HOURS)
-        )
+        self.coordinator.manual_target_until[self._zone_idx] = local_now() + timedelta(hours=MANUAL_TARGET_TTL_HOURS)
         await self.coordinator.async_request_refresh()
 
     async def async_set_preset_mode(self, preset_mode: str):
         """Setzt Preset."""
         _LOGGER.info(f"Zone {self._zone_idx}: Preset → {preset_mode}")
-        
+
         if not hasattr(self.coordinator, "manual_preset"):
             self.coordinator.manual_preset = {}
-        
+
         self.coordinator.manual_preset[self._zone_idx] = preset_mode
-        
+
         if preset_mode == PRESET_BOOST:
             if not hasattr(self.coordinator, "manual_boost"):
                 self.coordinator.manual_boost = {}
             self.coordinator.manual_boost[self._zone_idx] = True
-        
+
         await self.coordinator.async_request_refresh()
 
     @property
@@ -266,17 +242,17 @@ class RejuvenationBedClimate(CoordinatorEntity, ClimateEntity):
         data = self.coordinator.data
         if not data or "zones" not in data:
             return {}
-        
+
         zone_name = f"Zone {self._zone_idx + 1}"
         zone_data = data["zones"].get(zone_name, {})
-        
+
         attrs = {
             "hardware_level": self._hardware_level,
             "reason": zone_data.get("reason", ""),
         }
-        
+
         if self._hardware_level in ["C", "B+", "D", "E"]:
             attrs["presence_detected"] = zone_data.get("is_present", False)
             attrs["presence_confidence"] = zone_data.get("presence_confidence", 0.0)
-        
+
         return attrs

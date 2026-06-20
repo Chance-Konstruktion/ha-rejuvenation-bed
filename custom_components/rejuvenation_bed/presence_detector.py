@@ -96,6 +96,7 @@ from .const import (
     PRESENCE_MIN_SAMPLES,
     PRESENCE_DEBOUNCE_MINUTES,
     PRESENCE_BODY_TEMP_DIFF,
+    local_now,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -259,7 +260,7 @@ class PresenceDetector:
         Returns:
             (is_present, confidence, reason)
         """
-        now = datetime.now()
+        now = local_now()
 
         # Daten speichern (inkl. heater_active für v9 Heat-Ratio)
         self._store(zone_index, water_temp, air_temp, humidity, now)
@@ -356,7 +357,7 @@ class PresenceDetector:
         if not buffer:
             return 0.0
 
-        cutoff = datetime.now() - timedelta(minutes=self.thresholds.history_window_minutes)
+        cutoff = local_now() - timedelta(minutes=self.thresholds.history_window_minutes)
         temps = [val for ts, val in buffer if ts > cutoff and val is not None]
 
         if len(temps) < 2:
@@ -399,7 +400,7 @@ class PresenceDetector:
         if not buffer:
             return 0.0
 
-        cutoff = datetime.now() - timedelta(minutes=window_minutes)
+        cutoff = local_now() - timedelta(minutes=window_minutes)
         temps = [val for ts, val in buffer if ts > cutoff and val is not None]
 
         n = len(temps)
@@ -450,7 +451,7 @@ class PresenceDetector:
         if window_minutes is None:
             window_minutes = self.thresholds.history_window_minutes * 2
 
-        now = datetime.now()
+        now = local_now()
         end = now - timedelta(minutes=offset_minutes)
         start = end - timedelta(minutes=window_minutes)
 
@@ -486,7 +487,7 @@ class PresenceDetector:
         if not buffer:
             return 0.0
 
-        cutoff = datetime.now() - timedelta(minutes=self.thresholds.history_window_minutes)
+        cutoff = local_now() - timedelta(minutes=self.thresholds.history_window_minutes)
         temps = [val for ts, val in buffer if ts > cutoff and val is not None]
 
         if len(temps) < 10:
@@ -530,7 +531,7 @@ class PresenceDetector:
         if not buffer:
             return 0.5, 0
 
-        cutoff = datetime.now() - timedelta(minutes=self.thresholds.history_window_minutes)
+        cutoff = local_now() - timedelta(minutes=self.thresholds.history_window_minutes)
         temps = [val for ts, val in buffer if ts > cutoff and val is not None]
 
         if len(temps) < 3:
@@ -694,11 +695,7 @@ class PresenceDetector:
                 reasons.append("→heizt(empty)")
                 return False, 0.10, reasons
             # rise→stable greift auch unter aktiver Heizung (Person dämpft Rampe).
-            if (
-                abs(slope) < t.slope_stable_band
-                and prev_slope is not None
-                and prev_slope > t.slope_rise_threshold
-            ):
+            if abs(slope) < t.slope_stable_band and prev_slope is not None and prev_slope > t.slope_rise_threshold:
                 reasons.append(f"→rise→stable(prev={prev_slope:+.2f})")
                 self._last_chaos_time[zone_index] = now
                 self._empty_confirmed[zone_index] = False
@@ -716,11 +713,7 @@ class PresenceDetector:
                 reasons.append("→kühlt(empty)")
                 return False, 0.10, reasons
             # Stabil nach starkem Anstieg = Person eingestiegen.
-            if (
-                abs(slope) < t.slope_stable_band
-                and prev_slope is not None
-                and prev_slope > t.slope_rise_threshold
-            ):
+            if abs(slope) < t.slope_stable_band and prev_slope is not None and prev_slope > t.slope_rise_threshold:
                 reasons.append(f"→rise→stable(prev={prev_slope:+.2f})")
                 self._empty_confirmed[zone_index] = False
                 self._last_chaos_time[zone_index] = now
@@ -868,7 +861,7 @@ class PresenceDetector:
         if buffer is None or len(buffer) < self.thresholds.min_samples:
             return None
 
-        cutoff = datetime.now() - timedelta(minutes=window_minutes)
+        cutoff = local_now() - timedelta(minutes=window_minutes)
         values = [val for ts, val in buffer if ts > cutoff and val is not None]
 
         if len(values) < self.thresholds.min_samples:
@@ -889,7 +882,7 @@ class PresenceDetector:
         if not buffer or len(buffer) < self.thresholds.min_samples:
             return False
 
-        now = datetime.now()
+        now = local_now()
 
         recent_cutoff = now - timedelta(minutes=self.thresholds.sweat_confirm_minutes)
         recent = [val for ts, val in buffer if ts > recent_cutoff and val is not None]
@@ -941,7 +934,7 @@ class PresenceDetector:
         if not buffer:
             return False
 
-        now = datetime.now()
+        now = local_now()
         cutoff = now - timedelta(hours=self.thresholds.leak_confirm_hours)
         last_3h = [val for ts, val in buffer if ts > cutoff and val is not None]
 
@@ -1041,7 +1034,7 @@ class PresenceDetector:
         last_chaos = self._last_chaos_time.get(zone_index)
         chaos_lock_remaining = 0.0
         if last_chaos is not None:
-            elapsed = (datetime.now() - last_chaos).total_seconds() / 60
+            elapsed = (local_now() - last_chaos).total_seconds() / 60
             chaos_lock_remaining = max(0.0, self.thresholds.chaos_lock_minutes - elapsed)
 
         hum_buf = self._humidity.get(zone_index)

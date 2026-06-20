@@ -5,6 +5,38 @@ from homeassistant.helpers.entity import DeviceInfo
 from .const import DOMAIN, MANUFACTURER, SW_VERSION
 
 
+def detect_hardware_level(zone_config: dict) -> str:
+    """
+    Erkennt das Hardware-Level einer Zone anhand der konfigurierten Sensoren.
+
+    Einzige Quelle der Wahrheit — vorher 3× dupliziert in config_flow,
+    options_flow und climate (#12).
+
+    Level A (Basic):       Nur Relay → Zeitschaltuhr
+    Level B (Smart):       Relay + Power → Energie-Tracking
+    Level B+ (Temperatur): Relay + Temp → Biorhythmus-Kurve
+    Level C (Voll):        Relay + Temp + Power → alle Kern-Features
+    Level D (Erweitert):   + Luft ODER Feuchte
+    Level E (Premium):     + Luft UND Feuchte
+    """
+    has_temp = zone_config.get("temp_sensor") is not None
+    has_power = zone_config.get("power_sensor") is not None
+    has_air = zone_config.get("air_temp_sensor") is not None
+    has_moisture = zone_config.get("moisture_sensor") is not None
+
+    if has_temp and has_power and has_air and has_moisture:
+        return "E"  # Premium - Alles!
+    elif has_temp and has_power and (has_air or has_moisture):
+        return "D"  # Erweitert - Umgebungs-Sensorik
+    elif has_temp and has_power:
+        return "C"  # Vollausstattung - Alle Kern-Features
+    elif has_temp:
+        return "B+"  # Temperatur - Kurve ja, aber kein Energie-Tracking
+    elif has_power:
+        return "B"  # Smart - Energie, aber keine Kurve
+    return "A"  # Basic - Nur Zeitschaltuhr
+
+
 def get_device_info(coordinator) -> DeviceInfo:
     """Hauptgerät (Mono) oder Container-Gerät (Dual)."""
     global_conf = coordinator.config_entry.data.get("global", {})
