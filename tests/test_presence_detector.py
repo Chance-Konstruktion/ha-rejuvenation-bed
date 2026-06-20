@@ -407,6 +407,8 @@ class _Clock:
                 return outer._now
 
         monkeypatch.setattr(presence_module, "datetime", _FakeDateTime)
+        # Der Detector routet Zeit jetzt über local_now() (#10)
+        monkeypatch.setattr(presence_module, "local_now", lambda: outer._now)
 
     def advance(self, **kw):
         self._now += timedelta(**kw)

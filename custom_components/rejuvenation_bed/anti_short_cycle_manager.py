@@ -22,8 +22,10 @@ FIX v0.1.1: Grace Period blockiert nicht mehr das Einschalten!
 """
 
 import logging
-from datetime import datetime, timedelta
+from datetime import timedelta
 from typing import Dict, Optional, Tuple
+
+from .const import local_now
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -52,7 +54,7 @@ class AntiShortCycleManager:
     def __init__(self):
         """Initialisiert den Anti-Short-Cycle-Manager."""
         self._state_history: Dict[str, dict] = {}
-        self._startup_time = datetime.now()
+        self._startup_time = local_now()
         self._blocked_switches = 0  # Statistik
         self._total_decisions = 0   # Statistik
         self._grace_period_active = True  # NEU: Flag für Grace Period
@@ -81,7 +83,7 @@ class AntiShortCycleManager:
             (allowed, reason) - Tuple mit Erlaubnis und Begründung
         """
         self._total_decisions += 1
-        now = datetime.now()
+        now = local_now()
         
         # ═══════════════════════════════════════════════════════════════════════
         # FIX: Grace Period - NICHT mehr komplett blockieren!
@@ -234,7 +236,7 @@ class AntiShortCycleManager:
     
     def _update_history(self, heater_id: str, new_state: bool):
         """Aktualisiert die Switch-Historie mit automatischer Bereinigung."""
-        now = datetime.now()
+        now = local_now()
         
         # NEU: Alte Einträge bereinigen (älter als 24h nicht mehr relevant)
         cutoff = now - timedelta(hours=24)
@@ -253,7 +255,7 @@ class AntiShortCycleManager:
     
     def _is_in_grace_period(self) -> bool:
         """Prüft, ob wir noch in der Grace Period nach HA-Start sind."""
-        elapsed = (datetime.now() - self._startup_time).total_seconds()
+        elapsed = (local_now() - self._startup_time).total_seconds()
         return elapsed < self.GRACE_PERIOD_SECONDS
     
     def sync_with_hardware(self, heater_id: str, actual_state: bool):
@@ -266,7 +268,7 @@ class AntiShortCycleManager:
             heater_id: Entity-ID des Heaters
             actual_state: Echter Zustand aus Home Assistant
         """
-        now = datetime.now()
+        now = local_now()
         
         if heater_id in self._state_history:
             old_state = self._state_history[heater_id]["current_state"]

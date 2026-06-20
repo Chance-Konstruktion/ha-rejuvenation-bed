@@ -38,6 +38,7 @@ from .const import (
     DEFAULT_BED_BOOST_SOC_THRESHOLD,
     DEFAULT_BED_BOOST_MIN_FORECAST_KWH,
 )
+from .device_info import detect_hardware_level
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -345,7 +346,7 @@ class RejuvenationBedOptionsFlow(config_entries.OptionsFlow):
             }
             new_zone = {k: v for k, v in current_zone.items() if k not in sensor_keys}
             new_zone.update(cleaned)
-            new_zone["hardware_level"] = self._detect_hardware_level(new_zone)
+            new_zone["hardware_level"] = detect_hardware_level(new_zone)
 
             new_zones = list(zones)
             new_zones[zone_index] = new_zone
@@ -632,26 +633,6 @@ class RejuvenationBedOptionsFlow(config_entries.OptionsFlow):
         schema_dict[vol.Optional(key, **kwargs)] = selector.EntitySelector(
             selector.EntitySelectorConfig(**entity_config)
         )
-
-    @staticmethod
-    def _detect_hardware_level(zone_config: dict) -> str:
-        """Erkennt Hardware-Level basierend auf vorhandenen Sensoren."""
-        has_temp = bool(zone_config.get("temp_sensor"))
-        has_power = bool(zone_config.get("power_sensor"))
-        has_air = bool(zone_config.get("air_temp_sensor"))
-        has_moisture = bool(zone_config.get("moisture_sensor"))
-
-        if has_temp and has_power and has_air and has_moisture:
-            return "E"
-        elif has_temp and has_power and (has_air or has_moisture):
-            return "D"
-        elif has_temp and has_power:
-            return "C"
-        elif has_temp:
-            return "B+"
-        elif has_power:
-            return "B"
-        return "A"
 
     @staticmethod
     def _zone_display_name(zone_index: int, zones: list) -> str:

@@ -289,8 +289,9 @@ class TemperatureCalculator:
                     )
         
         # Schritt 6: Hole Basis-Temperatur aus der Biorhythmus-Kurve
+        # #10: HA-Lokalzeit explizit übergeben (Kurve selbst bleibt HA-frei)
         if use_biorhythmus:
-            curve_temp = curve.get_target_temperature()
+            curve_temp = curve.get_target_temperature(now)
         else:
             curve_temp = standby_temp
         
