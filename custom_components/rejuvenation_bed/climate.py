@@ -5,13 +5,14 @@ HVAC-Modi:
 - OFF: Komplett aus
 - AUTO: Idle (Eco/Solar-Batterie, Bett leer)
 - HEAT: Biorhythmus (Kurve aktiv, Präsenz erkannt)
-- DRY: Krank-Modus (konstant warm, 3 Tage)
 
 Presets:
 - NONE: Normal
 - AWAY: Urlaub (Frostschutz)
-- COMFORT: Ausschlafen (verlängerte Kurve)
 - BOOST: Schnellheizen
+
+Hinweis: Krank-Modus läuft über den Service `set_sick_mode` (nicht als
+HVAC-Preset), daher kein eigener DRY/COMFORT-Preset hier.
 """
 
 import logging
@@ -23,7 +24,6 @@ from homeassistant.components.climate import (
     HVACAction,
     PRESET_NONE,
     PRESET_AWAY,
-    PRESET_COMFORT,
     PRESET_BOOST,
 )
 from homeassistant.const import (
@@ -63,19 +63,17 @@ class RejuvenationBedClimate(CoordinatorEntity, ClimateEntity):
     _attr_has_entity_name = True
     _attr_temperature_unit = UnitOfTemperature.CELSIUS
     
-    # ERWEITERT: Mehr HVAC-Modi!
+    # Tatsächlich unterstützte HVAC-Modi (Krank läuft über Service, nicht DRY)
     _attr_hvac_modes = [
         HVACMode.OFF,
         HVACMode.AUTO,
         HVACMode.HEAT,
-        HVACMode.DRY,
     ]
-    
-    # ERWEITERT: Presets!
+
+    # Tatsächlich unterstützte Presets (COMFORT war ohne Funktion → entfernt)
     _attr_preset_modes = [
         PRESET_NONE,
         PRESET_AWAY,
-        PRESET_COMFORT,
         PRESET_BOOST,
     ]
     

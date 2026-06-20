@@ -218,6 +218,9 @@ class EnergyStateResolver:
             "solar_power": solar_power,
             "current_price": current_price,
             "reason": reason,
+            # #7: abgeleitete Status-Keys, die Coordinator/Switch/Sensor erwarten
+            "solar_active": mode == EnergyMode.SOLAR_BOOST,
+            "price_status": self._classify_price(current_price),
             "boost_available": mode == EnergyMode.SOLAR_BOOST,
             "boost_reason": self._boost_reason,
             "boost_waiting": self._boost_waiting,
@@ -530,6 +533,22 @@ class EnergyStateResolver:
         self._current_mode = EnergyMode.NORMAL
         return EnergyMode.NORMAL
     
+    def _classify_price(self, price: float) -> str:
+        """
+        Klassifiziert den Strompreis als 'cheap' / 'expensive' / 'normal' (#7).
+
+        Nur mit dynamischem Preis-Sensor aussagekräftig — ohne Sensor (Festpreis-
+        Fallback) wird 'normal' gemeldet, damit der Tarif-Status nicht fälschlich
+        'Günstig'/'Teuer' anzeigt.
+        """
+        if not self.price_sensor or price is None:
+            return "normal"
+        if price <= self.CHEAP_PRICE_THRESHOLD_EUR:
+            return "cheap"
+        if price >= self.ECO_PRICE_ON_EUR:
+            return "expensive"
+        return "normal"
+
     def _calculate_offset(self, mode: EnergyMode) -> float:
         """
         Berechnet den Temperatur-Offset basierend auf dem Modus.
