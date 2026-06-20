@@ -129,6 +129,14 @@ MANUAL_TARGET_TTL_HOURS = 8.0
 # damit eine fehlende Rückmeldung nicht zu unbegrenzter Volllast führt.
 FAILSAFE_MAX_ON_MINUTES = 90.0
 
+# Startup-Grace: ESP-Sensoren brauchen nach HA-Neustart Zeit zum Booten (O3)
+STARTUP_GRACE_SECONDS = 180
+
+# Heiz-Effizienz-Check: nach X Sekunden Dauerheizen wird ein Mindestanstieg
+# erwartet, sonst Warnung (Wärmeverlust/Defekt) (O3)
+HEATING_EFFICIENCY_WINDOW_SECONDS = 2700  # 45 Minuten
+HEATING_EFFICIENCY_MIN_RISE_C = 0.2
+
 # ═══════════════════════════════════════════════════════════════════════════════
 # SOLAR-BOOST TRIGGER (unabhängige ODER-Auslöser)
 # ═══════════════════════════════════════════════════════════════════════════════

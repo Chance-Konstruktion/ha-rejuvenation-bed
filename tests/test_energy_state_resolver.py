@@ -551,3 +551,17 @@ class TestDerivedStatusKeys:
         r = _make_resolver(solar_power=1000)
         state = r.resolve()
         assert state["price_status"] == "normal"
+
+
+class TestRelativeHysteresis:
+    """O5: Solar-Aus-Schwelle ist 10% relativ statt fix -50W."""
+
+    def test_off_threshold_is_ten_percent_below(self):
+        r = _make_resolver(solar_power=0, options={"solar_boost_threshold": 500})
+        assert r.solar_boost_on_w == 500.0
+        assert r.solar_boost_off_w == pytest.approx(450.0)  # 10% unter 500
+
+    def test_off_threshold_tighter_for_small_threshold(self):
+        r = _make_resolver(solar_power=0, options={"solar_boost_threshold": 150})
+        # relativ: 135W statt der alten fixen 100W
+        assert r.solar_boost_off_w == pytest.approx(135.0)

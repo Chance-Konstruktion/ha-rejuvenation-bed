@@ -253,3 +253,25 @@ def test_update_cycle_hvac_off_forces_off():
     assert zone["active"] is False
     args = hass.services.async_call.await_args
     assert args.args[1] == "turn_off"
+
+
+@patch("custom_components.rejuvenation_bed.coordinator.local_now")
+def test_sensor_warning_throttled(mock_now):
+    """O2: Sensor-Warnung höchstens 1×/Stunde je Entity."""
+    fake = SimpleNamespace(_sensor_warn_at={})
+
+    mock_now.return_value = BASE
+    RejuvenationBedCoordinator._warn_sensor_throttled(fake, "sensor.x", "weg")
+    first = fake._sensor_warn_at["sensor.x"]
+    assert first == BASE
+
+    # Innerhalb der Stunde → kein erneutes WARNING (Zeitstempel bleibt)
+    mock_now.return_value = BASE + timedelta(minutes=30)
+    RejuvenationBedCoordinator._warn_sensor_throttled(fake, "sensor.x", "weg")
+    assert fake._sensor_warn_at["sensor.x"] == first
+
+    # Nach über einer Stunde → erneut WARNING (Zeitstempel aktualisiert)
+    later = BASE + timedelta(hours=2)
+    mock_now.return_value = later
+    RejuvenationBedCoordinator._warn_sensor_throttled(fake, "sensor.x", "weg")
+    assert fake._sensor_warn_at["sensor.x"] == later

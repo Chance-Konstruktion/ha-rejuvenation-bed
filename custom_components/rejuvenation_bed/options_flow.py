@@ -33,7 +33,6 @@ from .const import (
     DEFAULT_SICK_MODE_TEMP,
     DEFAULT_SICK_MODE_DAYS,
     DEFAULT_SUMMER_TEMP,
-    DEFAULT_COMFORT_OFFSET,
     DEFAULT_BED_BOOST_SOC_THRESHOLD,
     DEFAULT_BED_BOOST_MIN_FORECAST_KWH,
 )
@@ -596,18 +595,8 @@ class RejuvenationBedOptionsFlow(config_entries.OptionsFlow):
                         mode=selector.NumberSelectorMode.SLIDER
                     )
                 ),
-
-                # ─── Komfort ──────────────────────────────────────
-                vol.Required(
-                    "comfort_offset",
-                    default=current.get("comfort_offset", DEFAULT_COMFORT_OFFSET)
-                ): selector.NumberSelector(
-                    selector.NumberSelectorConfig(
-                        min=0.0, max=3.0, step=0.5,
-                        unit_of_measurement="°C",
-                        mode=selector.NumberSelectorMode.SLIDER
-                    )
-                ),
+                # O9: comfort_offset entfernt — war nie verdrahtet (COMFORT-Preset
+                # wurde in #8 entfernt). Kein toter Konfig-Regler mehr.
             }),
         )
 

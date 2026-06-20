@@ -180,20 +180,18 @@
       },
       "mode_settings": {
         "title": "🎛️ Sondermodi",
-        "description": "Temperatur-Einstellungen für Krank, Boost, Urlaub und Ausschlafen.",
+        "description": "Temperatur-Einstellungen für Krank, Boost und Urlaub.",
         "data": {
           "sick_mode_temp": "Krank-Modus Temperatur",
           "sick_mode_days": "Krank-Modus Dauer",
           "boost_target_temp": "Boost-Zieltemperatur",
-          "away_temp": "Urlaub-Temperatur",
-          "comfort_offset": "Ausschlafen-Offset"
+          "away_temp": "Urlaub-Temperatur"
         },
         "data_description": {
           "sick_mode_temp": "Konstante Temperatur bei aktivem Krank-Modus. Empfohlen: 30–32°C für Muskelentspannung und Genesung.",
           "sick_mode_days": "Wie viele Tage der Krank-Modus aktiv bleibt, bevor er sich automatisch deaktiviert.",
           "boost_target_temp": "Feste Zieltemperatur beim Schnellheizen (Boost). Empfohlen: 32–34°C.",
-          "away_temp": "Haltetemperatur im Urlaub-Modus. Bei Wasserbetten nie unter 24°C wegen Kondensation und Vinyl-Schutz. Empfohlen: 24–25°C.",
-          "comfort_offset": "Extra Wärme zum Ausschlafen am Wochenende. Die Aufwach-Phase der Kurve wird entsprechend verzögert."
+          "away_temp": "Haltetemperatur im Urlaub-Modus. Bei Wasserbetten nie unter 24°C wegen Kondensation und Vinyl-Schutz. Empfohlen: 24–25°C."
         }
       },
       "global_times": {
