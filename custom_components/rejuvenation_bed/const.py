@@ -121,6 +121,14 @@ DEFAULT_BOOST_OFFSET = 2.0  # +2°C beim Schnellheizen
 DEFAULT_COMFORT_OFFSET = 0.5  # +0.5°C beim Ausschlafen
 BOOST_MAX_TEMP = 34.0  # Absolute Obergrenze Boost (Hardware-Thermostat = Backup)
 
+# Manuelle Zieltemperatur (Slider): verfällt nach dieser Zeit → zurück zur Kurve
+MANUAL_TARGET_TTL_HOURS = 8.0
+
+# Fail-Safe bei Sensor-Ausfall (nur Wasserbett heizt blind weiter)
+# Nach Ablauf wird von Dauer-AN auf Degraded-Duty (30%) zurückgefallen,
+# damit eine fehlende Rückmeldung nicht zu unbegrenzter Volllast führt.
+FAILSAFE_MAX_ON_MINUTES = 90.0
+
 # ═══════════════════════════════════════════════════════════════════════════════
 # SOLAR-BOOST TRIGGER (unabhängige ODER-Auslöser)
 # ═══════════════════════════════════════════════════════════════════════════════

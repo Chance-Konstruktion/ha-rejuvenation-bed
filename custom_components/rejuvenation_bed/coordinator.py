@@ -17,7 +17,15 @@ from homeassistant.core import HomeAssistant, callback
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 from homeassistant.components.persistent_notification import async_create as notify_create
 
-from .const import UPDATE_INTERVAL, get_bed_config, BED_TYPE_WATERBED, BED_TYPE_HEATING_PAD, BOOST_MAX_TEMP, local_now
+from .const import (
+    UPDATE_INTERVAL,
+    get_bed_config,
+    BED_TYPE_WATERBED,
+    BED_TYPE_HEATING_PAD,
+    BOOST_MAX_TEMP,
+    FAILSAFE_MAX_ON_MINUTES,
+    local_now,
+)
 from .safety_manager import SafetyManager
 from .temperature_calculator import TemperatureCalculator
 from .energy_state_resolver import EnergyStateResolver
@@ -100,6 +108,7 @@ class RejuvenationBedCoordinator(DataUpdateCoordinator):
         self._startup_time = local_now()
         self._startup_grace_seconds = 180  # 3 Minuten Geduld für ESP-Boot
         self._sensor_failure_notified = {}  # Nur einmal pro Zone benachrichtigen
+        self._failsafe_on_since = {}  # NEU: Start des Dauer-AN bei Sensor-Ausfall (#2)
         
         # ═══════════════════════════════════════════════════════════════════════
         # FIX: Alle Mode-Attribute initialisieren (für switch.py!)
@@ -109,6 +118,7 @@ class RejuvenationBedCoordinator(DataUpdateCoordinator):
         self.manual_hvac_mode = {}
         self.manual_preset = {}
         self.manual_target_temp = {}
+        self.manual_target_until = {}  # NEU: TTL für manuellen Slider-Wert (#4/#5)
         self.sick_mode_until = {}
         self.sick_mode_temp = {}
         self.thermal_battery_enabled = True  # NEU: Solar-Batterie Default AN
@@ -142,6 +152,35 @@ class RejuvenationBedCoordinator(DataUpdateCoordinator):
     def is_heating_pad(self) -> bool:
         """Gibt True zurück wenn es eine Heizmatte ist."""
         return self.bed_type == BED_TYPE_HEATING_PAD
+
+    def get_active_manual_target(self, zone_index: int) -> Optional[float]:
+        """
+        Gibt die aktive manuelle Zieltemperatur zurück — oder None (#4/#5).
+
+        Ein per Slider/Service gesetzter Wert verfällt nach Ablauf seiner TTL
+        (manual_target_until). Danach übernimmt wieder die Biorhythmus-Kurve,
+        statt dass die Automatik dauerhaft ausgehebelt bleibt.
+        """
+        temp = self.manual_target_temp.get(zone_index)
+        if temp is None:
+            return None
+
+        until = self.manual_target_until.get(zone_index)
+        if until is not None and local_now() > until:
+            self.manual_target_temp.pop(zone_index, None)
+            self.manual_target_until.pop(zone_index, None)
+            _LOGGER.info(
+                f"Zone {zone_index}: Manuelle Zieltemperatur abgelaufen "
+                f"→ zurück zur Automatik"
+            )
+            return None
+
+        return temp
+
+    def clear_manual_target(self, zone_index: int):
+        """Löscht eine manuelle Zieltemperatur (z.B. bei AUTO/Cancel)."""
+        self.manual_target_temp.pop(zone_index, None)
+        self.manual_target_until.pop(zone_index, None)
 
     # ═══════════════════════════════════════════════════════════════════════════
     # FIX: Robustes Sensor-Lesen
@@ -224,6 +263,14 @@ class RejuvenationBedCoordinator(DataUpdateCoordinator):
                         else self.config_entry.options.get("away_temp")
                         or self.bed_config.get("away_temp", 24.0)
                     )
+                    # #3 Kondensationsschutz: Wasserbett NIE unter min_temp
+                    min_temp = self.bed_config.get("min_temp", 24.0)
+                    if away_temp < min_temp:
+                        _LOGGER.info(
+                            f"Urlaub-Temp {away_temp}°C unter Minimum "
+                            f"({min_temp}°C) → auf {min_temp}°C angehoben (Kondensationsschutz)"
+                        )
+                        away_temp = min_temp
                     return away_temp, "vacation", f"✈️ Urlaub-Modus ({away_temp}°C Frostschutz)"
                 else:
                     return 0.0, "vacation", "✈️ Urlaub-Modus (Heizmatte AUS)"
@@ -270,22 +317,67 @@ class RejuvenationBedCoordinator(DataUpdateCoordinator):
     # ═══════════════════════════════════════════════════════════════════════════
     async def _async_handle_sensor_failure(self, zone_index: int, zone_config: dict):
         """
-        FAIL-SAFE: Bei Sensor-Ausfall Heizung sicherheitshalber EINSCHALTEN!
-        
-        Lieber zu warm als zu kalt - besonders bei Wasserbetten!
+        FAIL-SAFE bei Sensor-Ausfall — Richtung abhängig vom Bett-Typ (#2):
+
+        - Wasserbett: blind heizen ist sicherer als auskühlen (Kondensation,
+          hohe thermische Masse → langsame Reaktion). ABER mit Max-ON-Timeout:
+          nach FAILSAFE_MAX_ON_MINUTES auf 30%-Degraded-Duty zurückfallen,
+          damit eine dauerhaft fehlende Rückmeldung nicht zu Volllast führt.
+        - Heizmatte: niedrige Masse, kein Kondensationsrisiko → blind heizen ist
+          gefährlich. Ohne Sensor wird AUSgeschaltet.
         """
         heater_entity = zone_config.get("heater")
-        
+        now = local_now()
+
+        if not self.is_waterbed:
+            # Heizmatte: ohne Sensor NICHT blind heizen
+            await self._async_control_heater(heater_entity, False)
+            self._heater_states[heater_entity] = False
+            await self._async_send_notification(
+                title="⚠️ Heizmatte Sensor-Ausfall!",
+                message=(
+                    f"Der Temperatursensor für Zone {zone_index + 1} ist nicht erreichbar. "
+                    f"Die Heizmatte wurde sicherheitshalber AUSGESCHALTET. "
+                    f"Bitte prüfe den Sensor!"
+                ),
+                notification_id=f"rejuvenation_bed_sensor_failure_{zone_index}",
+            )
+            self._failsafe_on_since.pop(zone_index, None)
+            return {
+                "status": "FAIL_SAFE",
+                "reason": "⚠️ Sensor nicht verfügbar - Heizmatte AUS (Sicherheit)",
+                "heater_state": False,
+                "hvac_mode": "off",
+                "active": False,
+            }
+
+        # Wasserbett: Dauer-AN mit Max-ON-Timeout
+        started = self._failsafe_on_since.get(zone_index)
+        if started is None:
+            self._failsafe_on_since[zone_index] = now
+            started = now
+        on_minutes = (now - started).total_seconds() / 60
+
+        if on_minutes >= FAILSAFE_MAX_ON_MINUTES:
+            # Timeout: auf Degraded-Duty-Cycle (30%) zurückfallen
+            should_heat = self.safety_manager.should_heat_in_degraded_mode(zone_index)
+            reason = (
+                f"⚠️ Sensor-Ausfall seit {on_minutes:.0f} Min - "
+                f"Degraded-Duty 30% ({'AN' if should_heat else 'Pause'})"
+            )
+        else:
+            should_heat = True
+            reason = "⚠️ Sensor nicht verfügbar - Heizung AN (Sicherheit)"
+
         _LOGGER.warning(
             f"⚠️ FAIL-SAFE Zone {zone_index}: Sensor-Ausfall! "
-            f"Heizung {heater_entity} wird eingeschaltet."
+            f"Heizung {heater_entity} → {'AN' if should_heat else 'Pause'} "
+            f"(seit {on_minutes:.0f} Min)"
         )
-        
-        # Heizung einschalten
-        await self._async_control_heater(heater_entity, True)
-        self._heater_states[heater_entity] = True
-        
-        # Notification senden
+
+        await self._async_control_heater(heater_entity, should_heat)
+        self._heater_states[heater_entity] = should_heat
+
         await self._async_send_notification(
             title="⚠️ Wasserbett Sensor-Ausfall!",
             message=(
@@ -293,15 +385,15 @@ class RejuvenationBedCoordinator(DataUpdateCoordinator):
                 f"Die Heizung wurde sicherheitshalber EINGESCHALTET. "
                 f"Bitte prüfe den Sensor!"
             ),
-            notification_id=f"rejuvenation_bed_sensor_failure_{zone_index}"
+            notification_id=f"rejuvenation_bed_sensor_failure_{zone_index}",
         )
-        
+
         return {
             "status": "FAIL_SAFE",
-            "reason": "⚠️ Sensor nicht verfügbar - Heizung AN (Sicherheit)",
-            "heater_state": True,
+            "reason": reason,
+            "heater_state": should_heat,
             "hvac_mode": "heat",  # HVACMode.HEAT == "heat"
-            "active": True,
+            "active": should_heat,
         }
 
     async def _async_update_data(self) -> Dict:
@@ -430,6 +522,7 @@ class RejuvenationBedCoordinator(DataUpdateCoordinator):
                             # Manuellen HVAC-Override löschen (war evtl. auf OFF)
                             self.manual_hvac_mode.pop(zone_index, None)
                             self._sensor_failure_notified[zone_index] = False
+                            self._failsafe_on_since.pop(zone_index, None)  # #2 Timeout-Reset
                             
                             # Recovery-Notification
                             await self._async_send_notification(
@@ -441,6 +534,27 @@ class RejuvenationBedCoordinator(DataUpdateCoordinator):
                                 notification_id=f"rejuvenation_bed_sensor_failure_{zone_index}"
                             )
                     
+                    # ═══════════════════════════════════════════════════════════
+                    # #1 EMERGENCY-LATCH: Hält Not-Aus bis manuell zurückgesetzt
+                    # (SafetyManager setzt das Flag bei >36°C = Relais-Verdacht)
+                    # ═══════════════════════════════════════════════════════════
+                    if self.safety_manager.is_emergency_shutdown(zone_index):
+                        from homeassistant.components.climate.const import HVACMode as _HVACMode
+                        heater_entity = zone_config.get("heater")
+                        await self._async_control_heater(heater_entity, False)
+                        self._heater_states[heater_entity] = False
+                        emergency_reason = self.safety_manager.get_emergency_reason(zone_index)
+                        decision["zones"][zone_name] = {
+                            "target": round(current_temp, 1) if current_temp else "unknown",
+                            "current": round(current_temp, 1) if current_temp else "unknown",
+                            "active": False,
+                            "watt": 0.0,
+                            "mode": "emergency",
+                            "hvac_mode": _HVACMode.OFF,
+                            "reason": f"🚨 NOT-AUS aktiv: {emergency_reason} — Stecker prüfen, dann Reset!",
+                        }
+                        continue
+
                     # NEU: Degraded Mode Override
                     if is_degraded_mode and zone_index in degraded_zones:
                         should_heat = self.safety_manager.should_heat_in_degraded_mode(zone_index)
@@ -767,7 +881,30 @@ class RejuvenationBedCoordinator(DataUpdateCoordinator):
                     if not allowed_to_switch:
                         should_heat = current_heater_state
                         _LOGGER.debug(f"Zone {zone_index}: Short-Cycle verhindert - {cycle_reason}")
-                    
+
+                    # ═══════════════════════════════════════════════════════════
+                    # #1 ERWEITERTE ZONEN-SAFETY (zweite Verteidigungslinie):
+                    # Klebe-Relais, Sensor-Defekt (3h ohne Anstieg), Übertemperatur.
+                    # Setzt ggf. Emergency-Latch (>36°C). Hat das LETZTE Wort vor
+                    # dem Schalten — kann should_heat nur AUSschalten, nie AN.
+                    # ═══════════════════════════════════════════════════════════
+                    is_safe, safety_status, safety_notif = (
+                        await self.safety_manager.async_check_zone_safety(
+                            zone_index, current_temp, target_temp, should_heat
+                        )
+                    )
+                    if not is_safe:
+                        should_heat = False
+                        _LOGGER.warning(
+                            f"Zone {zone_index}: Safety-Veto ({safety_status}) → Heizung AUS"
+                        )
+                    if safety_notif:
+                        await self._async_send_notification(
+                            title=f"🛡️ Sicherheit Zone {zone_index + 1}",
+                            message=safety_notif,
+                            notification_id=f"rejuvenation_bed_safety_{zone_index}",
+                        )
+
                     # Effizienz-Check
                     await self._async_check_heating_efficiency(zone_index, current_temp, should_heat)
                     
@@ -872,17 +1009,23 @@ class RejuvenationBedCoordinator(DataUpdateCoordinator):
                     # FIX: Bei JEDEM Fehler → Heizung AN (Fail-Safe!)
                     # ═══════════════════════════════════════════════════════════
                     _LOGGER.error(f"Fehler in Zone {zone_index}: {zone_error}", exc_info=True)
-                    
+
+                    # #2 Fail-Safe-Richtung je Bett-Typ: Wasserbett AN, Heizmatte AUS
+                    fail_state = self.is_waterbed
                     heater_entity = zone_config.get("heater")
                     if heater_entity:
-                        await self._async_control_heater(heater_entity, True)
-                        self._heater_states[heater_entity] = True
-                    
+                        await self._async_control_heater(heater_entity, fail_state)
+                        self._heater_states[heater_entity] = fail_state
+
                     decision["zones"][zone_name] = {
                         "status": "ERROR",
                         "error": str(zone_error),
-                        "heater_state": True,
-                        "reason": "⚠️ Fehler - Heizung AN (Sicherheit)"
+                        "heater_state": fail_state,
+                        "reason": (
+                            "⚠️ Fehler - Heizung AN (Sicherheit)"
+                            if fail_state
+                            else "⚠️ Fehler - Heizmatte AUS (Sicherheit)"
+                        ),
                     }
 
             decision["global_state"]["energy"] = {
@@ -918,13 +1061,17 @@ class RejuvenationBedCoordinator(DataUpdateCoordinator):
             self._consecutive_failures += 1
             _LOGGER.error(f"Coordinator Fehler (#{self._consecutive_failures}): {err}", exc_info=True)
             
-            # Nach 3 Fehlern: Fail-Safe aktivieren
+            # Nach 3 Fehlern: Fail-Safe aktivieren (Richtung je Bett-Typ, #2)
             if self._consecutive_failures >= 3:
-                _LOGGER.critical("3+ aufeinanderfolgende Fehler - aktiviere Fail-Safe!")
+                fail_state = self.is_waterbed
+                _LOGGER.critical(
+                    f"3+ aufeinanderfolgende Fehler - aktiviere Fail-Safe "
+                    f"({'Heizung AN' if fail_state else 'Heizmatte AUS'})!"
+                )
                 for zone_config in self.config_entry.data.get("zones", []):
                     heater_entity = zone_config.get("heater")
                     if heater_entity:
-                        await self._async_control_heater(heater_entity, True)
+                        await self._async_control_heater(heater_entity, fail_state)
             
             raise UpdateFailed(f"Update fehlgeschlagen: {err}")
 
