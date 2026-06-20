@@ -129,6 +129,14 @@ MANUAL_TARGET_TTL_HOURS = 8.0
 # damit eine fehlende Rückmeldung nicht zu unbegrenzter Volllast führt.
 FAILSAFE_MAX_ON_MINUTES = 90.0
 
+# Startup-Grace: ESP-Sensoren brauchen nach HA-Neustart Zeit zum Booten (O3)
+STARTUP_GRACE_SECONDS = 180
+
+# Heiz-Effizienz-Check: nach X Sekunden Dauerheizen wird ein Mindestanstieg
+# erwartet, sonst Warnung (Wärmeverlust/Defekt) (O3)
+HEATING_EFFICIENCY_WINDOW_SECONDS = 2700  # 45 Minuten
+HEATING_EFFICIENCY_MIN_RISE_C = 0.2
+
 # ═══════════════════════════════════════════════════════════════════════════════
 # SOLAR-BOOST TRIGGER (unabhängige ODER-Auslöser)
 # ═══════════════════════════════════════════════════════════════════════════════
@@ -144,10 +152,10 @@ FAILSAFE_MAX_ON_MINUTES = 90.0
 # die Solar-Schwelle hinter SoC/Forecast (UND) — klassisches Gating, gibt
 # Akku/Boiler Vorrang auf den PV-Überschuss.
 
-DEFAULT_BED_BOOST_SOC_THRESHOLD = 90.0   # %SoC ab dem der SoC-Trigger auslöst
+DEFAULT_BED_BOOST_SOC_THRESHOLD = 90.0  # %SoC ab dem der SoC-Trigger auslöst
 DEFAULT_BED_BOOST_MIN_FORECAST_KWH = 3.0  # kWh Rest-Tag ab denen Forecast auslöst
-BED_BOOST_SOC_HYSTERESIS = 5.0            # %SoC Hysterese (an: 90%, aus: 85%)
-BED_BOOST_FORECAST_HYSTERESIS_KWH = 1.0   # kWh Hysterese (an: 3, aus: 2)
+BED_BOOST_SOC_HYSTERESIS = 5.0  # %SoC Hysterese (an: 90%, aus: 85%)
+BED_BOOST_FORECAST_HYSTERESIS_KWH = 1.0  # kWh Hysterese (an: 3, aus: 2)
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # PRÄSENZ-ERKENNUNG (Varianz-basiert, kalibriert Apr 2026)

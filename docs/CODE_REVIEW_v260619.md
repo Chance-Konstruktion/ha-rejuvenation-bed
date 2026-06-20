@@ -9,9 +9,44 @@
 - [x] Tier 1 — Safety (#1 #2 #3) ✅ PR A
 - [x] Tier 2 — UX/Funktions-Bugs (#4 #5 ✅ PR A · #7 #8 ✅ PR B)
 - [x] Tier 3 — Multi-Instanz/Targeting (#6) + manifest ✅ PR B
-- [ ] Tier 4 — CI härten
-- [ ] Tier 5 — Refactor/Optimierung (#9 #10 #11 #12 + O1..O9) — O7 ✅ (PR B)
+- [x] Tier 4 — CI härten ✅ (Black auf custom_components erweitert)
+- [x] Tier 5 — Refactor/Optimierung: #9–#12 ✅ · O1 O2 O3 O5 O6 O7 O9 ✅ · O4 + O8 = **Won't-do (bewusst, siehe unten)**
+
+> ### Won't-do — bekannt, aber bewusst NICHT geplant (solange es kein Problem gibt)
+> Diese Punkte sind verstanden und dokumentiert, werden aber absichtlich nicht
+> umgesetzt. Erst anfassen, wenn sie real ein Problem verursachen.
+>
+> - **O4 (Zone-String-Keys `"Zone N"` → Index):** rein interne Beschriftung der
+>   Zonen-Daten, **kein** nutzersichtbarer Effekt. Umstellung berührt den
+>   Daten-Vertrag Coordinator↔ALLE Entities (climate/sensor/binary_sensor/switch)
+>   gleichzeitig — also genau das Fragilitäts-Risiko, das sie vermeiden soll.
+>   Läuft seit Monaten stabil. Falls je nötig: risikoarmer Mittelweg wäre ein
+>   gemeinsamer `zone_key(i)`-Helper (eine Quelle fürs Format) statt Voll-Migration.
+> - **O8 (Typing/Docs):** rein kosmetisch (fehlende Rückgabe-Typen, ungenutzte
+>   `typing`-Importe). Kein Verhaltens- oder Betriebsgewinn → nicht geplant.
 - [ ] Release-Tag `v260619` setzen
+
+> **Erledigt (PR C):** #12 `detect_hardware_level` als einzige Quelle in
+> `device_info.py` (3× Duplikat entfernt). #10 Zeitzonen: `datetime.now()`
+> → `local_now()` in presence_detector, anti_short_cycle, ramp_controller,
+> heating_state_machine; Biorhythmus-Kurve bleibt HA-frei und bekommt die
+> Zeit vom Aufrufer. #9 (teilweise): `_async_sync_hardware_once` +
+> `_finalize_energy` aus dem Monolithen ausgelagert. conftest aktiviert
+> `local_now()` als echte Uhr im Test.
+>
+> **#9-Kern erledigt:** Zuerst 5 Coordinator-Integrations-Smoke-Tests gebaut
+> (normal/Heizen, Emergency-Latch, Fail-Safe-AN, Startup-Wait, HVAC-OFF) als
+> Sicherheitsnetz (zugleich O6), dann die ~530-Zeilen-Per-Zone-Logik mechanisch
+> nach `_process_zone()` extrahiert. Tests vor und nach der Extraktion grün —
+> Verhalten nachweislich erhalten.
+>
+> **#11 (Boost-Dopplung) erledigt:** Dopplung entfernt — Boost nutzt jetzt
+> EINE feste Zieltemperatur (`boost_target_temp`), kein Offset-Aufaddieren
+> mehr. Neue globale Option `boost_target_temp` (28–34 °C, Vorrang Option →
+> Zone-Config → 34). `boost_offset` aus dem Options-Flow + Übersetzungen
+> entfernt. Konsumenten (temperature_calculator, coordinator,
+> diagnostics_manager) auf dieselbe Quelle/Reihenfolge vereinheitlicht.
+> Tests: +2 in test_temperature_calculator.py.
 
 > **Erledigt (PR A):** #1 Safety-Engine verdrahtet (Emergency-Latch +
 > Zonen-Safety nach Heiz-Entscheidung), #2 Fail-Safe je Bett-Typ +

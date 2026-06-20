@@ -53,6 +53,15 @@ for mod_name in _HA_SUBMODULES:
         # Each module gets its own MagicMock so import X from Y works
         sys.modules[mod_name] = MagicMock()
 
+# const.local_now() does `from homeassistant.util import dt as dt_util` and
+# calls dt_util.now(). With the mocked package, dt_util resolves to the child
+# attribute `homeassistant.util.dt`, so we point its .now() at a real clock.
+# This lets modules that route time through local_now() behave like the old
+# datetime.now() in tests (naive local time), without every test patching it.
+import datetime as _datetime  # noqa: E402
+
+sys.modules["homeassistant.util"].dt.now = lambda: _datetime.datetime.now()
+
 
 # ── Fixtures ──
 

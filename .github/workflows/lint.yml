@@ -27,8 +27,8 @@ jobs:
         with:
           python-version: "3.12"
       - run: pip install black
-      - name: Black (check new files only)
-        run: black --check --diff --line-length 120 tests/
+      - name: Black (integration + tests)
+        run: black --check --diff --line-length 120 custom_components/ tests/
 
   pytest:
     name: Tests
