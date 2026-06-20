@@ -32,7 +32,7 @@ from homeassistant.const import (
 )
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from .const import DOMAIN, ABSOLUTE_MAX_TEMP, MANUAL_TARGET_TTL_HOURS, local_now
-from .device_info import get_zone_device_info
+from .device_info import get_zone_device_info, detect_hardware_level
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -104,35 +104,13 @@ class RejuvenationBedClimate(CoordinatorEntity, ClimateEntity):
         zones_config = coordinator.config_entry.data.get("zones", [])
         if zone_index < len(zones_config):
             zone_conf = zones_config[zone_index]
-            self._hardware_level = self._detect_hardware_level(zone_conf)
+            self._hardware_level = detect_hardware_level(zone_conf)
         else:
             self._hardware_level = "A"
-        
+
         # Passe verfügbare Modi an Hardware an
         self._adjust_modes_for_hardware()
 
-    def _detect_hardware_level(self, zone_conf) -> str:
-        """
-        Erkennt Hardware-Level: A/B/B+/C/D/E
-        """
-        has_temp = zone_conf.get("temp_sensor") is not None
-        has_power = zone_conf.get("power_sensor") is not None
-        has_air = zone_conf.get("air_temp_sensor") is not None
-        has_moisture = zone_conf.get("moisture_sensor") is not None
-
-        if has_temp and has_power and has_air and has_moisture:
-            return "E"  # Premium
-        elif has_temp and has_power and (has_air or has_moisture):
-            return "D"  # Erweitert
-        elif has_temp and has_power:
-            return "C"  # Vollausstattung
-        elif has_temp:
-            return "B+"  # Temperatur - Kurve ja, Energie nein
-        elif has_power:
-            return "B"  # Smart - Energie ja, Kurve nein
-        else:
-            return "A"  # Basic
-    
     def _adjust_modes_for_hardware(self):
         """Passt Modi an Hardware an."""
         if self._hardware_level == "A":

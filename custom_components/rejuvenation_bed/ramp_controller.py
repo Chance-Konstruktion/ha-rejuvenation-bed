@@ -25,6 +25,7 @@ from .const import (
     PREHEAT_BUFFER_HOURS,
     ABSOLUTE_MIN_TEMP,
     SOLAR_BOOST_MAX_TEMP,
+    local_now,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -92,7 +93,7 @@ class RampController:
         Returns:
             (ramped_setpoint, RampState)
         """
-        now = datetime.now()
+        now = local_now()
         
         # Initialisierung beim ersten Aufruf
         if zone_index not in self._last_setpoint:
@@ -248,7 +249,7 @@ class RampController:
         Returns:
             (should_start, reason)
         """
-        now = datetime.now()
+        now = local_now()
         
         # Wenn Schlafzeit schon vorbei, nicht vorheizen
         if now >= bedtime:
@@ -308,7 +309,7 @@ class RampController:
             f"Zone {zone_index}: Setpoint erzwungen auf {temp}°C (Rampe übersprungen!)"
         )
         self._last_setpoint[zone_index] = temp
-        self._last_update[zone_index] = datetime.now()
+        self._last_update[zone_index] = local_now()
         self._target_temp[zone_index] = temp
     
     # ═══════════════════════════════════════════════════════════════════════════
@@ -330,7 +331,7 @@ class RampController:
             "ramp_start": {
                 str(k): v.isoformat() for k, v in self._ramp_start.items()
             },
-            "saved_at": datetime.now().isoformat(),
+            "saved_at": local_now().isoformat(),
         }
     
     def restore_state_from_storage(self, data: Dict[str, Any]):
@@ -347,7 +348,7 @@ class RampController:
             saved_at_str = data.get("saved_at")
             if saved_at_str:
                 saved_at = datetime.fromisoformat(saved_at_str)
-                age_minutes = (datetime.now() - saved_at).total_seconds() / 60
+                age_minutes = (local_now() - saved_at).total_seconds() / 60
                 
                 if age_minutes > 30:
                     # Daten zu alt - ignorieren

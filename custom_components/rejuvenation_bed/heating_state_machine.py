@@ -23,6 +23,7 @@ from enum import Enum
 from typing import Optional
 from dataclasses import dataclass
 
+from .const import local_now
 from .anti_short_cycle_manager import AntiShortCycleManager
 from .ramp_controller import RampController
 
@@ -97,7 +98,7 @@ class HeatingStateMachine:
         Returns:
             HeatingDecision with all relevant info
         """
-        now = datetime.now()
+        now = local_now()
 
         # Step 1: Apply ramp if enabled (waterbed vinyl protection)
         if self.ramp_enabled:

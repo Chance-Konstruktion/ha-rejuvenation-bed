@@ -396,6 +396,70 @@ class RejuvenationBedCoordinator(DataUpdateCoordinator):
             "active": should_heat,
         }
 
+    def _finalize_energy(self, decision, total_current_power, energy_state):
+        """
+        Schreibt den Energie-Status in die Entscheidung und aktualisiert das
+        Energie-Budget (#9: aus dem Haupt-Loop ausgelagert).
+        """
+        decision["global_state"]["energy"] = {
+            "total_power": round(total_current_power, 1),
+            "solar_active": energy_state.get("solar_active", False),
+            "price_status": energy_state.get("price_status", "normal"),
+        }
+
+        from .energy_state_resolver import EnergyMode
+
+        mode = energy_state.get("mode")
+        is_solar_active = mode == EnergyMode.SOLAR_BOOST if mode else False
+        is_peak_price = mode == EnergyMode.ECO_MODE if mode else False
+
+        energy_config = self.config_entry.data.get("energy", {})
+        total_power_rating = energy_config.get("total_power_rating", 350)
+
+        self.diagnostics_manager.update_energy_usage(
+            power_watts=total_current_power,
+            update_interval_seconds=UPDATE_INTERVAL,
+            is_solar_active=is_solar_active,
+            is_peak_price=is_peak_price,
+            total_power_rating=total_power_rating,
+            power_correction_factor=self.bed_config.get("power_sensor_correction", 1.0),
+        )
+
+    async def _async_sync_hardware_once(self, zones):
+        """
+        Synchronisiert den internen Heizungs-Zustand einmalig mit der Hardware (#9).
+
+        Lädt zuvor gespeicherte Diagnostics/Intelligenz, liest den realen
+        Schaltzustand jeder Heizung und richtet den Anti-Short-Cycle-Manager
+        danach aus. Läuft nur beim allerersten Update-Zyklus.
+        """
+        if self._hardware_synced:
+            return
+
+        _LOGGER.info("Erster Update-Zyklus: Synchronisiere mit Hardware...")
+
+        # KRITISCH: Gespeicherte Diagnostics LADEN bevor irgendwas passiert!
+        await self.diagnostics_manager.async_load()
+        await self.bed_intelligence.async_load()
+
+        for zone_idx, zone_cfg in enumerate(zones):
+            heater_entity = zone_cfg.get("heater")
+            if heater_entity:
+                heater_state = self.hass.states.get(heater_entity)
+                if heater_state:
+                    actual_on = heater_state.state == "on"
+                    self._heater_states[heater_entity] = actual_on
+                    self.anti_short_cycle_manager.sync_with_hardware(
+                        heater_entity, actual_on
+                    )
+                    _LOGGER.info(
+                        f"Zone {zone_idx}: Heizung ist "
+                        f"{'AN' if actual_on else 'AUS'} (Hardware-Sync)"
+                    )
+                else:
+                    _LOGGER.warning(f"Zone {zone_idx}: Heizung {heater_entity} nicht gefunden!")
+        self._hardware_synced = True
+
     async def _async_update_data(self) -> Dict:
         """Zentraler Loop: Sicherheit -> Energie -> Entscheidung -> Schaltung."""
         try:
@@ -406,36 +470,10 @@ class RejuvenationBedCoordinator(DataUpdateCoordinator):
                 "errors": []
             }
             
-            # ═══════════════════════════════════════════════════════════════════
-            # FIX: Hardware-Sync beim ersten Update
-            # ═══════════════════════════════════════════════════════════════════
+            # FIX: Hardware-Sync beim ersten Update (#9: ausgelagert)
             zones = self.config_entry.data.get("zones", [])
-            
-            if not self._hardware_synced:
-                _LOGGER.info("Erster Update-Zyklus: Synchronisiere mit Hardware...")
-                
-                # KRITISCH: Gespeicherte Diagnostics LADEN bevor irgendwas passiert!
-                await self.diagnostics_manager.async_load()
-                await self.bed_intelligence.async_load()
-                
-                for zone_idx, zone_cfg in enumerate(zones):
-                    heater_entity = zone_cfg.get("heater")
-                    if heater_entity:
-                        heater_state = self.hass.states.get(heater_entity)
-                        if heater_state:
-                            actual_on = heater_state.state == "on"
-                            self._heater_states[heater_entity] = actual_on
-                            self.anti_short_cycle_manager.sync_with_hardware(
-                                heater_entity, actual_on
-                            )
-                            _LOGGER.info(
-                                f"Zone {zone_idx}: Heizung ist "
-                                f"{'AN' if actual_on else 'AUS'} (Hardware-Sync)"
-                            )
-                        else:
-                            _LOGGER.warning(f"Zone {zone_idx}: Heizung {heater_entity} nicht gefunden!")
-                self._hardware_synced = True
-            
+            await self._async_sync_hardware_once(zones)
+
             # 1. SICHERHEIT (Prio 1: Überhitzung & Sensor-Check)
             safety_check = await self.safety_manager.async_check_all()
             
@@ -1028,29 +1066,7 @@ class RejuvenationBedCoordinator(DataUpdateCoordinator):
                         ),
                     }
 
-            decision["global_state"]["energy"] = {
-                "total_power": round(total_current_power, 1),
-                "solar_active": energy_state.get("solar_active", False),
-                "price_status": energy_state.get("price_status", "normal")
-            }
-            
-            # Energy-Budget aktualisieren
-            from .energy_state_resolver import EnergyMode
-            mode = energy_state.get("mode")
-            is_solar_active = mode == EnergyMode.SOLAR_BOOST if mode else False
-            is_peak_price = mode == EnergyMode.ECO_MODE if mode else False
-            
-            energy_config = self.config_entry.data.get("energy", {})
-            total_power_rating = energy_config.get("total_power_rating", 350)
-            
-            self.diagnostics_manager.update_energy_usage(
-                power_watts=total_current_power,
-                update_interval_seconds=UPDATE_INTERVAL,
-                is_solar_active=is_solar_active,
-                is_peak_price=is_peak_price,
-                total_power_rating=total_power_rating,
-                power_correction_factor=self.bed_config.get("power_sensor_correction", 1.0),
-            )
+            self._finalize_energy(decision, total_current_power, energy_state)
 
             self._decision_log.append(decision)
             self._last_successful_update = local_now()

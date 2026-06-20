@@ -10,8 +10,25 @@
 - [x] Tier 2 — UX/Funktions-Bugs (#4 #5 ✅ PR A · #7 #8 ✅ PR B)
 - [x] Tier 3 — Multi-Instanz/Targeting (#6) + manifest ✅ PR B
 - [ ] Tier 4 — CI härten
-- [ ] Tier 5 — Refactor/Optimierung (#9 #10 #11 #12 + O1..O9) — O7 ✅ (PR B)
+- [~] Tier 5 — Refactor/Optimierung: #10 ✅ #12 ✅ · #9 teilweise ✅ · #11 ⏳ (Entscheidung) · O7 ✅ — offen: #9-Kern, O1–O6, O8, O9
 - [ ] Release-Tag `v260619` setzen
+
+> **Erledigt (PR C):** #12 `detect_hardware_level` als einzige Quelle in
+> `device_info.py` (3× Duplikat entfernt). #10 Zeitzonen: `datetime.now()`
+> → `local_now()` in presence_detector, anti_short_cycle, ramp_controller,
+> heating_state_machine; Biorhythmus-Kurve bleibt HA-frei und bekommt die
+> Zeit vom Aufrufer. #9 (teilweise): `_async_sync_hardware_once` +
+> `_finalize_energy` aus dem Monolithen ausgelagert. conftest aktiviert
+> `local_now()` als echte Uhr im Test.
+>
+> **#9-Kern (Zonenschleife) bewusst zurückgestellt:** Die ~400-Zeilen-
+> Per-Zone-Logik in `_async_update_data` hat KEINE Integrationstests. Eine
+> Blind-Extraktion auf sicherheitskritischem Pfad ist riskant → zuerst
+> einen Coordinator-Integrationstest (`_async_update_data` Smoke) bauen,
+> dann `_process_zone` extrahieren.
+>
+> **#11 (Boost-Dopplung) offen:** Produktentscheidung nötig — Boost-Switch/
+> Preset soll auf feste 34 °C (`boost_target_temp`) ODER auf Kurve+Offset.
 
 > **Erledigt (PR A):** #1 Safety-Engine verdrahtet (Emergency-Latch +
 > Zonen-Safety nach Heiz-Entscheidung), #2 Fail-Safe je Bett-Typ +

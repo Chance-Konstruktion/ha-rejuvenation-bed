@@ -4,10 +4,11 @@ from homeassistant import config_entries
 from homeassistant.core import callback
 from homeassistant.helpers import selector
 from .const import (
-    DOMAIN, 
-    DEFAULT_POWER, 
+    DOMAIN,
+    DEFAULT_POWER,
     DEFAULT_SUMMER_TEMP
 )
+from .device_info import detect_hardware_level
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -92,7 +93,7 @@ class RejuvenationBedConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             user_input["zone_key"] = zone_key 
             
             # Hardware-Level erkennen
-            hardware_level = self._detect_hardware_level(user_input)
+            hardware_level = detect_hardware_level(user_input)
             user_input["hardware_level"] = hardware_level
             
             self._data["zones"].append(user_input)
@@ -159,39 +160,7 @@ class RejuvenationBedConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 ),
             })
         )
-    
-    def _detect_hardware_level(self, zone_config: dict) -> str:
-        """
-        Erkennt Hardware-Level basierend auf konfigurierten Sensoren.
 
-        Level A (Basic):              Nur Relay → Zeitschaltuhr
-        Level B (Smart):              Relay + Power → Energie-Tracking
-        Level B+ (Temperatur):        Relay + Temp → Biorhythmus-Kurve
-        Level C (Verjüngungsbrunnen): Relay + Temp + Power → Voller Umfang
-        Level D (Erweitert):          + Luft ODER Feuchte
-        Level E (Premium):            + Luft UND Feuchte
-
-        Returns:
-            "A", "B", "B+", "C", "D" oder "E"
-        """
-        has_temp = zone_config.get("temp_sensor") is not None
-        has_power = zone_config.get("power_sensor") is not None
-        has_air = zone_config.get("air_temp_sensor") is not None
-        has_moisture = zone_config.get("moisture_sensor") is not None
-
-        if has_temp and has_power and has_air and has_moisture:
-            return "E"  # Premium - Alles!
-        elif has_temp and has_power and (has_air or has_moisture):
-            return "D"  # Erweitert - Umgebungs-Sensorik
-        elif has_temp and has_power:
-            return "C"  # Vollausstattung - Alle Kern-Features
-        elif has_temp:
-            return "B+"  # Temperatur - Kurve ja, aber kein Energie-Tracking
-        elif has_power:
-            return "B"  # Smart - Energie, aber keine Kurve
-        else:
-            return "A"  # Basic - Nur Zeitschaltuhr
-    
     async def async_step_hardware_summary(self, user_input=None):
         """
         NEU: Zeigt User, welche Features mit seinem Hardware-Setup verfügbar sind.
