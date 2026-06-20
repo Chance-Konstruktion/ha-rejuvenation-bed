@@ -10,15 +10,20 @@
 - [x] Tier 2 — UX/Funktions-Bugs (#4 #5 ✅ PR A · #7 #8 ✅ PR B)
 - [x] Tier 3 — Multi-Instanz/Targeting (#6) + manifest ✅ PR B
 - [x] Tier 4 — CI härten ✅ (Black auf custom_components erweitert)
-- [~] Tier 5 — Refactor/Optimierung: #9–#12 ✅ · O1 O2 O3 O5 O6 O7 O9 ✅ — bewusst verschoben: O4 (Zone-Keys), O8 (Typing)
+- [x] Tier 5 — Refactor/Optimierung: #9–#12 ✅ · O1 O2 O3 O5 O6 O7 O9 ✅ · O4 + O8 = **Won't-do (bewusst, siehe unten)**
 
-> **O4 (Zone-String-Keys) bewusst verschoben:** `decision["zones"]["Zone N"]`
-> auf `zone_index` umzustellen berührt den Daten-Vertrag zwischen Coordinator
-> und ALLEN Entities (climate/sensor/binary_sensor/switch). Reines Aufräumen
-> ohne Funktionsgewinn, aber hohes Regressionsrisiko auf einem täglich
-> genutzten Bett → erst mit breiterer Entity-Testabdeckung sinnvoll.
-> **O8 (Typing/Docs):** rein kosmetisch, große Fläche, kein Verhaltensgewinn
-> → optional für später.
+> ### Won't-do — bekannt, aber bewusst NICHT geplant (solange es kein Problem gibt)
+> Diese Punkte sind verstanden und dokumentiert, werden aber absichtlich nicht
+> umgesetzt. Erst anfassen, wenn sie real ein Problem verursachen.
+>
+> - **O4 (Zone-String-Keys `"Zone N"` → Index):** rein interne Beschriftung der
+>   Zonen-Daten, **kein** nutzersichtbarer Effekt. Umstellung berührt den
+>   Daten-Vertrag Coordinator↔ALLE Entities (climate/sensor/binary_sensor/switch)
+>   gleichzeitig — also genau das Fragilitäts-Risiko, das sie vermeiden soll.
+>   Läuft seit Monaten stabil. Falls je nötig: risikoarmer Mittelweg wäre ein
+>   gemeinsamer `zone_key(i)`-Helper (eine Quelle fürs Format) statt Voll-Migration.
+> - **O8 (Typing/Docs):** rein kosmetisch (fehlende Rückgabe-Typen, ungenutzte
+>   `typing`-Importe). Kein Verhaltens- oder Betriebsgewinn → nicht geplant.
 - [ ] Release-Tag `v260619` setzen
 
 > **Erledigt (PR C):** #12 `detect_hardware_level` als einzige Quelle in
