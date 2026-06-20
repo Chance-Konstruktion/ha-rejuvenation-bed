@@ -33,7 +33,6 @@ from .const import (
     DEFAULT_SICK_MODE_TEMP,
     DEFAULT_SICK_MODE_DAYS,
     DEFAULT_SUMMER_TEMP,
-    DEFAULT_BOOST_OFFSET,
     DEFAULT_COMFORT_OFFSET,
     DEFAULT_BED_BOOST_SOC_THRESHOLD,
     DEFAULT_BED_BOOST_MIN_FORECAST_KWH,
@@ -574,13 +573,13 @@ class RejuvenationBedOptionsFlow(config_entries.OptionsFlow):
                     )
                 ),
 
-                # ─── Boost ────────────────────────────────────────
+                # ─── Boost (#11: feste Zieltemperatur, absolut) ───
                 vol.Required(
-                    "boost_offset",
-                    default=current.get("boost_offset", DEFAULT_BOOST_OFFSET)
+                    "boost_target_temp",
+                    default=current.get("boost_target_temp", 34.0)
                 ): selector.NumberSelector(
                     selector.NumberSelectorConfig(
-                        min=0.5, max=5.0, step=0.5,
+                        min=28.0, max=34.0, step=0.5,
                         unit_of_measurement="°C",
                         mode=selector.NumberSelectorMode.SLIDER
                     )

@@ -154,14 +154,14 @@
         "data": {
           "sick_mode_temp": "Sick mode temperature",
           "sick_mode_days": "Sick mode duration",
-          "boost_offset": "Boost offset",
+          "boost_target_temp": "Boost target temperature",
           "away_temp": "Away temperature",
           "comfort_offset": "Comfort offset"
         },
         "data_description": {
           "sick_mode_temp": "Constant temperature during sick mode. Recommended: 30–32°C for muscle relaxation and recovery.",
           "sick_mode_days": "How many days sick mode stays active before automatically deactivating.",
-          "boost_offset": "Temperature increase above the current target during quick heating. Recommended: +2–3°C.",
+          "boost_target_temp": "Fixed target temperature during quick heating (boost). Recommended: 32–34°C.",
           "away_temp": "Holding temperature during away mode. For waterbeds never below 24°C due to condensation and vinyl protection. Recommended: 24–25°C.",
           "comfort_offset": "Extra warmth for sleeping in on weekends. The wake-up phase of the curve is delayed accordingly."
         }

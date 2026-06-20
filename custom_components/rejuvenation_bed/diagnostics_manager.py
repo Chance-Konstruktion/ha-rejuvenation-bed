@@ -201,7 +201,9 @@ class DiagnosticsManager:
             breakdown_method = "manual_override"
         elif boost_active:
             zones_config = self.config_entry.data.get("zones", [])
-            final_target = zones_config[zone_index].get("boost_target_temp", 34)
+            final_target = self.config_entry.options.get("boost_target_temp") or zones_config[zone_index].get(
+                "boost_target_temp", 34
+            )
             breakdown_method = "boost_mode"
         else:
             final_target = base_temp + energy_offset + sleep_stage_offset

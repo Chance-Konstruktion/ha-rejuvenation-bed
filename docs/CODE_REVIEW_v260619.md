@@ -10,7 +10,7 @@
 - [x] Tier 2 — UX/Funktions-Bugs (#4 #5 ✅ PR A · #7 #8 ✅ PR B)
 - [x] Tier 3 — Multi-Instanz/Targeting (#6) + manifest ✅ PR B
 - [ ] Tier 4 — CI härten
-- [~] Tier 5 — Refactor/Optimierung: #10 ✅ #12 ✅ · #9 teilweise ✅ · #11 ⏳ (Entscheidung) · O7 ✅ — offen: #9-Kern, O1–O6, O8, O9
+- [~] Tier 5 — Refactor/Optimierung: #10 ✅ #11 ✅ #12 ✅ · #9 teilweise ✅ · O7 ✅ — offen: #9-Kern, O1–O6, O8, O9
 - [ ] Release-Tag `v260619` setzen
 
 > **Erledigt (PR C):** #12 `detect_hardware_level` als einzige Quelle in
@@ -27,8 +27,13 @@
 > einen Coordinator-Integrationstest (`_async_update_data` Smoke) bauen,
 > dann `_process_zone` extrahieren.
 >
-> **#11 (Boost-Dopplung) offen:** Produktentscheidung nötig — Boost-Switch/
-> Preset soll auf feste 34 °C (`boost_target_temp`) ODER auf Kurve+Offset.
+> **#11 (Boost-Dopplung) erledigt:** Dopplung entfernt — Boost nutzt jetzt
+> EINE feste Zieltemperatur (`boost_target_temp`), kein Offset-Aufaddieren
+> mehr. Neue globale Option `boost_target_temp` (28–34 °C, Vorrang Option →
+> Zone-Config → 34). `boost_offset` aus dem Options-Flow + Übersetzungen
+> entfernt. Konsumenten (temperature_calculator, coordinator,
+> diagnostics_manager) auf dieselbe Quelle/Reihenfolge vereinheitlicht.
+> Tests: +2 in test_temperature_calculator.py.
 
 > **Erledigt (PR A):** #1 Safety-Engine verdrahtet (Emergency-Latch +
 > Zonen-Safety nach Heiz-Entscheidung), #2 Fail-Safe je Bett-Typ +
