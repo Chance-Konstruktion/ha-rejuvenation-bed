@@ -514,3 +514,40 @@ class TestDiagnostics:
         assert diag["active_triggers"]["forecast"] is True
         assert diag["thresholds"]["bed_boost_soc_threshold"] == 90.0
         assert diag["thresholds"]["bed_boost_min_forecast_kwh"] == 3.0
+
+
+class TestDerivedStatusKeys:
+    """#7: resolve() liefert solar_active + price_status für Coordinator/Switch/Sensor."""
+
+    def test_solar_active_true_on_boost(self):
+        r = _make_resolver(solar_power=1000)
+        state = r.resolve()
+        assert state["solar_active"] is True
+
+    def test_solar_active_false_without_boost(self):
+        r = _make_resolver(solar_power=300)
+        state = r.resolve()
+        assert state["solar_active"] is False
+
+    def test_price_status_cheap(self):
+        r = _make_resolver(solar_power=0, price=0.10)
+        state = r.resolve()
+        assert state["price_status"] == "cheap"
+        # Günstiger Strom löst zugleich Solar-Boost aus
+        assert state["solar_active"] is True
+
+    def test_price_status_expensive(self):
+        r = _make_resolver(solar_power=0, price=0.40)
+        state = r.resolve()
+        assert state["price_status"] == "expensive"
+
+    def test_price_status_normal(self):
+        r = _make_resolver(solar_power=0, price=0.25)
+        state = r.resolve()
+        assert state["price_status"] == "normal"
+
+    def test_price_status_normal_without_price_sensor(self):
+        # Ohne dynamischen Preis-Sensor → immer "normal" (kein Fehl-"Günstig")
+        r = _make_resolver(solar_power=1000)
+        state = r.resolve()
+        assert state["price_status"] == "normal"

@@ -122,7 +122,11 @@ class TemperatureCalculator:
         sick_temp = None
         
         if coordinator:
-            manual_temp = getattr(coordinator, "manual_target_temp", {}).get(zone_index)
+            # #4/#5: TTL-bewusst lesen — abgelaufene Slider-Werte werden verworfen
+            if hasattr(coordinator, "get_active_manual_target"):
+                manual_temp = coordinator.get_active_manual_target(zone_index)
+            else:
+                manual_temp = getattr(coordinator, "manual_target_temp", {}).get(zone_index)
             boost_active = getattr(coordinator, "manual_boost", {}).get(zone_index, False)
             
             # Krank-Modus prüfen

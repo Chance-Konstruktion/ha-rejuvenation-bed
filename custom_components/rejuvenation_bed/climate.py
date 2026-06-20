@@ -5,16 +5,18 @@ HVAC-Modi:
 - OFF: Komplett aus
 - AUTO: Idle (Eco/Solar-Batterie, Bett leer)
 - HEAT: Biorhythmus (Kurve aktiv, Präsenz erkannt)
-- DRY: Krank-Modus (konstant warm, 3 Tage)
 
 Presets:
 - NONE: Normal
 - AWAY: Urlaub (Frostschutz)
-- COMFORT: Ausschlafen (verlängerte Kurve)
 - BOOST: Schnellheizen
+
+Hinweis: Krank-Modus läuft über den Service `set_sick_mode` (nicht als
+HVAC-Preset), daher kein eigener DRY/COMFORT-Preset hier.
 """
 
 import logging
+from datetime import timedelta
 from homeassistant.components.climate import (
     ClimateEntity,
     ClimateEntityFeature,
@@ -22,7 +24,6 @@ from homeassistant.components.climate import (
     HVACAction,
     PRESET_NONE,
     PRESET_AWAY,
-    PRESET_COMFORT,
     PRESET_BOOST,
 )
 from homeassistant.const import (
@@ -30,7 +31,7 @@ from homeassistant.const import (
     UnitOfTemperature,
 )
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
-from .const import DOMAIN, ABSOLUTE_MAX_TEMP
+from .const import DOMAIN, ABSOLUTE_MAX_TEMP, MANUAL_TARGET_TTL_HOURS, local_now
 from .device_info import get_zone_device_info
 
 _LOGGER = logging.getLogger(__name__)
@@ -62,19 +63,17 @@ class RejuvenationBedClimate(CoordinatorEntity, ClimateEntity):
     _attr_has_entity_name = True
     _attr_temperature_unit = UnitOfTemperature.CELSIUS
     
-    # ERWEITERT: Mehr HVAC-Modi!
+    # Tatsächlich unterstützte HVAC-Modi (Krank läuft über Service, nicht DRY)
     _attr_hvac_modes = [
         HVACMode.OFF,
         HVACMode.AUTO,
         HVACMode.HEAT,
-        HVACMode.DRY,
     ]
-    
-    # ERWEITERT: Presets!
+
+    # Tatsächlich unterstützte Presets (COMFORT war ohne Funktion → entfernt)
     _attr_preset_modes = [
         PRESET_NONE,
         PRESET_AWAY,
-        PRESET_COMFORT,
         PRESET_BOOST,
     ]
     
@@ -217,6 +216,13 @@ class RejuvenationBedClimate(CoordinatorEntity, ClimateEntity):
             self.coordinator.manual_hvac_mode = {}
         
         self.coordinator.manual_hvac_mode[self._zone_idx] = hvac_mode
+
+        # #4: Zurück auf AUTO/HEAT → manuellen Slider-Wert verwerfen,
+        # damit die Biorhythmus-Automatik wieder übernimmt.
+        if hvac_mode in (HVACMode.AUTO, HVACMode.HEAT):
+            if hasattr(self.coordinator, "clear_manual_target"):
+                self.coordinator.clear_manual_target(self._zone_idx)
+
         await self.coordinator.async_request_refresh()
 
     async def async_set_temperature(self, **kwargs):
@@ -228,8 +234,14 @@ class RejuvenationBedClimate(CoordinatorEntity, ClimateEntity):
         
         if not hasattr(self.coordinator, "manual_target_temp"):
             self.coordinator.manual_target_temp = {}
-        
+        if not hasattr(self.coordinator, "manual_target_until"):
+            self.coordinator.manual_target_until = {}
+
         self.coordinator.manual_target_temp[self._zone_idx] = temp
+        # #4: TTL setzen — der manuelle Wert verfällt automatisch
+        self.coordinator.manual_target_until[self._zone_idx] = (
+            local_now() + timedelta(hours=MANUAL_TARGET_TTL_HOURS)
+        )
         await self.coordinator.async_request_refresh()
 
     async def async_set_preset_mode(self, preset_mode: str):
