@@ -35,6 +35,7 @@ from custom_components.rejuvenation_bed.const import (  # noqa: E402
     BED_TYPE_HEATING_PAD,
     WATERBED_CONFIG,
     HEATING_PAD_CONFIG,
+    local_now,
 )
 
 BASE = datetime(2026, 6, 20, 22, 0, 0)
@@ -128,3 +129,127 @@ def test_clear_manual_target():
     assert 0 not in fake.manual_target_until
     # Andere Zone bleibt unberührt
     assert fake.manual_target_temp[1] == 30.0
+
+
+# ── #9/O6: Integrations-Smoke-Test des Haupt-Loops ──────────────────────────
+# Konstruiert einen echten Coordinator (Basisklasse via _RealBase ersetzt) und
+# fährt EINEN _async_update_data-Zyklus. Blatt-Kollaborateure werden gestubbt,
+# damit die ORCHESTRIERUNG (Sensor-Lesen, Mode, Rampe, Hysterese, Safety,
+# Schaltung, Decision-Aufbau) als echte Coordinator-Logik durchläuft.
+# Dient als Sicherheitsnetz für die _process_zone-Extraktion (#9).
+
+import asyncio  # noqa: E402
+from unittest.mock import AsyncMock  # noqa: E402
+
+
+def _build_coordinator(current_temp="24.0", heater_state="off"):
+    hass = MagicMock()
+    states = {
+        "sensor.temp": SimpleNamespace(state=str(current_temp)),
+        "switch.heater": SimpleNamespace(state=heater_state),
+    }
+    hass.states.get = lambda eid: states.get(eid)
+    hass.services.async_call = AsyncMock()
+
+    entry = SimpleNamespace(
+        entry_id="test_entry",
+        data={
+            "global": {"bed_type": "wasserbett"},
+            "zones": [{"heater": "switch.heater", "temp_sensor": "sensor.temp"}],
+            "energy": {},
+        },
+        options={},
+    )
+
+    coord = RejuvenationBedCoordinator(hass, entry)
+    coord._hardware_synced = True  # Hardware-Sync (mit async_load) überspringen
+
+    # Blatt-Kollaborateure stubben (nicht Teil der Loop-Orchestrierung)
+    coord.temperature_calculator.update_trend_data = MagicMock()
+    coord.temperature_calculator.async_calculate_target = AsyncMock(return_value=28.0)
+    coord.temperature_calculator.async_get_decision_reason = AsyncMock(return_value="reason")
+    coord.presence_detector.detect_presence = MagicMock(return_value=(False, 0.0, "test"))
+    coord.presence_detector.is_potential_leak = MagicMock(return_value=False)
+    coord.ramp_controller.calculate_ramped_setpoint = MagicMock(return_value=(28.0, SimpleNamespace(ramp_active=False)))
+    coord.anti_short_cycle_manager.can_switch = MagicMock(return_value=(True, "test"))
+    coord.bed_intelligence.calibration = SimpleNamespace(is_calibrated=False)
+    coord.bed_intelligence.update = MagicMock()
+    coord.bed_intelligence.get_sweat_status = MagicMock(
+        return_value=SimpleNamespace(is_sweating=False, is_moist=False, humidity_level=None, cause=None)
+    )
+    coord.bed_intelligence.get_isolation_status = MagicMock(
+        return_value=SimpleNamespace(energy_waste_warning=False, level=None, delta_water_air=None, uncovered_minutes=0)
+    )
+    coord._async_update_sleep_tracking = AsyncMock()
+    coord.diagnostics_manager.update_energy_usage = MagicMock()
+    return coord, hass
+
+
+def test_update_cycle_produces_zone_decision_and_switches_heater():
+    coord, hass = _build_coordinator(current_temp="24.0", heater_state="off")
+
+    result = asyncio.run(coord._async_update_data())
+
+    # Loop lief sauber durch und lieferte eine wohlgeformte Zonen-Entscheidung
+    assert "Zone 1" in result["zones"]
+    zone = result["zones"]["Zone 1"]
+    assert zone.get("status") != "ERROR", f"Zone lief in Fail-Safe: {zone}"
+    assert "target" in zone and "active" in zone
+    # 24°C ist deutlich unter Ziel (28°C) → Heizung muss eingeschaltet werden
+    assert zone["active"] is True
+    hass.services.async_call.assert_awaited()
+    args = hass.services.async_call.await_args
+    assert args.args[1] == "turn_on"
+
+
+def test_update_cycle_emergency_latch_forces_off():
+    coord, hass = _build_coordinator(current_temp="24.0", heater_state="on")
+    # Not-Aus-Latch für Zone 0 setzen → Heizung muss AUS bleiben
+    coord.safety_manager._emergency_shutdown[0] = True
+    coord.safety_manager._emergency_reason[0] = "Test-Notfall"
+
+    result = asyncio.run(coord._async_update_data())
+
+    zone = result["zones"]["Zone 1"]
+    assert zone["active"] is False
+    assert "NOT-AUS" in zone["reason"]
+
+
+def test_update_cycle_sensor_failure_failsafe_on():
+    # Temp-Sensor unavailable + Startup-Grace abgelaufen → Wasserbett heizt blind
+    coord, hass = _build_coordinator(current_temp="unavailable", heater_state="off")
+    coord._startup_time = local_now() - timedelta(hours=1)
+
+    result = asyncio.run(coord._async_update_data())
+
+    zone = result["zones"]["Zone 1"]
+    assert zone["status"] == "FAIL_SAFE"
+    assert zone["active"] is True
+    args = hass.services.async_call.await_args
+    assert args.args[1] == "turn_on"
+
+
+def test_update_cycle_startup_wait():
+    # Temp-Sensor unavailable, aber noch in der Startup-Grace → warten, nicht schalten
+    coord, hass = _build_coordinator(current_temp="unavailable", heater_state="off")
+    coord._startup_time = local_now()  # gerade gestartet
+
+    result = asyncio.run(coord._async_update_data())
+
+    zone = result["zones"]["Zone 1"]
+    assert zone["status"] == "STARTUP_WAIT"
+    hass.services.async_call.assert_not_awaited()
+
+
+def test_update_cycle_hvac_off_forces_off():
+    from homeassistant.components.climate.const import HVACMode
+
+    coord, hass = _build_coordinator(current_temp="24.0", heater_state="on")
+    coord.manual_hvac_mode[0] = HVACMode.OFF
+
+    result = asyncio.run(coord._async_update_data())
+
+    zone = result["zones"]["Zone 1"]
+    assert zone["active"] is False
+    args = hass.services.async_call.await_args
+    assert args.args[1] == "turn_off"
