@@ -7,6 +7,15 @@ Alle Änderungen am Rejuvenation Bed Projekt.
 ## [v260619] - 2026-06-19
 
 ### Bugfixes
+- **Solar-Boost schaltete tagsüber die Heizung (Smartplug) nicht ein.**
+  Der Energie-Offset (Solar-Boost +1.5 °C) wurde nur im Warmhalte-Fenster
+  (nachts) auf die Biorhythmus-Kurve addiert — also genau dann NICHT, wenn
+  PV-Überschuss da ist. Tagsüber lief der Standby-Zweig in ein frühes
+  `return standby_temp` ohne Offset, das Ziel blieb auf Normaltemperatur und
+  die Heizung sprang nie an. Solar-Boost soll den Überschuss aber als
+  thermische Batterie ins Bett laden. Fix: neuer `_charge_standby_temp` hebt
+  das Tages-Standby-Ziel um den Solar-Offset an (gedeckelt auf
+  `solar_boost_max`, nur für Betten mit Wärmespeicher, nur positiver Offset).
 - **Präsenz v11.1 — Stale-Cooldown-Release (Sensor hing ~12 h auf "belegt").**
   An einem echten Tag-Schlaf-Datensatz (Nutzer lag 06:00–14:00 CEST, jetzt
   inkl. Heizungs-Switch-Historie) blieb `binary_sensor.…_bett_prasenz` nach

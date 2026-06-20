@@ -254,9 +254,11 @@ class TemperatureCalculator:
                     )
                     return preheat_temp
                 else:
-                    # Tagsüber: Standby
+                    # Tagsüber: Standby (+ Solar-Boost lädt die thermische Batterie)
                     _LOGGER.debug(f"Zone {zone_index}: Standby → {standby_temp}°C")
-                    return max(standby_temp, self.min_temp)
+                    return self._charge_standby_temp(
+                        standby_temp, energy_state, zone_index
+                    )
         
         else:
             # ═══════════════════════════════════════════════════════════
@@ -278,7 +280,9 @@ class TemperatureCalculator:
                     return preheat_temp
                 else:
                     _LOGGER.debug(f"Zone {zone_index}: Tagsüber → Standby {standby_temp}°C")
-                    return max(standby_temp, self.min_temp)
+                    return self._charge_standby_temp(
+                        standby_temp, energy_state, zone_index
+                    )
         
         # Schritt 6: Hole Basis-Temperatur aus der Biorhythmus-Kurve
         if use_biorhythmus:
@@ -316,7 +320,38 @@ class TemperatureCalculator:
             _LOGGER.debug("Zone %d: %.1f°C", zone_index, final_temp)
         
         return round(final_temp, 2)
-    
+
+    def _charge_standby_temp(
+        self, base_temp: float, energy_state: dict, zone_index: int
+    ) -> float:
+        """
+        Wendet den Solar-Boost auf den Tages-Standby an (thermische Batterie).
+
+        Ohne das schaltet die Heizung tagsüber gar nicht erst ein: der
+        Energie-Offset wurde bisher nur im Warmhalte-Fenster (nachts) auf die
+        Kurve addiert — also genau dann NICHT, wenn PV-Überschuss da ist.
+        Solar-Boost soll den Überschuss aber tagsüber im Bett speichern, daher
+        muss das Standby-Ziel über die Normaltemperatur steigen.
+
+        Nur für Betten mit Wärmespeicher (``thermal_battery``) und nur für
+        einen positiven Offset (Solar-Boost, nicht Eco). Gedeckelt auf
+        ``solar_boost_max`` des Bett-Typs.
+        """
+        target = max(base_temp, self.min_temp)
+        offset = energy_state.get("temperature_offset", 0.0) if energy_state else 0.0
+
+        if offset > 0 and self.thermal_battery_enabled:
+            cap = self.bed_config.get("solar_boost_max", target + offset)
+            charged = min(target + offset, cap)
+            if charged > target:
+                _LOGGER.debug(
+                    "Zone %d: Solar-Boost lädt Standby %.1f → %.1f°C (Cap %.1f)",
+                    zone_index, target, charged, cap,
+                )
+            target = charged
+
+        return round(target, 2)
+
     async def _ensure_resolvers_initialized(self, zone_index: int):
         """
         Stellt sicher, dass alle Resolver für diese Zone existieren.
