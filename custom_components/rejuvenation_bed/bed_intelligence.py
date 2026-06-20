@@ -42,6 +42,9 @@ _LOGGER = logging.getLogger(__name__)
 STORAGE_VERSION = 1
 STORAGE_KEY = "rejuvenation_bed_intelligence"
 
+# O1: Schreib-Debounce — mehrere Updates werden zu einem Flash-Write gebündelt
+SAVE_DEBOUNCE_SECONDS = 30
+
 # Sensor-Rauschen Schwellwert (DS18B20 = 0.0625°C Auflösung)
 SENSOR_NOISE_THRESHOLD = 0.07
 
@@ -249,8 +252,9 @@ class BedIntelligence:
                 unc = self.calibration.delta_uncovered_mean
                 if abs(cov - unc) < 0.4:
                     _LOGGER.warning(
-                        "Isolation-Kalibrierung unzuverlässig (cov=%.2f, unc=%.2f) — "
-                        "setze auf Defaults zurück.", cov, unc,
+                        "Isolation-Kalibrierung unzuverlässig (cov=%.2f, unc=%.2f) — " "setze auf Defaults zurück.",
+                        cov,
+                        unc,
                     )
                     self.calibration.delta_covered_mean = 2.0
                     self.calibration.delta_uncovered_mean = 1.5
@@ -268,16 +272,32 @@ class BedIntelligence:
 
         self._loaded = True
 
-    async def async_save(self):
-        """Speichert Kalibrierungsdaten."""
-        try:
-            save_data = {
-                "calibration": self.calibration.to_dict(),
-            }
-            if hasattr(self, "_bedtime_history") and self._bedtime_history:
-                save_data["bedtime_history"] = self._bedtime_history
+    def _collect_save_data(self) -> dict:
+        """Stellt das zu speichernde Datenpaket zusammen."""
+        save_data = {
+            "calibration": self.calibration.to_dict(),
+        }
+        if hasattr(self, "_bedtime_history") and self._bedtime_history:
+            save_data["bedtime_history"] = self._bedtime_history
+        return save_data
 
-            await self._store.async_save(save_data)
+    def _schedule_save(self):
+        """
+        Plant einen entprellten Schreibvorgang (O1).
+
+        Nutzt Store.async_delay_save statt pro Update sofort zu schreiben —
+        mehrere Änderungen innerhalb des Fensters werden zu EINEM Write
+        zusammengefasst (schont den Flash bei häufigen Updates).
+        """
+        try:
+            self._store.async_delay_save(self._collect_save_data, SAVE_DEBOUNCE_SECONDS)
+        except Exception as e:
+            _LOGGER.error(f"BedIntelligence Save-Planung fehlgeschlagen: {e}")
+
+    async def async_save(self):
+        """Speichert Kalibrierungsdaten sofort (z.B. beim Entladen)."""
+        try:
+            await self._store.async_save(self._collect_save_data())
         except Exception as e:
             _LOGGER.error(f"BedIntelligence Save-Fehler: {e}")
 
@@ -388,7 +408,7 @@ class BedIntelligence:
             self._finalize_calibration(now)
         elif cal.samples_collected % 50 == 0:
             if self.hass:
-                self.hass.async_create_task(self.async_save())
+                self._schedule_save()
 
     def _finalize_calibration(self, now: datetime):
         """Berechnet optimale Schwellwerte aus den gesammelten Daten."""
@@ -423,8 +443,11 @@ class BedIntelligence:
                 _LOGGER.info(
                     "Isolation-Kalibrierung verworfen: Spread |%.2f - %.2f| < %.2f — "
                     "behalte Defaults (cov=%.2f, unc=%.2f).",
-                    cov, unc, MIN_DELTA_SPREAD,
-                    cal.delta_covered_mean, cal.delta_uncovered_mean,
+                    cov,
+                    unc,
+                    MIN_DELTA_SPREAD,
+                    cal.delta_covered_mean,
+                    cal.delta_uncovered_mean,
                 )
 
         # Feuchtigkeit
@@ -444,7 +467,7 @@ class BedIntelligence:
         _LOGGER.info(f"✅ Auto-Kalibrierung abgeschlossen nach " f"{cal.samples_collected} Samples!")
 
         if self.hass:
-            self.hass.async_create_task(self.async_save())
+            self._schedule_save()
 
     def _update_drift_correction(
         self,
@@ -502,7 +525,7 @@ class BedIntelligence:
                 _LOGGER.info(f"🔄 Drift-Korrektur: Schwelle {old_threshold:.4f} → " f"{cal.water_std_threshold:.4f}")
 
                 if self.hass:
-                    self.hass.async_create_task(self.async_save())
+                    self._schedule_save()
 
     # ═══════════════════════════════════════════════════════════════════════
     # 2. ISOLATIONS-ERKENNUNG (sensor-agnostisch, kalibrations-basiert)
@@ -828,7 +851,7 @@ class BedIntelligence:
         )
 
         if self.hass and hasattr(self.hass, "async_create_task"):
-            self.hass.async_create_task(self.async_save())
+            self._schedule_save()
 
     def predict_bedtime(self, zone_index: int) -> Optional[dict]:
         """Sagt die wahrscheinliche Einschlafzeit vorher."""

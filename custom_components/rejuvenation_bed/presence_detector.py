@@ -695,11 +695,7 @@ class PresenceDetector:
                 reasons.append("→heizt(empty)")
                 return False, 0.10, reasons
             # rise→stable greift auch unter aktiver Heizung (Person dämpft Rampe).
-            if (
-                abs(slope) < t.slope_stable_band
-                and prev_slope is not None
-                and prev_slope > t.slope_rise_threshold
-            ):
+            if abs(slope) < t.slope_stable_band and prev_slope is not None and prev_slope > t.slope_rise_threshold:
                 reasons.append(f"→rise→stable(prev={prev_slope:+.2f})")
                 self._last_chaos_time[zone_index] = now
                 self._empty_confirmed[zone_index] = False
@@ -717,11 +713,7 @@ class PresenceDetector:
                 reasons.append("→kühlt(empty)")
                 return False, 0.10, reasons
             # Stabil nach starkem Anstieg = Person eingestiegen.
-            if (
-                abs(slope) < t.slope_stable_band
-                and prev_slope is not None
-                and prev_slope > t.slope_rise_threshold
-            ):
+            if abs(slope) < t.slope_stable_band and prev_slope is not None and prev_slope > t.slope_rise_threshold:
                 reasons.append(f"→rise→stable(prev={prev_slope:+.2f})")
                 self._empty_confirmed[zone_index] = False
                 self._last_chaos_time[zone_index] = now

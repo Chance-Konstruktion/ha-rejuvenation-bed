@@ -102,9 +102,7 @@ class HeatingStateMachine:
 
         # Step 1: Apply ramp if enabled (waterbed vinyl protection)
         if self.ramp_enabled:
-            setpoint, ramp_state = self.ramp.calculate_ramped_setpoint(
-                zone_index, desired_temp, current_temp
-            )
+            setpoint, ramp_state = self.ramp.calculate_ramped_setpoint(zone_index, desired_temp, current_temp)
             ramp_active = ramp_state.ramp_active
             completion = ramp_state.estimated_completion
         else:
@@ -131,9 +129,7 @@ class HeatingStateMachine:
             should_heat = heater_on  # Keep current state
 
         # Step 5: Determine state
-        state = self._classify_state(
-            should_heat, ramp_active, current_temp, setpoint, heater_on
-        )
+        state = self._classify_state(should_heat, ramp_active, current_temp, setpoint, heater_on)
 
         # Track state transitions
         prev_state = self._state.get(zone_index)
@@ -218,8 +214,6 @@ class HeatingStateMachine:
             "state": state.value if state else "unknown",
             "state_since": since.isoformat() if since else None,
             "ramp_enabled": self.ramp_enabled,
-            "ramp": self.ramp.get_ramp_state(zone_index).__dict__
-            if self.ramp.get_ramp_state(zone_index)
-            else None,
+            "ramp": self.ramp.get_ramp_state(zone_index).__dict__ if self.ramp.get_ramp_state(zone_index) else None,
             "anti_cycle": self.anti_cycle.get_diagnostics(),
         }
