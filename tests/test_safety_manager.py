@@ -99,12 +99,36 @@ def test_stuck_relay_detected(mock_now, manager):
     assert is_safe is True
     assert status == "OK"
 
-    # 2. Zyklus: 11 Min später, Temp gestiegen obwohl AUS befohlen
-    mock_now.return_value = BASE + timedelta(minutes=11)
-    is_safe, status, notif = _check(manager, 0, 27.6, 28.0, False)
+    # 2. Zyklus: 15 Min später, Temp schnell +1.0°C trotz AUS-Befehl
+    # → echter Relais-Verdacht (anhaltender, schneller Anstieg)
+    mock_now.return_value = BASE + timedelta(minutes=15)
+    is_safe, status, notif = _check(manager, 0, 28.0, 28.0, False)
     assert is_safe is True  # Warnung, aber kein harter Stopp
     assert "STUCK_RELAY_SUSPECTED" in status
     assert notif is not None
+
+
+@patch("custom_components.rejuvenation_bed.safety_manager.local_now")
+def test_stuck_relay_no_false_alarm_on_slow_summer_drift(mock_now, manager):
+    """Regression: Sommer + Schläfer → langsame Drift darf KEINEN Alarm auslösen.
+
+    Reale Meldung: 674 Min AUS, nur +0.4°C Anstieg (Raumwärme/Körperwärme).
+    Das ist kein klebendes Relais und darf nicht als solches gemeldet werden.
+    """
+    mock_now.return_value = BASE
+    _check(manager, 0, 24.0, 28.0, False)  # Referenz setzen
+
+    # Über 11h hinweg minimal steigend (~0.036°C/h) → nie schnell genug
+    last_status, last_notif = "OK", None
+    for minutes in range(30, 700, 30):
+        mock_now.return_value = BASE + timedelta(minutes=minutes)
+        # linear von 24.0 auf 24.4 über 674 Min
+        temp = 24.0 + 0.4 * (minutes / 674)
+        is_safe, last_status, last_notif = _check(manager, 0, temp, 28.0, False)
+        assert is_safe is True
+
+    assert "STUCK_RELAY" not in last_status
+    assert last_notif is None
 
 
 @patch("custom_components.rejuvenation_bed.safety_manager.local_now")
@@ -152,13 +176,13 @@ def test_warning_throttled_within_hour(mock_now, manager):
     # Erster Stuck-Relay-Trigger → Notification
     mock_now.return_value = BASE
     _check(manager, 0, 27.0, 28.0, False)
-    mock_now.return_value = BASE + timedelta(minutes=11)
-    _, _, notif1 = _check(manager, 0, 27.6, 28.0, False)
+    mock_now.return_value = BASE + timedelta(minutes=15)
+    _, _, notif1 = _check(manager, 0, 28.0, 28.0, False)
     assert notif1 is not None
 
     # Weiterer Trigger 5 Min später → innerhalb der Stunde unterdrückt
-    mock_now.return_value = BASE + timedelta(minutes=16)
-    _, _, notif2 = _check(manager, 0, 28.0, 28.0, False)
+    mock_now.return_value = BASE + timedelta(minutes=20)
+    _, _, notif2 = _check(manager, 0, 28.5, 28.0, False)
     assert notif2 is None
 
 

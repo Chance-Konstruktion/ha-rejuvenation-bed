@@ -4,6 +4,19 @@ Alle Änderungen am Rejuvenation Bed Projekt.
 
 ## [Unreleased]
 
+### Sicherheit / Bugfix
+- **Klebe-Relais-Fehlalarm im Sommer behoben:** Die Erkennung verglich die
+  aktuelle Temperatur mit dem Messwert beim AUS-Befehl – über ein **unbegrenztes**
+  Zeitfenster. Jede Drift >0.3 °C löste irgendwann Alarm aus, je länger alles
+  in Ordnung war, desto wahrscheinlicher. Folge: nach 674 Min AUS reichten
+  +0.4 °C aus Raum-/Körperwärme für eine „Relais-Verdacht"-Meldung.
+  Jetzt **ratenbasiert** über ein gleitendes 30-Min-Fenster: gemeldet wird nur
+  ein **anhaltender, schneller** Anstieg (≥0.8 °C/Fenster ≈ 1.6 °C/h), wie ihn
+  ein dauerhaft heizendes Relais erzeugt. Langsame Sommer-/Körperwärme-Drift
+  akkumuliert nicht mehr zu einem Fehlalarm.
+- **Meldungstext entschärft:** nennt jetzt Körperwärme (Schläfer) und warmes
+  Schlafzimmer als häufige harmlose Ursachen statt nur Defekt-Verdacht.
+
 ## [v260620] - 2026-06-20
 
 ### Sicherheit
