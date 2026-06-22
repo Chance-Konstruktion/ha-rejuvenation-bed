@@ -42,8 +42,15 @@ HEATING_EFFICIENCY_CHECK_HOURS = 3.0  # Nach 3h heizen prüfen
 HEATING_MIN_TEMP_RISE = 0.5  # Mindestens 0.5°C Anstieg erwartet
 
 # Klebe-Relais-Erkennung
-STUCK_RELAY_CHECK_MINUTES = 10  # Wenn 10 Min AUS aber Temp steigt = Relais klebt
-STUCK_RELAY_TEMP_RISE = 0.3  # Ab diesem Anstieg = Verdacht
+#
+# Ein klebendes Relais heizt KONTINUIERLICH → die Temperatur steigt schnell und
+# anhaltend. Langsame Drift (warmes Schlafzimmer im Sommer, Körperwärme eines
+# Schläfers) ist KEIN Defekt. Deshalb bewerten wir die ANSTIEGSRATE in einem
+# gleitenden Fenster – nicht den absoluten Anstieg seit dem (evtl. Stunden alten)
+# AUS-Befehl. Sonst kippt jede minimale Drift nach genug Zeit in einen Fehlalarm.
+STUCK_RELAY_CHECK_MINUTES = 10  # Frühestens nach 10 Min bewerten (Sensor-Rauschen glätten)
+STUCK_RELAY_WINDOW_MINUTES = 30  # Gleitendes Beobachtungsfenster
+STUCK_RELAY_TEMP_RISE = 0.8  # Anstieg INNERHALB des Fensters, der auf aktives Heizen deutet (~1.6°C/h)
 
 # Degraded Mode (bei Sensor-Ausfall)
 DEGRADED_DUTY_CYCLE = 0.30  # 30% Heizleistung
@@ -179,26 +186,38 @@ class SafetyManager:
         # CHECK 2: Klebe-Relais Erkennung
         # ═══════════════════════════════════════════════════════════════════════
         if not heater_commanded_on:
-            if zone_index not in self._off_command_time:
+            ref_time = self._off_command_time.get(zone_index)
+            if ref_time is None:
+                # Erstkontakt: Referenzpunkt für das gleitende Fenster setzen.
                 self._off_command_time[zone_index] = now
                 self._off_command_temp[zone_index] = current_temp
             else:
-                off_duration = (now - self._off_command_time[zone_index]).total_seconds() / 60
+                window_minutes = (now - ref_time).total_seconds() / 60
                 temp_rise = current_temp - self._off_command_temp[zone_index]
 
-                if off_duration >= STUCK_RELAY_CHECK_MINUTES and temp_rise > STUCK_RELAY_TEMP_RISE:
+                if window_minutes >= STUCK_RELAY_CHECK_MINUTES and temp_rise >= STUCK_RELAY_TEMP_RISE:
+                    # Schneller, anhaltender Anstieg trotz AUS-Befehl → echter Verdacht.
                     notification = self._create_warning_notification(
                         zone_index,
                         "stuck_relay",
                         f"⚠️ Zone {zone_index+1}: Relais-Verdacht!\n\n"
-                        f"Heizung ist seit {off_duration:.0f} Min AUS befohlen, "
-                        f"aber Temperatur steigt (+{temp_rise:.1f}°C).\n\n"
-                        f"Mögliche Ursachen:\n"
-                        f"• Relais klebt (verschweißte Kontakte)\n"
+                        f"Die Heizung ist AUS befohlen, aber die Temperatur steigt "
+                        f"schnell weiter (+{temp_rise:.1f}°C in {window_minutes:.0f} Min).\n\n"
+                        f"Das deutet auf ein klebendes Relais hin. Häufige harmlose Ursachen:\n"
+                        f"• Jemand liegt im Bett (Körperwärme)\n"
+                        f"• Sehr warmes Schlafzimmer (Sommer)\n"
                         f"• Jemand hat manuell eingeschaltet\n\n"
-                        f"Bitte prüfen!",
+                        f"Bitte prüfen, ob die Heizung wirklich aus ist.",
                     )
-                    return True, f"STUCK_RELAY_SUSPECTED (+{temp_rise:.1f}°C)", notification
+                    return True, f"STUCK_RELAY_SUSPECTED (+{temp_rise:.1f}°C/{window_minutes:.0f}min)", notification
+
+                # Fenster nachziehen, sobald es abgelaufen ist ODER die Temperatur
+                # nicht (mehr) steigt. So vergleichen wir stets gegen einen frischen
+                # Messwert und werten nur einen ANHALTENDEN Anstieg – langsame
+                # Sommer-/Körperwärme-Drift akkumuliert nie zu einem Fehlalarm.
+                if window_minutes >= STUCK_RELAY_WINDOW_MINUTES or temp_rise <= 0:
+                    self._off_command_time[zone_index] = now
+                    self._off_command_temp[zone_index] = current_temp
         else:
             self._off_command_time.pop(zone_index, None)
             self._off_command_temp.pop(zone_index, None)
