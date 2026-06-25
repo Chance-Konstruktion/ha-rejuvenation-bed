@@ -97,6 +97,9 @@ class RejuvenationBedOptionsFlow(config_entries.OptionsFlow):
             data_schema=vol.Schema(
                 {
                     vol.Optional(
+                        "summer_cutoff_enabled", default=_val("summer_cutoff_enabled", True)
+                    ): selector.BooleanSelector(),
+                    vol.Optional(
                         "summer_threshold", default=_val("summer_threshold", DEFAULT_SUMMER_TEMP)
                     ): selector.NumberSelector(
                         selector.NumberSelectorConfig(
