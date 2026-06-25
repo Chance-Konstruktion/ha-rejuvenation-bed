@@ -168,11 +168,13 @@
         "title": "🌡️ Temperature & Bed",
         "description": "System-wide temperature limits and bed properties.",
         "data": {
+          "summer_cutoff_enabled": "Summer shutoff",
           "summer_threshold": "Summer threshold",
           "temperature_offset": "Temperature offset",
           "bed_volume_liters": "Bed volume"
         },
         "data_description": {
+          "summer_cutoff_enabled": "When enabled, heating is reduced above the summer threshold. Turn off to keep the normal sleep profile all year regardless of outdoor temperature.",
           "summer_threshold": "Above this outdoor temperature the system enters summer mode. Recommended: 25°C.",
           "temperature_offset": "Fine-tune all temperatures. +1.0 = everything 1°C warmer, -1.0 = cooler.",
           "bed_volume_liters": "Water volume in liters. Guidelines: 250 L single, 400 L double, 700 L king-size. Used for thermal battery and heating time."
