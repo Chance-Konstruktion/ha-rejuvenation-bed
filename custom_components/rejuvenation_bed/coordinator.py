@@ -1173,8 +1173,18 @@ class RejuvenationBedCoordinator(DataUpdateCoordinator):
     async def _async_check_vetos(self) -> Dict:
         """Prüft auf Sommer-Schwelle im Außenbereich."""
         global_cfg = self.config_entry.data.get("global", {})
-        outdoor_sensor = global_cfg.get("outdoor_sensor")
-        summer_limit = global_cfg.get("summer_threshold", 25)
+        options = self.config_entry.options
+
+        def _cfg(key, fallback=None):
+            """Option (vom Options-Flow) hat Vorrang vor data['global']."""
+            return options.get(key, global_cfg.get(key, fallback))
+
+        # Sommer-Abschaltung per Options-Flow deaktivierbar (Default: an)
+        if not _cfg("summer_cutoff_enabled", True):
+            return {"is_summer": False}
+
+        outdoor_sensor = _cfg("outdoor_sensor")
+        summer_limit = _cfg("summer_threshold", 25)
 
         is_summer = False
         if outdoor_sensor:
