@@ -229,6 +229,52 @@ def test_update_cycle_sensor_failure_failsafe_on():
     assert args.args[1] == "turn_on"
 
 
+def test_update_cycle_sensor_failure_summer_stays_off():
+    # Sensor-Ausfall im Sommer → Heizung bleibt AUS (Sommer-Veto greift auch im Fail-Safe)
+    hass = MagicMock()
+    states = {
+        "sensor.temp": SimpleNamespace(state="unavailable"),
+        "switch.heater": SimpleNamespace(state="off"),
+        "sensor.outdoor": SimpleNamespace(state="28.0"),
+    }
+    hass.states.get = lambda eid: states.get(eid)
+    hass.services.async_call = AsyncMock()
+
+    entry = SimpleNamespace(
+        entry_id="test_entry",
+        data={
+            "global": {
+                "bed_type": "wasserbett",
+                "outdoor_sensor": "sensor.outdoor",
+                "summer_threshold": 25,
+                "summer_cutoff_enabled": True,
+            },
+            "zones": [{"heater": "switch.heater", "temp_sensor": "sensor.temp"}],
+            "energy": {},
+        },
+        options={},
+    )
+
+    coord = RejuvenationBedCoordinator(hass, entry)
+    coord._hardware_synced = True
+    coord._startup_time = local_now() - timedelta(hours=1)
+    coord.temperature_calculator.update_trend_data = MagicMock()
+    coord.temperature_calculator.async_calculate_target = AsyncMock(return_value=28.0)
+    coord.safety_manager.check_safety = MagicMock(return_value={"emergency_stop": False})
+    coord.safety_manager.should_heat_in_degraded_mode = MagicMock(return_value=True)
+    coord.presence_detector.is_present = MagicMock(return_value=True)
+    coord._async_send_notification = AsyncMock()
+
+    result = asyncio.run(coord._async_update_data())
+
+    zone = result["zones"]["Zone 1"]
+    assert zone["status"] == "FAIL_SAFE"
+    assert zone["active"] is False, "Sommer-Modus: Heizung muss trotz Sensor-Ausfall AUS bleiben"
+    # Heizung darf nicht eingeschaltet worden sein
+    for call in hass.services.async_call.await_args_list:
+        assert call.args[1] != "turn_on", "turn_on darf im Sommer-Fail-Safe nicht aufgerufen werden"
+
+
 def test_update_cycle_startup_wait():
     # Temp-Sensor unavailable, aber noch in der Startup-Grace → warten, nicht schalten
     coord, hass = _build_coordinator(current_temp="unavailable", heater_state="off")
