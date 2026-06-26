@@ -361,6 +361,32 @@ class RejuvenationBedCoordinator(DataUpdateCoordinator):
                 "active": False,
             }
 
+        # Sommer-Check: Bei aktivem Sommer-Veto NICHT blind heizen
+        vetos = await self._async_check_vetos()
+        if vetos.get("is_summer", False):
+            await self._async_control_heater(heater_entity, False)
+            self._heater_states[heater_entity] = False
+            self._failsafe_on_since.pop(zone_index, None)
+            _LOGGER.warning(
+                f"⚠️ FAIL-SAFE Zone {zone_index}: Sensor-Ausfall, aber Sommer-Modus aktiv → Heizung BLEIBT AUS"
+            )
+            await self._async_send_notification(
+                title="⚠️ Wasserbett Sensor-Ausfall (Sommer)",
+                message=(
+                    f"Der Temperatursensor für Zone {zone_index + 1} ist nicht erreichbar. "
+                    f"Wegen aktiver Sommer-Abschaltung bleibt die Heizung AUS. "
+                    f"Bitte prüfe den Sensor!"
+                ),
+                notification_id=f"rejuvenation_bed_sensor_failure_{zone_index}",
+            )
+            return {
+                "status": "FAIL_SAFE",
+                "reason": "⚠️ Sensor-Ausfall + Sommer-Modus → Heizung AUS",
+                "heater_state": False,
+                "hvac_mode": "off",
+                "active": False,
+            }
+
         # Wasserbett: Dauer-AN mit Max-ON-Timeout
         started = self._failsafe_on_since.get(zone_index)
         if started is None:
