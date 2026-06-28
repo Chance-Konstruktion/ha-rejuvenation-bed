@@ -9,6 +9,29 @@ Alle Änderungen am Rejuvenation Bed Projekt.
   `info.md` (Pitch, Highlights, Quick-Start) mit prominentem Link auf die
   Editorial-Seite, statt die lange README. `hacs.json`: `render_readme → false`.
 
+### Funktion / UX
+- **Sommer-Modus klar kommuniziert + ehrlicher Status:** Im Options-Flow ist
+  jetzt sauber getrennt, was eingestellt wird — die **Außentemperatur-Schwelle**
+  (`summer_threshold`, ab wann der Sommer-Modus greift) und die neue, einstellbare
+  **Bett-Haltetemperatur im Sommer** (`summer_temp`, vorher hart auf 25 °C). Die
+  Beschreibungen erklären beides eindeutig und benennen den Solar-Boost als
+  Übergangszeit-/Winter-Feature. Zudem behoben: Der Status zeigte „☀️ Solar-Boost
+  aktiv", obwohl bei aktivem Sommer-Veto die Zieltemperatur auf die Sommer-
+  Temperatur gedeckelt war und das Bett gar nicht hochheizte. Bei Sommer-Veto
+  meldet der Status nun „☀️ Sommer aktiv – Heizung reduziert (X°C)" und
+  `solar_active` wird nicht mehr fälschlich als aktiv gemeldet. Wasserbetten
+  bleiben auf mind. 24 °C geklemmt (Kondensationsschutz).
+  README (DE/EN) entsprechend ergänzt: Sommer-Schwelle vs. Sommer-Bett-
+  Temperatur klar getrennt, Solar-Boost als Übergangszeit-/Winter-Feature.
+- **Options-Flow mit Zurück-Navigation:** Der Einstellungs-Dialog beendet sich
+  nicht mehr nach jeder gespeicherten Maske. Jede Eingabemaske kehrt nach dem
+  Speichern zu ihrem übergeordneten Menü zurück, sodass jederzeit eine Seite
+  zurück navigiert werden kann, ohne den kompletten Options-Flow neu starten zu
+  müssen. Änderungen werden in einer Arbeitskopie gesammelt und erst über
+  »💾 Speichern & Beenden« im Hauptmenü übernommen (genau ein Reload statt einem
+  pro Maske). Das Untermenü »Globale Einstellungen« listet jetzt zusätzlich
+  »☀️ Solar & Akku« sowie einen »⬅️ Zurück«-Eintrag.
+
 ### Sicherheit / Bugfix
 - **Klebe-Relais-Fehlalarm im Sommer behoben:** Die Erkennung verglich die
   aktuelle Temperatur mit dem Messwert beim AUS-Befehl – über ein **unbegrenztes**

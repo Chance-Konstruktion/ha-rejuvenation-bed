@@ -69,6 +69,57 @@ class TestChargeStandbyTemp:
         assert result == pytest.approx(26.0)
 
 
+class TestSummerHoldTemp:
+    """Sommer-Modus: konfigurierbare Bett-Haltetemperatur + ehrlicher Status."""
+
+    @staticmethod
+    def _calc(options=None, global_conf=None, bed=WATERBED_CONFIG):
+        hass = MagicMock()
+        config_entry = SimpleNamespace(
+            options=options or {},
+            data={"global": global_conf or {}, "zones": [{}]},
+        )
+        return TemperatureCalculator(hass, config_entry, bed.copy())
+
+    def test_default_summer_hold_temp(self):
+        calc = self._calc()
+        assert calc.get_summer_hold_temp() == pytest.approx(25.0)
+
+    def test_option_overrides_summer_hold_temp(self):
+        calc = self._calc(options={"summer_temp": 24.5})
+        assert calc.get_summer_hold_temp() == pytest.approx(24.5)
+
+    def test_clamped_to_min_temp_for_waterbed(self):
+        # 22 unter min_temp 24 → auf 24 angehoben (Kondensationsschutz)
+        calc = self._calc(options={"summer_temp": 22.0})
+        assert calc.get_summer_hold_temp() == pytest.approx(24.0)
+
+    def test_summer_veto_returns_configured_temp(self):
+        import asyncio
+
+        calc = self._calc(options={"summer_temp": 24.5})
+        temp = asyncio.run(calc.async_calculate_target(0, {}, {"is_summer": True}))
+        assert temp == pytest.approx(24.5)
+
+    def test_decision_reason_summer_beats_solar(self):
+        import asyncio
+
+        calc = self._calc()
+        # Energie-Status meldet Solar-Boost, aber Sommer-Veto hat Vorrang.
+        energy_state = {"mode": SimpleNamespace(value="solar_boost"), "reason": "☀️ Solar-Boost"}
+        reason = asyncio.run(calc.async_get_decision_reason(0, 25.0, 25.0, False, energy_state, is_summer=True))
+        assert "Sommer" in reason
+        assert "Solar-Boost" not in reason
+
+    def test_decision_reason_solar_when_not_summer(self):
+        import asyncio
+
+        calc = self._calc()
+        energy_state = {"mode": SimpleNamespace(value="solar_boost"), "reason": "☀️ Solar-Boost"}
+        reason = asyncio.run(calc.async_get_decision_reason(0, 28.0, 27.0, True, energy_state, is_summer=False))
+        assert "Solar-Boost" in reason
+
+
 class TestBoostTargetTemp:
     """#11: Boost = feste Zieltemperatur (absolut), Vorrang Option → Zone → 34."""
 

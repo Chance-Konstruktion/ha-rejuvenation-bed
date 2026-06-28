@@ -83,7 +83,8 @@
           "global_settings": "🌐 Global Settings",
           "zone_sensors": "📡 Zone Sensors",
           "zone_settings": "🌡️ Sleep Profile",
-          "mode_settings": "🎛️ Special Modes"
+          "mode_settings": "🎛️ Special Modes",
+          "save": "💾 Save & Close"
         }
       },
       "global_settings": {
@@ -91,7 +92,9 @@
         "description": "What would you like to configure?",
         "menu_options": {
           "global_times": "🌡️ Temperature & Bed",
-          "global_sensors": "📊 Sensors & Electricity Price"
+          "global_sensors": "📊 Sensors & Electricity Price",
+          "global_solar": "☀️ Solar & Battery",
+          "init": "⬅️ Back"
         }
       },
       "zone_sensors": {
@@ -169,13 +172,15 @@
         "description": "System-wide temperature limits and bed properties.",
         "data": {
           "summer_cutoff_enabled": "Summer shutoff",
-          "summer_threshold": "Summer threshold",
+          "summer_threshold": "Summer threshold (outdoor)",
+          "summer_temp": "Summer bed temperature",
           "temperature_offset": "Temperature offset",
           "bed_volume_liters": "Bed volume"
         },
         "data_description": {
-          "summer_cutoff_enabled": "When enabled, heating is reduced above the summer threshold. Turn off to keep the normal sleep profile all year regardless of outdoor temperature.",
-          "summer_threshold": "Above this outdoor temperature the system enters summer mode. Recommended: 25°C.",
+          "summer_cutoff_enabled": "When enabled, the bed is held at the summer temperature once the outdoor threshold is exceeded — instead of running the sleep curve. Also pauses Solar Boost (a warm bed in summer is pointless; the thermal battery is mainly a transitional-season / winter feature). Turn off to run the normal sleep profile all year.",
+          "summer_threshold": "OUTDOOR temperature at which summer mode kicks in. Above this the bed switches to the summer bed temperature below. Recommended: 25°C.",
+          "summer_temp": "BED temperature held during summer mode (not the outdoor threshold). The bed is kept cool at this value instead of following the sleep curve. Waterbeds are clamped to at least 24°C (condensation protection). Recommended: 24–25°C.",
           "temperature_offset": "Fine-tune all temperatures. +1.0 = everything 1°C warmer, -1.0 = cooler.",
           "bed_volume_liters": "Water volume in liters. Guidelines: 250 L single, 400 L double, 700 L king-size. Used for thermal battery and heating time."
         }
