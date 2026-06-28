@@ -1,6 +1,7 @@
 DOMAIN = "rejuvenation_bed"
 DEFAULT_POWER = 300
-DEFAULT_SUMMER_TEMP = 25
+DEFAULT_SUMMER_TEMP = 25  # Außentemperatur-Schwelle, ab der der Sommer-Modus greift
+DEFAULT_SUMMER_HOLD_TEMP = 25.0  # Bett-Haltetemperatur im Sommer-Modus
 DEFAULT_MAX_TEMP = 36
 ABSOLUTE_MAX_TEMP = 38
 UPDATE_INTERVAL = 60

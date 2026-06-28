@@ -432,14 +432,20 @@ class RejuvenationBedCoordinator(DataUpdateCoordinator):
             "active": should_heat,
         }
 
-    def _finalize_energy(self, decision, total_current_power, energy_state):
+    def _finalize_energy(self, decision, total_current_power, energy_state, veto_result=None):
         """
         Schreibt den Energie-Status in die Entscheidung und aktualisiert das
         Energie-Budget (#9: aus dem Haupt-Loop ausgelagert).
         """
+        # Bei aktivem Sommer-Veto deckelt die Temperatur-Logik das Bett auf die
+        # Sommer-Haltetemperatur — der Solar-Boost heizt dann NICHT. Daher den
+        # Status nicht fälschlich als "solar aktiv" melden.
+        is_summer = bool(veto_result.get("is_summer")) if veto_result else False
+        solar_active = energy_state.get("solar_active", False) and not is_summer
+
         decision["global_state"]["energy"] = {
             "total_power": round(total_current_power, 1),
-            "solar_active": energy_state.get("solar_active", False),
+            "solar_active": solar_active,
             "price_status": energy_state.get("price_status", "normal"),
         }
 
@@ -550,7 +556,7 @@ class RejuvenationBedCoordinator(DataUpdateCoordinator):
                 )
                 total_current_power += watt
 
-            self._finalize_energy(decision, total_current_power, energy_state)
+            self._finalize_energy(decision, total_current_power, energy_state, veto_result)
 
             self._decision_log.append(decision)
             self._last_successful_update = local_now()
@@ -1062,7 +1068,13 @@ class RejuvenationBedCoordinator(DataUpdateCoordinator):
                     mode_reason
                     if active_mode != "normal"
                     else await self.temperature_calculator.async_get_decision_reason(
-                        zone_index, target_temp, current_temp, should_heat, energy_state, coordinator=self
+                        zone_index,
+                        target_temp,
+                        current_temp,
+                        should_heat,
+                        energy_state,
+                        coordinator=self,
+                        is_summer=veto_result.get("is_summer", False),
                     )
                 ),
                 "is_present": is_present,

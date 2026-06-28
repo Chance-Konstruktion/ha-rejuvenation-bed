@@ -5,6 +5,17 @@ Alle Änderungen am Rejuvenation Bed Projekt.
 ## [Unreleased]
 
 ### Funktion / UX
+- **Sommer-Modus klar kommuniziert + ehrlicher Status:** Im Options-Flow ist
+  jetzt sauber getrennt, was eingestellt wird — die **Außentemperatur-Schwelle**
+  (`summer_threshold`, ab wann der Sommer-Modus greift) und die neue, einstellbare
+  **Bett-Haltetemperatur im Sommer** (`summer_temp`, vorher hart auf 25 °C). Die
+  Beschreibungen erklären beides eindeutig und benennen den Solar-Boost als
+  Übergangszeit-/Winter-Feature. Zudem behoben: Der Status zeigte „☀️ Solar-Boost
+  aktiv", obwohl bei aktivem Sommer-Veto die Zieltemperatur auf die Sommer-
+  Temperatur gedeckelt war und das Bett gar nicht hochheizte. Bei Sommer-Veto
+  meldet der Status nun „☀️ Sommer aktiv – Heizung reduziert (X°C)" und
+  `solar_active` wird nicht mehr fälschlich als aktiv gemeldet. Wasserbetten
+  bleiben auf mind. 24 °C geklemmt (Kondensationsschutz).
 - **Options-Flow mit Zurück-Navigation:** Der Einstellungs-Dialog beendet sich
   nicht mehr nach jeder gespeicherten Maske. Jede Eingabemaske kehrt nach dem
   Speichern zu ihrem übergeordneten Menü zurück, sodass jederzeit eine Seite
