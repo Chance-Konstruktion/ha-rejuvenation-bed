@@ -42,6 +42,7 @@ from .const import (
     DEFAULT_SICK_MODE_TEMP,
     DEFAULT_SICK_MODE_DAYS,
     DEFAULT_SUMMER_TEMP,
+    DEFAULT_SUMMER_HOLD_TEMP,
     DEFAULT_BED_BOOST_SOC_THRESHOLD,
     DEFAULT_BED_BOOST_MIN_FORECAST_KWH,
 )
@@ -128,6 +129,13 @@ class RejuvenationBedOptionsFlow(config_entries.OptionsFlow):
                     ): selector.NumberSelector(
                         selector.NumberSelectorConfig(
                             min=15, max=35, step=1, unit_of_measurement="°C", mode=selector.NumberSelectorMode.SLIDER
+                        )
+                    ),
+                    vol.Optional(
+                        "summer_temp", default=_val("summer_temp", DEFAULT_SUMMER_HOLD_TEMP)
+                    ): selector.NumberSelector(
+                        selector.NumberSelectorConfig(
+                            min=22, max=30, step=0.5, unit_of_measurement="°C", mode=selector.NumberSelectorMode.SLIDER
                         )
                     ),
                     vol.Optional(
