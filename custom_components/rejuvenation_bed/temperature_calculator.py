@@ -23,7 +23,7 @@ from .biorhythmus_curve import BiorhythmusCurve
 from .wake_time_resolver import WakeTimeResolver
 from .sleep_stage_resolver import SleepStageResolver
 from .energy_state_resolver import EnergyStateResolver
-from .const import ABSOLUTE_MAX_TEMP, WATERBED_CONFIG, local_now
+from .const import ABSOLUTE_MAX_TEMP, DEFAULT_SUMMER_HOLD_TEMP, WATERBED_CONFIG, local_now
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -158,7 +158,7 @@ class TemperatureCalculator:
 
         # Schritt 3: Veto-Checks (z.B. Sommer-Abschaltung)
         if veto_state.get("is_summer"):
-            summer_temp = 25.0  # Minimale Temperatur im Sommer
+            summer_temp = self.get_summer_hold_temp()
             _LOGGER.debug(f"Zone {zone_index}: Sommer-Veto aktiv ({summer_temp}°C)")
             return summer_temp
 
@@ -592,6 +592,18 @@ class TemperatureCalculator:
         """
         return self._temp_history.get(zone_index, {}).get("trend", 0.0)
 
+    def get_summer_hold_temp(self) -> float:
+        """Konfigurierte Bett-Haltetemperatur im Sommer-Modus.
+
+        Option ``summer_temp`` → globale Config → Default (25 °C), nach unten
+        auf ``min_temp`` des Bett-Typs geklemmt (Kondensationsschutz beim
+        Wasserbett) und nach oben auf das Hardware-Limit.
+        """
+        options = self.config_entry.options
+        global_conf = self.config_entry.data.get("global", {})
+        raw = options.get("summer_temp", global_conf.get("summer_temp", DEFAULT_SUMMER_HOLD_TEMP))
+        return float(min(max(raw, self.min_temp), ABSOLUTE_MAX_TEMP))
+
     async def async_get_decision_reason(
         self,
         zone_index: int,
@@ -600,6 +612,7 @@ class TemperatureCalculator:
         should_heat: bool,
         energy_state: dict,
         coordinator=None,  # NEU: Coordinator als Parameter
+        is_summer: bool = False,
     ) -> str:
         """
         Generiert eine menschenlesbare Erklärung für das UI.
@@ -614,6 +627,13 @@ class TemperatureCalculator:
         # Boost-Switch?
         if coordinator and getattr(coordinator, "manual_boost", {}).get(zone_index, False):
             return f"🔥 Schnellheizen aktiv: {target_temp}°C"
+
+        # Sommer-Veto: hat Vorrang vor Solar-Boost & Biorhythmus. Ohne diesen
+        # Zweig würde der Status fälschlich "Solar-Boost" melden, obwohl die
+        # Zieltemperatur in Wahrheit auf die Sommer-Haltetemperatur gedeckelt
+        # ist und das Bett deshalb nicht hochheizt.
+        if is_summer:
+            return f"☀️ Sommer aktiv – Heizung reduziert ({target_temp:.1f}°C)"
 
         # Energie-Modus
         energy_mode = energy_state.get("mode")
