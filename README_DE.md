@@ -33,7 +33,7 @@ Das System lernt automatisch deine Einschlafzeit und die optimalen Schwellwerte 
 
 **Kern-Funktionen** – Biorhythmus-Kurve mit Chronotyp-Anpassung (Lerche/Normal/Eule), Wecker-Integration (Handy-Alarm, feste Zeit oder Hybrid), saisonale Anpassung via Außentemperatur, Dual-Zone für Partner.
 
-**Energie-Management** – Solar-Boost nutzt PV-Überschuss als thermische Batterie. Dynamische Strompreise (Tibber, aWATTar, ENTSO-E). Energie-Tracking mit kWh, Heizstunden und Ersparnis-Berechnung. Thermische Batterie als Prozent-Sensor.
+**Energie-Management** – Solar-Boost nutzt PV-Überschuss als thermische Batterie (Übergangszeit-/Winter-Feature, im Sommer pausiert). Dynamische Strompreise (Tibber, aWATTar, ENTSO-E). Energie-Tracking mit kWh, Heizstunden und Ersparnis-Berechnung. Thermische Batterie als Prozent-Sensor.
 
 **Intelligenz** – Präsenz-Erkennung durch Wassertemperatur-Varianz (kein extra Sensor nötig). Auto-Kalibrierung in 3–5 Tagen. Isolations-Erkennung (Bett zugedeckt?). Schwitz-Erkennung per Kreuzkorrelation. Schlaf-Score 0–100. Lernbasiertes Vorheizen.
 
@@ -73,7 +73,7 @@ Minimum: Ein Smart-Plug der die Heizung schaltet.
 
 Der Setup-Assistent führt durch alle Schritte. Danach sind vier Bereiche über den Options-Flow erreichbar:
 
-**🌐 Globale Einstellungen** – Aufgeteilt in *Temperatur & Bett* (Warmhalte-Fenster, Sommer-Schwelle, Offset, Bett-Volumen), *Sensoren & Strompreis* (Preis-Sensor, Festtarif, CO₂) und *Solar & Akku* (Solar-Sensor + Schwelle, optionaler Hausakku-SoC + Schwelle, optionale PV-Forecast + Schwelle, Akku-Vorrang-Häkchen). Solar-Schwelle, SoC und Forecast sind unabhängige Trigger – jeder startet Solar-Boost; Akku-Vorrang lässt die Solar-Schwelle auf vollen Akku / üppige Forecast warten.
+**🌐 Globale Einstellungen** – Aufgeteilt in *Temperatur & Bett* (Warmhalte-Fenster, Offset, Bett-Volumen sowie die zwei Sommer-Regler: **Sommer-Schwelle** = *Außentemperatur*, ab der der Sommer-Modus greift, und **Sommer-Bett-Temperatur** = der Wert, auf den das Bett im Sommer *gehalten* wird, statt der Schlaf-Kurve zu folgen; Wasserbetten bleiben auf ≥ 24 °C geklemmt), *Sensoren & Strompreis* (Preis-Sensor, Festtarif, CO₂) und *Solar & Akku* (Solar-Sensor + Schwelle, optionaler Hausakku-SoC + Schwelle, optionale PV-Forecast + Schwelle, Akku-Vorrang-Häkchen). Solar-Schwelle, SoC und Forecast sind unabhängige Trigger – jeder startet Solar-Boost; Akku-Vorrang lässt die Solar-Schwelle auf vollen Akku / üppige Forecast warten. Im Sommer-Modus pausiert der Solar-Boost (ein warmes Bett ergibt im Sommer keinen Sinn) – er ist v. a. ein Übergangszeit-/Winter-Feature, und der Status zeigt das jetzt ehrlich an, statt „Solar-Boost“ zu melden, während das Bett kühl gehalten wird.
 
 **📡 Zonen-Sensoren** – Hardware pro Zone: Heizungsschalter (Pflicht), Temperatursensor, Leistungssensor, Präsenzsensor, Feuchtigkeitssensor, Oberflächentemperatur.
 
