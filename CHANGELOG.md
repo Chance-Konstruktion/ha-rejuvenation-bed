@@ -4,6 +4,8 @@ Alle Änderungen am Rejuvenation Bed Projekt.
 
 ## [Unreleased]
 
+## [v260628] - 2026-06-28
+
 ### Dokumentation
 - **Eigene `info.md` für den HACS-Store:** HACS rendert jetzt eine schlanke
   `info.md` (Pitch, Highlights, Quick-Start) mit prominentem Link auf die
