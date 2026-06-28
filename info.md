@@ -27,7 +27,7 @@ Rejuvenation Bed follows the rhythm instead.
 - **🕯️ Biorhythm curve** — Chronotype-aware sleep-phase model (early bird / normal / night owl) with seasonal adjustment from outdoor temperature.
 - **⏰ Alarm-aware wake** — Phone alarm, fixed time or hybrid. The bed warms *toward* your wake time, not *at* it.
 - **🌗 Dual-zone for partners** — Two sleep profiles, two curves, one bed. Different chronotypes welcome.
-- **🪫 Thermal battery** — Solar surplus is stored as heat, tracked as a 0–100 % charge sensor.
+- **🪫 Thermal battery** — Solar surplus is stored as heat, tracked as a 0–100 % charge sensor. A transitional-season / winter feature: it pauses in summer (a configurable summer threshold keeps the bed cool), and the status reflects that honestly.
 - **💶 Dynamic tariffs** — Tibber, Octopus, ENTSO-E or a fixed rate. Auto-reduces during expensive hours.
 - **👤 Sensor-less presence** — Detects you in bed via water-temperature variance. No PIR, no mattress sensor required.
 - **🛡️ Fail-safe first** — Overheat protection, anti-short-cycle and leak alarm are non-negotiable. Every optional sensor can fail without taking the heater with it.
