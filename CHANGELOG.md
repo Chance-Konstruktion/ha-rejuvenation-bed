@@ -4,6 +4,16 @@ Alle Änderungen am Rejuvenation Bed Projekt.
 
 ## [Unreleased]
 
+### Funktion / UX
+- **Options-Flow mit Zurück-Navigation:** Der Einstellungs-Dialog beendet sich
+  nicht mehr nach jeder gespeicherten Maske. Jede Eingabemaske kehrt nach dem
+  Speichern zu ihrem übergeordneten Menü zurück, sodass jederzeit eine Seite
+  zurück navigiert werden kann, ohne den kompletten Options-Flow neu starten zu
+  müssen. Änderungen werden in einer Arbeitskopie gesammelt und erst über
+  »💾 Speichern & Beenden« im Hauptmenü übernommen (genau ein Reload statt einem
+  pro Maske). Das Untermenü »Globale Einstellungen« listet jetzt zusätzlich
+  »☀️ Solar & Akku« sowie einen »⬅️ Zurück«-Eintrag.
+
 ### Sicherheit / Bugfix
 - **Klebe-Relais-Fehlalarm im Sommer behoben:** Die Erkennung verglich die
   aktuelle Temperatur mit dem Messwert beim AUS-Befehl – über ein **unbegrenztes**
