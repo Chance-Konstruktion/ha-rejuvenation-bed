@@ -78,7 +78,8 @@
           "global_settings": "🌐 Global Settings",
           "zone_sensors": "📡 Zone Sensors",
           "zone_settings": "🌡️ Sleep Profile",
-          "mode_settings": "🎛️ Special Modes"
+          "mode_settings": "🎛️ Special Modes",
+          "save": "💾 Save & Close"
         }
       },
       "global_settings": {
@@ -86,7 +87,9 @@
         "description": "What would you like to configure?",
         "menu_options": {
           "global_times": "🌡️ Temperature & Bed",
-          "global_sensors": "📊 Sensors & Electricity Price"
+          "global_sensors": "📊 Sensors & Electricity Price",
+          "global_solar": "☀️ Solar & Battery",
+          "init": "⬅️ Back"
         }
       },
       "zone_sensors": {
