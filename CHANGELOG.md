@@ -16,6 +16,8 @@ Alle Änderungen am Rejuvenation Bed Projekt.
   meldet der Status nun „☀️ Sommer aktiv – Heizung reduziert (X°C)" und
   `solar_active` wird nicht mehr fälschlich als aktiv gemeldet. Wasserbetten
   bleiben auf mind. 24 °C geklemmt (Kondensationsschutz).
+  README (DE/EN) entsprechend ergänzt: Sommer-Schwelle vs. Sommer-Bett-
+  Temperatur klar getrennt, Solar-Boost als Übergangszeit-/Winter-Feature.
 - **Options-Flow mit Zurück-Navigation:** Der Einstellungs-Dialog beendet sich
   nicht mehr nach jeder gespeicherten Maske. Jede Eingabemaske kehrt nach dem
   Speichern zu ihrem übergeordneten Menü zurück, sodass jederzeit eine Seite

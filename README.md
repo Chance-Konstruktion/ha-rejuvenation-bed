@@ -77,7 +77,7 @@ Every optional sensor — humidity, surface temp, power — can fail without tak
 </td>
 <td valign="top">
 
-**🪫 Thermal battery** — Solar surplus is stored as heat. Tracked as a 0–100 % charge sensor.
+**🪫 Thermal battery** — Solar surplus is stored as heat (a transitional-season / winter feature; paused in summer). Tracked as a 0–100 % charge sensor.
 
 </td>
 </tr>
@@ -192,9 +192,9 @@ The options flow is split into four panes — each one a single page, no nesting
 
 Split into three cards:
 
-- **Times & Temperature** — warm window, summer threshold, manual offset, bed water volume in litres.
+- **Times & Temperature** — warm window, manual offset, bed water volume in litres, and the two summer settings: the **summer threshold** (the *outdoor* temperature at which summer mode kicks in) and the **summer bed temperature** (the value the bed is *held* at in summer instead of running the sleep curve). Waterbeds stay clamped to ≥ 24 °C for condensation protection.
 - **Sensors & Electricity Price** — dynamic price sensor or fixed tariff (ct/kWh), grid CO₂ intensity.
-- **Solar & Battery** — solar production sensor + threshold, optional home-battery SoC sensor + threshold, optional PV forecast sensor + threshold, and a *home battery priority* toggle. Solar threshold, SoC and forecast act as independent triggers — any one starts Solar Boost; turn on battery priority to make the solar threshold wait for a full battery / generous forecast.
+- **Solar & Battery** — solar production sensor + threshold, optional home-battery SoC sensor + threshold, optional PV forecast sensor + threshold, and a *home battery priority* toggle. Solar threshold, SoC and forecast act as independent triggers — any one starts Solar Boost; turn on battery priority to make the solar threshold wait for a full battery / generous forecast. Solar Boost is paused while summer mode is active (a warm bed in summer is pointless) — it's mainly a transitional-season / winter feature, and the status reflects that honestly instead of claiming "Solar Boost" while the bed is held cool.
 
 </details>
 
