@@ -4,6 +4,11 @@ Alle Änderungen am Rejuvenation Bed Projekt.
 
 ## [Unreleased]
 
+### Dokumentation
+- **Eigene `info.md` für den HACS-Store:** HACS rendert jetzt eine schlanke
+  `info.md` (Pitch, Highlights, Quick-Start) mit prominentem Link auf die
+  Editorial-Seite, statt die lange README. `hacs.json`: `render_readme → false`.
+
 ### Sicherheit / Bugfix
 - **Klebe-Relais-Fehlalarm im Sommer behoben:** Die Erkennung verglich die
   aktuelle Temperatur mit dem Messwert beim AUS-Befehl – über ein **unbegrenztes**
