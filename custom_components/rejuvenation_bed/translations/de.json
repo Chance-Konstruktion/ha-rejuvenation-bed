@@ -202,13 +202,15 @@
         "description": "System-weite Temperatur-Grenzen und Bett-Eigenschaften.",
         "data": {
           "summer_cutoff_enabled": "Sommer-Abschaltung",
-          "summer_threshold": "Sommer-Schwelle",
+          "summer_threshold": "Sommer-Schwelle (Außentemperatur)",
+          "summer_temp": "Sommer-Bett-Temperatur",
           "temperature_offset": "Temperatur-Offset",
           "bed_volume_liters": "Bett-Volumen"
         },
         "data_description": {
-          "summer_cutoff_enabled": "Wenn aktiv, wird oberhalb der Sommer-Schwelle weniger geheizt. Ausschalten, um das normale Schlaf-Profil ganzjährig unabhängig von der Außentemperatur beizubehalten.",
-          "summer_threshold": "Ab dieser Außentemperatur schaltet das System in den Sommer-Modus und heizt nicht mehr. Empfohlen: 25°C.",
+          "summer_cutoff_enabled": "Wenn aktiv, wird das Bett oberhalb der Außen-Schwelle auf die Sommer-Bett-Temperatur gehalten — statt der Schlaf-Kurve zu folgen. Pausiert auch den Solar-Boost (ein warmes Bett ergibt im Sommer keinen Sinn; die thermische Batterie ist v.a. ein Übergangszeit-/Winter-Feature). Ausschalten, um das normale Schlaf-Profil ganzjährig zu fahren.",
+          "summer_threshold": "AUSSENTEMPERATUR, ab der der Sommer-Modus greift. Darüber wechselt das Bett auf die Sommer-Bett-Temperatur (siehe unten). Empfohlen: 25°C.",
+          "summer_temp": "BETT-Temperatur, auf die im Sommer-Modus gehalten wird (nicht die Außen-Schwelle!). Das Bett bleibt auf diesem Wert kühl, statt der Schlaf-Kurve zu folgen. Wasserbetten werden auf mind. 24°C geklemmt (Kondensationsschutz). Empfohlen: 24–25°C.",
           "temperature_offset": "Feinjustierung für alle Temperaturen. +1.0 = alles 1°C wärmer, -1.0 = alles kühler.",
           "bed_volume_liters": "Wassermenge in Litern. Richtwerte: 250 L Einzelbett, 400 L Doppelbett, 700 L King-Size. Wird für die thermische Batterie und Aufheizzeit benötigt."
         }
