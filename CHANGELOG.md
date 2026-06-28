@@ -4,6 +4,11 @@ Alle Änderungen am Rejuvenation Bed Projekt.
 
 ## [Unreleased]
 
+### Dokumentation
+- **Eigene `info.md` für den HACS-Store:** HACS rendert jetzt eine schlanke
+  `info.md` (Pitch, Highlights, Quick-Start) mit prominentem Link auf die
+  Editorial-Seite, statt die lange README. `hacs.json`: `render_readme → false`.
+
 ### Funktion / UX
 - **Sommer-Modus klar kommuniziert + ehrlicher Status:** Im Options-Flow ist
   jetzt sauber getrennt, was eingestellt wird — die **Außentemperatur-Schwelle**
