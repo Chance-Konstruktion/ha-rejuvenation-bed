@@ -23,6 +23,15 @@ Vier Bereiche, logisch getrennt:
      ├── Boost (Offset)
      ├── Urlaub (Haltetemperatur)
      └── Komfort (Ausschlafen-Offset)
+
+Navigation
+──────────
+Der Flow bleibt durchgehend offen. Jede Eingabemaske kehrt nach dem
+Speichern zu ihrem übergeordneten Menü zurück (statt den Flow zu beenden),
+sodass jederzeit eine Seite zurück navigiert werden kann, ohne den
+kompletten Options-Flow neu starten zu müssen. Änderungen werden in einer
+Arbeitskopie gesammelt und erst über »💾 Speichern & Beenden« im Hauptmenü
+endgültig übernommen (genau ein Reload statt einem pro Maske).
 """
 
 import voluptuous as vol
@@ -47,6 +56,11 @@ class RejuvenationBedOptionsFlow(config_entries.OptionsFlow):
     def __init__(self, config_entry):
         self._config_entry = config_entry
         self._editing_zone_index = 0
+        # Arbeitskopien: Änderungen werden hier gesammelt und erst beim
+        # finalen »Speichern & Beenden« in den Config-Entry übernommen.
+        # So bleibt der Flow offen und es ist jederzeit »zurück« möglich.
+        self._options = dict(config_entry.options)
+        self._zones = [dict(z) for z in config_entry.data.get("zones", [])]
 
     # ═══════════════════════════════════════════════════════════════════════
     # HAUPTMENÜ
@@ -61,8 +75,19 @@ class RejuvenationBedOptionsFlow(config_entries.OptionsFlow):
                 "zone_sensors": "📡 Zonen-Sensoren",
                 "zone_settings": "🌡️ Schlaf-Profil",
                 "mode_settings": "🎛️ Sondermodi",
+                "save": "💾 Speichern & Beenden",
             },
         )
+
+    async def async_step_save(self, user_input=None):
+        """Alle gesammelten Änderungen übernehmen und Flow beenden."""
+        # Zonen-Hardware (liegt in entry.data) nur schreiben, wenn geändert —
+        # vermeidet einen überflüssigen Reload, wenn nur Options angepasst wurden.
+        if self._zones != self._config_entry.data.get("zones", []):
+            new_data = {**self._config_entry.data, "zones": self._zones}
+            self.hass.config_entries.async_update_entry(self._config_entry, data=new_data)
+        # Options übernehmen → schließt den Flow und löst den Reload aus.
+        return self.async_create_entry(title="", data=self._options)
 
     # ═══════════════════════════════════════════════════════════════════════
     # 🌐 GLOBALE EINSTELLUNGEN (Sub-Menü)
@@ -83,14 +108,13 @@ class RejuvenationBedOptionsFlow(config_entries.OptionsFlow):
     async def async_step_global_times(self, user_input=None):
         """Temperatur-Grenzen und Bett-Eigenschaften."""
         if user_input is not None:
-            new_options = {**self._config_entry.options, **user_input}
-            return self.async_create_entry(title="", data=new_options)
+            self._options.update(user_input)
+            return await self.async_step_global_settings()
 
-        current = self._config_entry.options
         global_data = self._config_entry.data.get("global", {})
 
         def _val(key, fallback=None):
-            return current.get(key, global_data.get(key, fallback))
+            return self._options.get(key, global_data.get(key, fallback))
 
         return self.async_show_form(
             step_id="global_times",
@@ -129,23 +153,21 @@ class RejuvenationBedOptionsFlow(config_entries.OptionsFlow):
     async def async_step_global_sensors(self, user_input=None):
         """Sensoren und Strompreis (Solar & Akku siehe eigener Bereich)."""
         if user_input is not None:
-            new_options = dict(self._config_entry.options)
             optional_sensors = {
                 "price_sensor",
                 "co2_sensor",
             }
             for key, value in user_input.items():
                 if key in optional_sensors and (value is None or value == ""):
-                    new_options.pop(key, None)
+                    self._options.pop(key, None)
                 else:
-                    new_options[key] = value
-            return self.async_create_entry(title="", data=new_options)
+                    self._options[key] = value
+            return await self.async_step_global_settings()
 
-        current = self._config_entry.options
         global_data = self._config_entry.data.get("global", {})
 
         def _val(key, fallback=None):
-            return current.get(key, global_data.get(key, fallback))
+            return self._options.get(key, global_data.get(key, fallback))
 
         return self.async_show_form(
             step_id="global_sensors",
@@ -178,7 +200,6 @@ class RejuvenationBedOptionsFlow(config_entries.OptionsFlow):
     async def async_step_global_solar(self, user_input=None):
         """Solar & Akku: Solar-Boost-Trigger (Solar-Schwelle, SoC, Forecast)."""
         if user_input is not None:
-            new_options = dict(self._config_entry.options)
             optional_sensors = {
                 "solar_sensor",
                 "battery_soc_sensor",
@@ -186,16 +207,15 @@ class RejuvenationBedOptionsFlow(config_entries.OptionsFlow):
             }
             for key, value in user_input.items():
                 if key in optional_sensors and (value is None or value == ""):
-                    new_options.pop(key, None)
+                    self._options.pop(key, None)
                 else:
-                    new_options[key] = value
-            return self.async_create_entry(title="", data=new_options)
+                    self._options[key] = value
+            return await self.async_step_global_settings()
 
-        current = self._config_entry.options
         global_data = self._config_entry.data.get("global", {})
 
         def _val(key, fallback=None):
-            return current.get(key, global_data.get(key, fallback))
+            return self._options.get(key, global_data.get(key, fallback))
 
         return self.async_show_form(
             step_id="global_solar",
@@ -264,7 +284,7 @@ class RejuvenationBedOptionsFlow(config_entries.OptionsFlow):
 
     async def async_step_zone_sensors(self, user_input=None):
         """Zonen-Sensoren: Bei Dual-Zone erst per Menü auswählen (mit Zurück)."""
-        zones = self._config_entry.data.get("zones", [])
+        zones = self._zones
         if not zones:
             return self.async_abort(reason="no_zones")
 
@@ -294,7 +314,7 @@ class RejuvenationBedOptionsFlow(config_entries.OptionsFlow):
     async def async_step_edit_zone_sensors(self, user_input=None):
         """Hardware-Sensoren einer Zone bearbeiten."""
         zone_index = self._editing_zone_index
-        zones = self._config_entry.data.get("zones", [])
+        zones = self._zones
         if zone_index >= len(zones):
             return self.async_abort(reason="invalid_zone")
 
@@ -315,13 +335,11 @@ class RejuvenationBedOptionsFlow(config_entries.OptionsFlow):
             new_zone.update(cleaned)
             new_zone["hardware_level"] = detect_hardware_level(new_zone)
 
-            new_zones = list(zones)
-            new_zones[zone_index] = new_zone
-            new_data = {**self._config_entry.data, "zones": new_zones}
-
-            self.hass.config_entries.async_update_entry(self._config_entry, data=new_data)
-            _LOGGER.info(f"Zone {zone_index} Sensoren aktualisiert: {cleaned}")
-            return self.async_create_entry(title="", data=self._config_entry.options)
+            # In Arbeitskopie schreiben (persistiert beim finalen Speichern).
+            self._zones[zone_index] = new_zone
+            _LOGGER.debug(f"Zone {zone_index} Sensoren vorgemerkt: {cleaned}")
+            # Zurück zur Zonen-Auswahl bzw. zum Hauptmenü (Single-Zone).
+            return await self.async_step_zone_sensors_done()
 
         zone_name = self._zone_display_name(zone_index, zones)
         schema_dict = {}
@@ -368,13 +386,19 @@ class RejuvenationBedOptionsFlow(config_entries.OptionsFlow):
             description_placeholders={"zone_name": zone_name},
         )
 
+    async def async_step_zone_sensors_done(self, user_input=None):
+        """Nach dem Speichern: zurück zur Zonen-Auswahl bzw. Hauptmenü."""
+        if len(self._zones) > 1:
+            return await self.async_step_zone_sensors()
+        return await self.async_step_init()
+
     # ═══════════════════════════════════════════════════════════════════════
     # 🌡️ SCHLAF-PROFIL (pro Zone)
     # ═══════════════════════════════════════════════════════════════════════
 
     async def async_step_zone_settings(self, user_input=None):
         """Schlaf-Profil: Bei Dual-Zone erst per Menü auswählen (mit Zurück)."""
-        zones = self._config_entry.data.get("zones", [])
+        zones = self._zones
         if not zones:
             return self.async_abort(reason="no_zones")
 
@@ -404,22 +428,21 @@ class RejuvenationBedOptionsFlow(config_entries.OptionsFlow):
     async def async_step_edit_zone_settings(self, user_input=None):
         """Schlaf-Profil einer Zone bearbeiten."""
         zone_index = self._editing_zone_index
-        zones = self._config_entry.data.get("zones", [])
+        zones = self._zones
         if zone_index >= len(zones):
             return self.async_abort(reason="invalid_zone")
 
-        opts = self._config_entry.options
+        opts = self._options
         global_data = self._config_entry.data.get("global", {})
         prefix = f"zone_{zone_index}_"
 
         if user_input is not None:
-            new_options = dict(opts)
             for key, value in user_input.items():
                 if value not in (None, ""):
-                    new_options[f"{prefix}{key}"] = value
+                    self._options[f"{prefix}{key}"] = value
                 else:
-                    new_options.pop(f"{prefix}{key}", None)
-            return self.async_create_entry(title="", data=new_options)
+                    self._options.pop(f"{prefix}{key}", None)
+            return await self.async_step_zone_settings_done()
 
         zone_name = self._zone_display_name(zone_index, zones)
 
@@ -481,6 +504,12 @@ class RejuvenationBedOptionsFlow(config_entries.OptionsFlow):
             description_placeholders={"zone_name": zone_name},
         )
 
+    async def async_step_zone_settings_done(self, user_input=None):
+        """Nach dem Speichern: zurück zur Zonen-Auswahl bzw. Hauptmenü."""
+        if len(self._zones) > 1:
+            return await self.async_step_zone_settings()
+        return await self.async_step_init()
+
     # ═══════════════════════════════════════════════════════════════════════
     # 🎛️ SONDERMODI
     # ═══════════════════════════════════════════════════════════════════════
@@ -488,10 +517,10 @@ class RejuvenationBedOptionsFlow(config_entries.OptionsFlow):
     async def async_step_mode_settings(self, user_input=None):
         """Sondermodi: Krank, Boost, Urlaub, Komfort."""
         if user_input is not None:
-            new_options = {**self._config_entry.options, **user_input}
-            return self.async_create_entry(title="", data=new_options)
+            self._options.update(user_input)
+            return await self.async_step_init()
 
-        current = self._config_entry.options
+        current = self._options
 
         return self.async_show_form(
             step_id="mode_settings",

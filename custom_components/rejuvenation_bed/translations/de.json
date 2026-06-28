@@ -113,7 +113,8 @@
           "global_settings": "🌐 Globale Einstellungen",
           "zone_sensors": "📡 Zonen-Sensoren",
           "zone_settings": "🌡️ Schlaf-Profil",
-          "mode_settings": "🎛️ Sondermodi"
+          "mode_settings": "🎛️ Sondermodi",
+          "save": "💾 Speichern & Beenden"
         }
       },
       "global_settings": {
@@ -121,7 +122,9 @@
         "description": "Was möchtest du anpassen?",
         "menu_options": {
           "global_times": "🌡️ Temperatur & Bett",
-          "global_sensors": "📊 Sensoren & Strompreis"
+          "global_sensors": "📊 Sensoren & Strompreis",
+          "global_solar": "☀️ Solar & Akku",
+          "init": "⬅️ Zurück"
         }
       },
       "zone_sensors": {
