@@ -1567,40 +1567,37 @@ cp -r custom_components/rejuvenation_bed \
   <div class="wrap">
     <div class="section-head">
       <div>
-        <span class="eyebrow">// 09 · DASHBOARD-TEMPLATES</span>
-        <h2 class="section">Zwei fertige<br/><em>Cockpits.</em></h2>
+        <span class="eyebrow">// 09 · NACHTTISCH</span>
+        <h2 class="section">Ein Wecker.<br/><em>Drei Tasten.</em></h2>
       </div>
       <p class="lede" style="max-width:440px">
-        Mobile-/Tablet-tauglich. Im Repo unter <code class="inline">/dashboards/</code>. Entity-IDs an deine Installation anpassen.
+        Für das Tablet neben dem Bett. Im Repo unter <code class="inline">/dashboards/nightstand.html</code>. Entity-IDs an deine Installation anpassen.
       </p>
     </div>
 
     <div class="row cols-2">
       <div class="install-card">
-        <div class="tag-row" style="margin-bottom:12px"><span class="tg">Lovelace · YAML</span></div>
-        <h4>Nightstand Cockpit</h4>
-        <p style="margin:8px 0 0;font-size:14px">Klassisches Lovelace-Template, perfekt für Nachttisch-Tablets neben dem Bett.</p>
-        <pre class="code">
-<span class="c"># rejuvenation_bed_nightstand_cockpit.yaml</span>
-<span class="k">type</span>: vertical-stack
-<span class="k">cards</span>:
-  - <span class="k">type</span>: thermostat
-    <span class="k">entity</span>: <span class="s">climate.rejuvenation_bed</span>
-  - <span class="k">type</span>: glance
-    <span class="k">entities</span>: <span class="s">[sensor.bett_schlaf_score, …]</span></pre>
-      </div>
-
-      <div class="install-card">
-        <div class="tag-row" style="margin-bottom:12px"><span class="tg">Standalone · HTML</span><span class="tg" style="color:var(--heat)">Premium</span></div>
-        <h4>Premium Dashboard</h4>
-        <p style="margin:8px 0 0;font-size:14px">Standalone React/HTML-Dashboard mit Mini-View unter 800px Breite.</p>
+        <div class="tag-row" style="margin-bottom:12px"><span class="tg">Standalone · HTML</span><span class="tg" style="color:var(--heat)">AMOLED</span></div>
+        <h4>Nachttischwecker</h4>
+        <p style="margin:8px 0 0;font-size:14px">Tiefschwarzer Hintergrund, bernsteinfarbene Akzente, große Uhr — darunter nur Wasserbett, Wecker und Schlafzimmerlampe. Nach 45 Sekunden ohne Berührung dimmt alles auf die blanke Uhrzeit herunter, die Ziffern wandern minütlich ein paar Pixel gegen Einbrennen.</p>
         <pre class="code">
 <span class="c"># Als Panel einbinden:</span>
 <span class="k">panel_iframe</span>:
-  <span class="k">waterbed_cockpit</span>:
-    <span class="k">title</span>: Waterbed Cockpit
-    <span class="k">icon</span>: mdi:bed-outline
-    <span class="k">url</span>: <span class="s">/local/rejuvenation_bed/premium_nightstand_dashboard.html</span></pre>
+  <span class="k">nachttisch</span>:
+    <span class="k">title</span>: Nachttisch
+    <span class="k">icon</span>: mdi:alarm
+    <span class="k">url</span>: <span class="s">/local/rejuvenation_bed/nightstand.html</span></pre>
+      </div>
+
+      <div class="install-card">
+        <div class="tag-row" style="margin-bottom:12px"><span class="tg">Einrichtung</span></div>
+        <h4>Verbinden</h4>
+        <p style="margin:8px 0 0;font-size:14px">Datei nach <code class="inline">/config/www/rejuvenation_bed/</code> kopieren. Ein Tipp auf die Statuszeile unten öffnet die Einrichtung — Adresse, Long-Lived Access Token und Entity-IDs. Beides bleibt im lokalen Speicher des Browsers und geht ausschließlich an die eingetragene Adresse. Ohne Angaben läuft die Seite im Demomodus.</p>
+        <pre class="code">
+<span class="c"># Oder als Karte:</span>
+<span class="k">type</span>: iframe
+<span class="k">url</span>: <span class="s">/local/rejuvenation_bed/nightstand.html</span>
+<span class="k">aspect_ratio</span>: <span class="s">100%</span></pre>
       </div>
     </div>
   </div>
