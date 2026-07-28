@@ -3,7 +3,7 @@
   "name": "Rejuvenation Bed",
   "codeowners": ["@Chance-Konstruktion"],
   "config_flow": true,
-  "dependencies": [],
+  "dependencies": ["http", "frontend"],
   "documentation": "https://github.com/Chance-Konstruktion/ha-rejuvenation-bed",
   "integration_type": "device",
   "iot_class": "local_polling",
