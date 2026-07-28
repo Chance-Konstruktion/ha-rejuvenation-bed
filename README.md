@@ -9,7 +9,7 @@
 Biorhythm-based temperature curve, learned bedtime prediction, solar surplus stored as heat, presence detection without extra sensors, and a fail-safe that survives every sensor it depends on. Works with waterbeds, heating pads and heated mattress toppers.
 
 [![HACS](https://img.shields.io/badge/HACS-Default-E8A33D.svg?style=flat-square)](https://github.com/hacs/integration)
-[![Version](https://img.shields.io/badge/version-v260628-B47326.svg?style=flat-square)](https://github.com/Chance-Konstruktion/ha-rejuvenation-bed/releases)
+[![Version](https://img.shields.io/badge/version-v260728-B47326.svg?style=flat-square)](https://github.com/Chance-Konstruktion/ha-rejuvenation-bed/releases)
 [![License](https://img.shields.io/badge/license-MIT-7BA968.svg?style=flat-square)](LICENSE)
 [![Home Assistant](https://img.shields.io/badge/Home%20Assistant-2024.6+-41BDF5.svg?style=flat-square)](https://www.home-assistant.io/)
 
@@ -357,10 +357,20 @@ url: /local/rejuvenation_bed/nightstand.html
 aspect_ratio: 100%
 ```
 
-Tap the status line at the bottom to enter your Home Assistant URL, a long-lived
+The gear in the top corner opens the settings: Home Assistant URL, a long-lived
 access token and the entity IDs. Both are stored in the browser's local storage
 and are only ever sent to the address you entered. Without them the page runs in
 demo mode so you can look at it before wiring anything up.
+
+Entity IDs belong to a bed profile rather than to the page, so several beds in
+one house — or two sides of the same bed — each get their own set. Every phone
+remembers which one is its own, so you and your partner control your own sides
+from your own devices. With more than one profile the bed's name appears next to
+the gear and switches between them.
+
+The clock face is switchable by tapping the clock: outline (the default — a
+filled digit throws too much light next to a pillow), 7-segment, 5x7 LED matrix
+and split-flap. Its brightness has its own slider in the settings.
 
 Details: the display dims to the bare clock after 45 seconds without a touch, and
 the digits drift a few pixels every minute so nothing burns into an OLED panel
