@@ -3,7 +3,7 @@
 **Intelligente Bett-Heizungssteuerung für Home Assistant**
 
 [![HACS Badge](https://img.shields.io/badge/HACS-Default-orange.svg)](https://github.com/hacs/integration)
-[![Version](https://img.shields.io/badge/version-v260628-blue.svg)](https://github.com/Chance-Konstruktion/ha-rejuvenation-bed/releases)
+[![Version](https://img.shields.io/badge/version-v260728-blue.svg)](https://github.com/Chance-Konstruktion/ha-rejuvenation-bed/releases)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
 > ### → [**Zur gerenderten Editorial-README**](https://chance-konstruktion.github.io/ha-rejuvenation-bed/)
@@ -159,35 +159,53 @@ Die Integration erstellt drei Geräte in Home Assistant:
 
 ## Dashboard-Vorlagen
 
-Zwei fertige Dashboard-Vorlagen im `dashboards/`-Ordner:
+Die Integration bringt eine Lovelace-Karte mit, `custom:rejuvenation-nightstand`,
+und meldet sie selbst im Frontend an — nichts nach `/config/www` kopieren, keine
+Ressource von Hand eintragen, kein Token und keine zweite Anmeldung. Die Karte
+spricht über die Sitzung mit Home Assistant, in der du ohnehin angemeldet bist.
 
-### Lovelace YAML (Nightstand Cockpit)
+Ein Weckerdisplay für das Tablet neben dem Bett: tiefschwarzer
+AMOLED-Hintergrund mit bernsteinfarbenen Akzenten, große Uhr und genau drei
+Tasten — Wasserbetttemperatur (Thermostat-Ring zum Ziehen), Wecker und
+Schlafzimmerlampe.
 
-`dashboards/rejuvenation_bed_nightstand_cockpit.yaml` — Mobile/Tablet-freundliche Lovelace-Vorlage. Entity-IDs an deine Installation anpassen.
-
-### Standalone HTML (Premium Dashboard)
-
-`dashboards/premium_nightstand_dashboard.html` — Eigenständiges React/HTML-Dashboard mit Mini-Ansicht (< 800px).
-
-**Einbindung als Panel:**
-
-```yaml
-panel_iframe:
-  waterbed_cockpit:
-    title: Wasserbett Cockpit
-    icon: mdi:bed-outline
-    url: /local/rejuvenation_bed/premium_nightstand_dashboard.html
-```
-
-**Oder als iframe-Card:**
+Dashboard anlegen, den Raw-Konfigurationseditor öffnen und
+`dashboards/nightstand.yaml` einfügen, dann die Entity-IDs anpassen. Die
+Ansicht nutzt `type: panel`, damit die Karte den Bildschirm füllt; der Knopf in
+der Ecke der Karte schaltet in echtes Vollbild ohne Browserleisten.
 
 ```yaml
-type: iframe
-url: /local/rejuvenation_bed/premium_nightstand_dashboard.html
-aspect_ratio: 100%
+views:
+  - type: panel
+    cards:
+      - type: custom:rejuvenation-nightstand
+        beds:
+          - name: Schlafzimmer · links
+            climate: climate.thermostat_bett_links
+            alarm: input_datetime.wecker_links
+            alarm_switch: input_boolean.wecker_links_aktiv
+            light: light.schlafzimmer
 ```
 
-Datei nach `/config/www/rejuvenation_bed/` kopieren.
+Die Entity-IDs hängen an einem Bett-Eintrag, nicht an der Karte: Mehrere Betten
+im Haus — oder zwei Seiten desselben Betts — bekommen je einen. Jedes Gerät
+merkt sich seinen eigenen, sodass jeder seine Seite vom eigenen Telefon aus
+bedient. Ab zwei Einträgen steht der Bettname in der Kopfzeile und wechselt
+zwischen ihnen.
+
+Das Zifferblatt wechselt per Tipp auf die Uhr: Kontur (Standard — eine
+ausgefüllte Ziffer strahlt neben dem Kopfkissen zu viel Fläche ab), 7-Segment,
+LED-Matrix und Klappanzeige. Die Helligkeit hat einen eigenen Regler. Beides
+gilt pro Gerät, ein Dashboard darf also auf jedem Bildschirm anders aussehen.
+
+Nach 45 Sekunden ohne Berührung blendet alles außer der Uhr aus, und die Ziffern
+wandern minütlich ein paar Pixel, damit sich über Nacht nichts in ein OLED-Panel
+einbrennt. Die erste Berührung weckt nur auf und löst keine Taste aus.
+
+Der Wecker nutzt gewöhnliche Helfer (ein Datum/Zeit-Helfer auf »nur Zeit« sowie
+einen Schalter), anzulegen unter Einstellungen → Geräte & Dienste → Helfer. Sie
+gehören bewusst nicht zur Integration, damit deine bestehende Weck-Automation
+weiterläuft.
 
 ---
 
