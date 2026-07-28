@@ -41,6 +41,8 @@ _HA_SUBMODULES = [
     "homeassistant.components.binary_sensor",
     "homeassistant.components.switch",
     "homeassistant.components.persistent_notification",
+    "homeassistant.components.frontend",
+    "homeassistant.components.http",
     "voluptuous",
     "voluptuous.humanize",
 ]

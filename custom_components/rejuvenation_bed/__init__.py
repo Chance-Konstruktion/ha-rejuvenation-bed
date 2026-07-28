@@ -1,5 +1,8 @@
 import logging
 from datetime import datetime, timedelta
+from pathlib import Path
+from homeassistant.components import frontend
+from homeassistant.components.http import StaticPathConfig
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.core import HomeAssistant, ServiceCall
 from homeassistant.helpers import config_validation as cv, device_registry as dr
@@ -11,6 +14,13 @@ _LOGGER = logging.getLogger(__name__)
 
 # Diese Plattformen müssen als .py Dateien im Ordner existieren
 PLATFORMS: list[str] = ["climate", "sensor", "binary_sensor", "switch"]
+
+# Lovelace-Karte (Nachttischwecker). Wird von der Integration selbst
+# ausgeliefert und ins Frontend geladen — kein manueller Ressourcen-
+# Eintrag, kein Kopieren nach /config/www.
+CARD_FILENAME = "rejuvenation-nightstand-card.js"
+CARD_URL = f"/{DOMAIN}/{CARD_FILENAME}"
+CARD_REGISTERED = f"{DOMAIN}_card_registered"
 
 MODEL_WASSERBETT = "Smart Wasserbett Controller"
 MODEL_HEIZMATTE = "Smart Heizmatte Controller"
@@ -103,7 +113,35 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     #    (z.B. CO₂-Sensor nachträglich hinzugefügt → Score-Sensoren erstellen)
     entry.async_on_unload(entry.add_update_listener(_async_options_updated))
 
+    # 9. Lovelace-Karte im Frontend bereitstellen
+    await _async_register_card(hass)
+
     return True
+
+
+async def _async_register_card(hass: HomeAssistant) -> None:
+    """Die Nachttisch-Karte ausliefern und ins Frontend laden.
+
+    Läuft genau einmal pro Home-Assistant-Start, auch wenn mehrere
+    Config-Entries (z.B. zwei Betten) eingerichtet sind.
+    """
+    if hass.data.get(CARD_REGISTERED):
+        return
+
+    card_path = Path(__file__).parent / "frontend" / CARD_FILENAME
+    if not card_path.is_file():
+        _LOGGER.warning("Karte %s nicht gefunden – Dashboard-Karte steht nicht zur Verfügung", card_path)
+        return
+
+    try:
+        await hass.http.async_register_static_paths([StaticPathConfig(CARD_URL, str(card_path), cache_headers=False)])
+        frontend.add_extra_js_url(hass, CARD_URL)
+        hass.data[CARD_REGISTERED] = True
+        _LOGGER.debug("Nachttisch-Karte unter %s registriert", CARD_URL)
+    except Exception as err:  # pragma: no cover - defensiv, nie fatal
+        # Ohne Karte bleibt die Integration voll funktionsfähig; nur das
+        # fertige Dashboard fehlt. Das darf das Setup nicht abbrechen.
+        _LOGGER.warning("Nachttisch-Karte konnte nicht registriert werden: %s", err)
 
 
 async def _async_options_updated(hass: HomeAssistant, entry: ConfigEntry):
