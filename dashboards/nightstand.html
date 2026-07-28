@@ -64,16 +64,116 @@
       }
 
       .time {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.04em;
         font-size: clamp(76px, 23vw, 168px);
         font-weight: 200;
         letter-spacing: -0.03em;
+        line-height: 1;
         color: var(--amber);
-        text-shadow: 0 0 34px rgba(255, 180, 84, 0.16);
       }
 
       .time .colon {
-        opacity: 0.5;
         animation: blink 2s steps(1, end) infinite;
+      }
+
+      /* ── Zifferblätter ──────────────────────────────────────
+         Alle vier sind bewusst als Kontur oder als schmale
+         Leuchtsegmente gebaut: eine ausgefüllte Ziffer strahlt
+         nachts zu viel Fläche ab. */
+
+      /* Kontur — nur der Umriss steht im Dunkeln. */
+      .face-outline .time {
+        color: transparent;
+        -webkit-text-stroke: 2px var(--amber);
+        text-stroke: 2px var(--amber);
+      }
+
+      .face-outline .colon {
+        -webkit-text-stroke-width: 2px;
+      }
+
+      /* 7-Segment — Weckerradio, frühe 80er. Die unbeleuchteten
+         Segmente bleiben als Geisterbild sichtbar, genau wie bei
+         einer echten LED-Anzeige. */
+      .glyph-seg,
+      .glyph-mat {
+        display: block;
+        height: 1em;
+        width: auto;
+      }
+
+      .face-segment .time {
+        gap: 0.09em;
+      }
+
+      .face-matrix .time {
+        gap: 0.12em;
+      }
+
+      .glyph-seg .s {
+        fill: var(--amber);
+        opacity: 0.055;
+        transition: opacity 0.25s ease;
+      }
+
+      .glyph-seg .s.on {
+        opacity: 1;
+      }
+
+      /* LED-Matrix — Radiowecker der 90er. */
+      .glyph-mat .d {
+        fill: var(--amber);
+        opacity: 0.05;
+      }
+
+      .glyph-mat .d.on {
+        opacity: 1;
+      }
+
+      /* Klappanzeige — Split-Flap, Bahnhofsuhr. */
+      .face-flip .time {
+        gap: 0.1em;
+        color: transparent;
+        -webkit-text-stroke: 1.6px var(--amber);
+        text-stroke: 1.6px var(--amber);
+      }
+
+      .face-flip .flap {
+        position: relative;
+        padding: 0.06em 0.1em 0.1em;
+        border: 1px solid var(--amber-faint);
+        border-radius: 0.12em;
+      }
+
+      .face-flip .flap::after {
+        content: "";
+        position: absolute;
+        left: 0;
+        right: 0;
+        top: 50%;
+        border-top: 1px solid var(--amber-faint);
+      }
+
+      .face-flip .colon {
+        border: none;
+        padding: 0;
+      }
+
+      .face-flip .flap::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        border-radius: 0.12em;
+        background: linear-gradient(
+          180deg,
+          rgba(255, 180, 84, 0.05),
+          transparent 48%,
+          rgba(0, 0, 0, 0.6) 52%,
+          transparent
+        );
       }
 
       @keyframes blink {
@@ -424,7 +524,8 @@
         color: var(--amber-deep);
       }
 
-      .cfg input {
+      .cfg input,
+      .cfg select {
         padding: 12px 14px;
         border: 1px solid var(--amber-faint);
         border-radius: 12px;
@@ -436,9 +537,17 @@
         text-transform: none;
       }
 
-      .cfg input:focus {
+      .cfg input:focus,
+      .cfg select:focus {
         outline: none;
         border-color: var(--amber-deep);
+      }
+
+      .cfg input[type="range"] {
+        padding: 0;
+        border: none;
+        background: transparent;
+        width: 100%;
       }
 
       .hint {
@@ -515,9 +624,7 @@
 
   <body>
     <div class="clock" id="clock">
-      <div class="time">
-        <span id="hh">--</span><span class="colon">:</span><span id="mm">--</span>
-      </div>
+      <div class="time" id="time"></div>
       <div class="date" id="date">&nbsp;</div>
     </div>
 
@@ -630,6 +737,15 @@
         <label>Wecker (input_datetime)<input name="alarm" placeholder="input_datetime.wecker" /></label>
         <label>Wecker-Schalter (optional)<input name="alarmSwitch" placeholder="input_boolean.wecker_aktiv" /></label>
         <label>Lampe<input name="light" placeholder="light.schlafzimmer" /></label>
+        <label>Ziffernstil (oder auf die Uhr tippen)
+          <select name="face">
+            <option value="outline">Kontur</option>
+            <option value="segment">7-Segment · 80er</option>
+            <option value="matrix">LED-Matrix · 90er</option>
+            <option value="flip">Klappanzeige</option>
+          </select>
+        </label>
+        <label>Helligkeit der Uhr<input name="dim" type="range" min="25" max="100" step="5" /></label>
         <label>Min. Temperatur °C<input name="tempMin" inputmode="decimal" placeholder="20" /></label>
         <label>Max. Temperatur °C<input name="tempMax" inputmode="decimal" placeholder="40" /></label>
         <div class="row">
@@ -657,6 +773,8 @@
         light: "",
         tempMin: "20",
         tempMax: "40",
+        face: "outline",
+        dim: "85",
       };
 
       function loadCfg() {
@@ -721,10 +839,158 @@
       const TAGE = ["Sonntag", "Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samstag"];
       const MONATE = ["Jan", "Feb", "Mär", "Apr", "Mai", "Jun", "Jul", "Aug", "Sep", "Okt", "Nov", "Dez"];
 
+      /* ── Zifferblätter ─────────────────────────────────────
+         Vier Stile, umschaltbar durch Tippen auf die Uhr. */
+      const FACES = ["outline", "segment", "matrix", "flip"];
+      const FACE_NAMES = {
+        outline: "Kontur",
+        segment: "7-Segment · 80er",
+        matrix: "LED-Matrix · 90er",
+        flip: "Klappanzeige",
+      };
+
+      /* Segmentgeometrie: a oben, im Uhrzeigersinn bis f, g in der
+         Mitte — die uebliche Benennung einer Siebensegmentanzeige. */
+      const hSeg = (x, y, w) =>
+        `${x + 1},${y} ${x + w - 1},${y} ${x + w},${y + 1} ${x + w - 1},${y + 2} ${x + 1},${y + 2} ${x},${y + 1}`;
+      const vSeg = (x, y, h) =>
+        `${x},${y + 1} ${x + 1},${y} ${x + 2},${y + 1} ${x + 2},${y + h - 1} ${x + 1},${y + h} ${x},${y + h - 1}`;
+
+      const SEG_SHAPES = [
+        ["a", hSeg(1, 0, 10)],
+        ["b", vSeg(10, 1, 9)],
+        ["c", vSeg(10, 11, 9)],
+        ["d", hSeg(1, 20, 10)],
+        ["e", vSeg(0, 11, 9)],
+        ["f", vSeg(0, 1, 9)],
+        ["g", hSeg(1, 10, 10)],
+      ];
+
+      const SEG_DIGITS = {
+        0: "abcdef",
+        1: "bc",
+        2: "abdeg",
+        3: "abcdg",
+        4: "bcfg",
+        5: "acdfg",
+        6: "acdefg",
+        7: "abc",
+        8: "abcdefg",
+        9: "abcdfg",
+      };
+
+      /* 5x7-Punktmatrix, wie sie in Radioweckern der 90er steckte. */
+      const MATRIX_DIGITS = {
+        0: ["01110", "10001", "10011", "10101", "11001", "10001", "01110"],
+        1: ["00100", "01100", "00100", "00100", "00100", "00100", "01110"],
+        2: ["01110", "10001", "00001", "00010", "00100", "01000", "11111"],
+        3: ["11111", "00010", "00100", "00010", "00001", "10001", "01110"],
+        4: ["00010", "00110", "01010", "10010", "11111", "00010", "00010"],
+        5: ["11111", "10000", "11110", "00001", "00001", "10001", "01110"],
+        6: ["00110", "01000", "10000", "11110", "10001", "10001", "01110"],
+        7: ["11111", "00001", "00010", "00100", "01000", "01000", "01000"],
+        8: ["01110", "10001", "10001", "01110", "10001", "10001", "01110"],
+        9: ["01110", "10001", "10001", "01111", "00001", "00010", "01100"],
+      };
+
+      function segDigit(ch) {
+        const lit = SEG_DIGITS[ch] || "";
+        const shapes = SEG_SHAPES.map(
+          ([key, points]) =>
+            `<polygon class="s${lit.includes(key) ? " on" : ""}" points="${points}"/>`,
+        ).join("");
+        return `<svg class="glyph-seg" viewBox="-1 -1 14 24">${shapes}</svg>`;
+      }
+
+      function segColon() {
+        return (
+          '<svg class="glyph-seg colon" viewBox="-1 -1 5 24">' +
+          '<rect class="s on" x="0" y="5" width="3" height="3" rx="0.6"/>' +
+          '<rect class="s on" x="0" y="14" width="3" height="3" rx="0.6"/>' +
+          "</svg>"
+        );
+      }
+
+      function matrixDigit(ch) {
+        const rows = MATRIX_DIGITS[ch] || MATRIX_DIGITS[8];
+        let dots = "";
+        rows.forEach((row, y) => {
+          for (let x = 0; x < row.length; x++) {
+            dots +=
+              `<circle class="d${row[x] === "1" ? " on" : ""}" ` +
+              `cx="${x + 0.5}" cy="${y + 0.5}" r="0.4"/>`;
+          }
+        });
+        return `<svg class="glyph-mat" viewBox="-0.2 -0.2 5.4 7.4">${dots}</svg>`;
+      }
+
+      function matrixColon() {
+        return (
+          '<svg class="glyph-mat colon" viewBox="-0.2 -0.2 1.4 7.4">' +
+          '<circle class="d on" cx="0.5" cy="2.5" r="0.4"/>' +
+          '<circle class="d on" cx="0.5" cy="4.5" r="0.4"/>' +
+          "</svg>"
+        );
+      }
+
+      let lastFaceKey = "";
+
+      function renderTime(hh, mm) {
+        const face = FACES.includes(cfg.face) ? cfg.face : "outline";
+        const digits = `${pad(hh)}${pad(mm)}`;
+        const key = `${face}|${digits}`;
+        if (key === lastFaceKey) return;
+        lastFaceKey = key;
+
+        document.body.className = document.body.className
+          .replace(/\bface-\S+/g, "")
+          .trim();
+        document.body.classList.add(`face-${face}`);
+
+        const chars = digits.split("");
+        let html;
+        if (face === "segment") {
+          html = segDigit(chars[0]) + segDigit(chars[1]) + segColon() +
+            segDigit(chars[2]) + segDigit(chars[3]);
+        } else if (face === "matrix") {
+          html = matrixDigit(chars[0]) + matrixDigit(chars[1]) + matrixColon() +
+            matrixDigit(chars[2]) + matrixDigit(chars[3]);
+        } else if (face === "flip") {
+          html =
+            `<span class="flap">${chars[0]}</span><span class="flap">${chars[1]}</span>` +
+            '<span class="colon">:</span>' +
+            `<span class="flap">${chars[2]}</span><span class="flap">${chars[3]}</span>`;
+        } else {
+          html =
+            `<span>${chars[0]}${chars[1]}</span><span class="colon">:</span>` +
+            `<span>${chars[2]}${chars[3]}</span>`;
+        }
+        $("time").innerHTML = html;
+      }
+
+      function applyDim() {
+        const dim = clamp(parseInt(cfg.dim, 10) || 85, 25, 100);
+        $("clock").style.opacity = String(dim / 100);
+      }
+
+      let faceHintTimer = null;
+
+      function cycleFace() {
+        const index = FACES.indexOf(cfg.face);
+        cfg.face = FACES[(index + 1) % FACES.length];
+        localStorage.setItem(CFG_KEY, JSON.stringify(cfg));
+        lastFaceKey = "";
+        paintClock();
+        $("status").textContent = FACE_NAMES[cfg.face];
+        clearTimeout(faceHintTimer);
+        faceHintTimer = setTimeout(refresh, 1800);
+      }
+
+      $("clock").addEventListener("click", cycleFace);
+
       function paintClock() {
         const now = new Date();
-        $("hh").textContent = pad(now.getHours());
-        $("mm").textContent = pad(now.getMinutes());
+        renderTime(now.getHours(), now.getMinutes());
         $("date").textContent =
           `${TAGE[now.getDay()]} · ${now.getDate()}. ${MONATE[now.getMonth()]}`;
         driftClock(now);
@@ -1063,6 +1329,9 @@
         cfg = next;
         localStorage.setItem(CFG_KEY, JSON.stringify(cfg));
         $("cfg").classList.remove("show");
+        lastFaceKey = "";
+        applyDim();
+        paintClock();
         refresh();
       });
 
@@ -1093,6 +1362,7 @@
         paintLight();
       }
 
+      applyDim();
       paintClock();
       paintAlarmSheet();
       refresh();
