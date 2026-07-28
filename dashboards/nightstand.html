@@ -470,6 +470,40 @@
         text-shadow: none;
       }
 
+      /* ── Liegendes Tablet ───────────────────────────────────
+         Quer ist die Mittelspalte zu schmal und laesst die Seite
+         leer wirken: Uhr nach links, Tasten nach rechts. */
+      @media (min-width: 820px) and (orientation: landscape) {
+        body {
+          flex-direction: row;
+          align-items: center;
+          justify-content: center;
+          gap: 7vw;
+          padding-bottom: 64px;
+        }
+
+        .clock {
+          margin: 0;
+        }
+
+        .time {
+          font-size: clamp(110px, 15vw, 200px);
+        }
+
+        .deck {
+          margin-top: 0;
+          max-width: 420px;
+        }
+
+        .status {
+          position: absolute;
+          bottom: max(20px, env(safe-area-inset-bottom));
+          left: 0;
+          right: 0;
+          text-align: center;
+        }
+      }
+
       @media (prefers-reduced-motion: reduce) {
         * {
           animation: none !important;
