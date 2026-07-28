@@ -337,45 +337,53 @@ Per zone (one zone for single beds, two for dual-core waterbeds):
 
 ## 🌒 Dashboards
 
-`dashboards/nightstand.html` — a standalone alarm-clock face for the tablet next to the bed. Pure-black AMOLED background with amber accents, a large drifting clock and exactly three keys: waterbed temperature (thermostat dial), alarm and bedroom lamp.
+The integration ships a Lovelace card, `custom:rejuvenation-nightstand`, and
+registers it with the frontend itself — nothing to copy into `/config/www`, no
+resource to add by hand, no token and no second login. It talks to Home
+Assistant through the same session you are already signed in to.
 
-Copy the file to `/config/www/rejuvenation_bed/` and embed it as a panel:
+An alarm-clock face for the tablet next to the bed: pure-black AMOLED
+background with amber accents, a large clock, and exactly three keys —
+waterbed temperature (a draggable thermostat ring), alarm and bedroom lamp.
+
+Create a dashboard, open its raw configuration editor and paste
+`dashboards/nightstand.yaml`, adjusting the entity IDs. The view uses
+`type: panel` so the card fills the screen; the button in the card's corner
+takes it to true fullscreen without browser chrome.
 
 ```yaml
-panel_iframe:
-  nightstand:
-    title: Nightstand
-    icon: mdi:alarm
-    url: /local/rejuvenation_bed/nightstand.html
+views:
+  - type: panel
+    cards:
+      - type: custom:rejuvenation-nightstand
+        beds:
+          - name: Bedroom · left
+            climate: climate.thermostat_bed_left
+            alarm: input_datetime.alarm_left
+            alarm_switch: input_boolean.alarm_left_active
+            light: light.bedroom
 ```
 
-Or as an iframe card:
-
-```yaml
-type: iframe
-url: /local/rejuvenation_bed/nightstand.html
-aspect_ratio: 100%
-```
-
-The gear in the top corner opens the settings: Home Assistant URL, a long-lived
-access token and the entity IDs. Both are stored in the browser's local storage
-and are only ever sent to the address you entered. Without them the page runs in
-demo mode so you can look at it before wiring anything up.
-
-Entity IDs belong to a bed profile rather than to the page, so several beds in
-one house — or two sides of the same bed — each get their own set. Every phone
+Entity IDs belong to a bed entry rather than to the card, so several beds in
+one house — or two sides of the same bed — each get their own. Every device
 remembers which one is its own, so you and your partner control your own sides
-from your own devices. With more than one profile the bed's name appears next to
-the gear and switches between them.
+from your own phones. With more than one entry the bed's name appears in the
+header and switches between them.
 
 The clock face is switchable by tapping the clock: outline (the default — a
 filled digit throws too much light next to a pillow), 7-segment, 5x7 LED matrix
-and split-flap. Its brightness has its own slider in the settings.
+and split-flap. Brightness has its own slider. Both are per device, so one
+dashboard can look different on every screen.
 
-Details: the display dims to the bare clock after 45 seconds without a touch, and
-the digits drift a few pixels every minute so nothing burns into an OLED panel
+After 45 seconds without a touch everything but the clock fades away, and the
+digits drift a few pixels every minute so nothing burns into an OLED panel
 overnight. The first touch only wakes the screen — it never triggers a key by
 accident.
+
+The alarm uses ordinary helpers (a date/time helper set to "time only" plus a
+toggle), created under Settings -> Devices & Services -> Helpers. They are
+deliberately not part of the integration so your existing wake-up automation
+keeps working.
 
 ---
 

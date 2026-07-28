@@ -7,34 +7,41 @@ Alle Änderungen am Rejuvenation Bed Projekt.
 ## [v260728] - 2026-07-28
 
 ### Dashboard
-- **Neuer Nachttischwecker statt der alten Dashboards:** Die beiden bisherigen
-  Vorlagen sind entfallen — das „Premium"-Dashboard war zu einer Wand aus Panels
-  geworden, `Dashboard _claudedesign.html` war ein 1,5 MB großer Einmal-Export.
-  An ihre Stelle tritt `dashboards/nightstand.html`, eine einzelne
-  eigenständige Datei ohne externe Abhängigkeiten (auch ohne Google-Fonts, damit
-  ein Tablet ohne Internet nicht die Schrift verliert). Tiefschwarzer
-  AMOLED-Hintergrund, Akzente ausschließlich in gedecktem Bernstein, große Uhr —
-  und darunter genau die drei Tasten, die man vom Bett aus braucht:
-  Wasserbetttemperatur (Thermostat-Ring zum Ziehen), Wecker und
-  Schlafzimmerlampe. Nebenbei entfernt: der Verweis auf
-  `rejuvenation_bed_nightstand_cockpit.yaml`, die es im Repo nie gab.
-- **Vier umschaltbare Zifferblätter:** Kontur (Standard, nur Umriss ohne
-  Leuchtschleier — eine ausgefüllte Ziffer strahlt neben dem Kopfkissen zu viel
-  Fläche ab), 7-Segment im Weckerradio-Stil der frühen 80er inklusive sichtbarer
-  unbeleuchteter Segmente, 5×7-LED-Matrix der 90er und eine Klappanzeige.
-  Umschalten durch Tippen auf die Uhr oder über die Einstellungen; dazu ein
-  eigener Helligkeitsregler nur für die Uhr (25–100 %).
-- **Mehrere Betten und Seiten:** Entities hängen jetzt an einem Bett-Profil
-  statt an der Anzeige. Wer mehrere Betten im Haus hat — oder sich ein Bett zu
-  zweit teilt — legt pro Bett bzw. Seite eine Auswahl an; jedes Telefon merkt
-  sich seine eigene, sodass beide Seiten unabhängig bedient werden. Erreichbar
-  über ein sichtbares Zahnrad in der Kopfzeile (vorher nur über die Statuszeile
-  versteckt), Wechseln im Betrieb über den Namen daneben. Vorhandene
-  Konfigurationen werden beim ersten Start automatisch zum ersten Bett.
+- **Nachttischwecker als echte Lovelace-Karte:** Die Integration liefert
+  `custom:rejuvenation-nightstand` mit und meldet die Karte beim Start selbst im
+  Frontend an — kein Kopieren nach `/config/www`, kein Ressourcen-Eintrag von
+  Hand, kein Long-Lived Token und keine zweite Anmeldung. Die Karte spricht über
+  das `hass`-Objekt mit Home Assistant, also über die Sitzung, in der man
+  ohnehin angemeldet ist. Die frühere eigenständige HTML-Seite entfällt damit,
+  ebenso die beiden alten Dashboard-Vorlagen (`premium_nightstand_dashboard.html`
+  sowie der 1,5 MB große Export `Dashboard _claudedesign.html`). Beispiel-
+  Dashboard: `dashboards/nightstand.yaml`, als `type: panel` bildschirmfüllend,
+  mit Vollbild-Knopf in der Karte.
+- **Drei Tasten wie am Bett:** Wasserbetttemperatur als ziehbarer
+  Thermostat-Ring, Wecker (Stunde/Minute stellen, ausschalten) und
+  Schlafzimmerlampe (Helligkeit, An/Aus, Nachtlicht mit 1 % bei 2000 K).
+  Tiefschwarzer AMOLED-Hintergrund, Akzente ausschließlich in gedecktem
+  Bernstein.
+- **Vier Zifferblätter:** Kontur (Standard, nur Umriss ohne Leuchtschleier —
+  eine ausgefüllte Ziffer strahlt neben dem Kopfkissen zu viel Fläche ab),
+  7-Segment im Weckerradio-Stil der frühen 80er inklusive sichtbarer
+  unbeleuchteter Segmente, 5×7-LED-Matrix der 90er und Klappanzeige. Umschalten
+  per Tipp auf die Uhr, dazu ein eigener Helligkeitsregler. Beides gilt pro
+  Gerät, ein Dashboard darf also auf jedem Bildschirm anders aussehen.
+- **Mehrere Betten und Seiten:** Die Entities hängen an einem Bett-Eintrag der
+  Kartenkonfiguration. Mehrere Betten im Haus — oder zwei Seiten desselben
+  Betts — bekommen je einen Eintrag; jedes Gerät merkt sich seinen eigenen,
+  sodass beide Seiten unabhängig vom jeweiligen Telefon bedient werden.
 - **Nachtbetrieb:** Nach 45 Sekunden ohne Berührung blendet alles außer der Uhr
   aus, und die Ziffern wandern minütlich einige Pixel gegen Einbrennen auf
   OLED-Panels. Die erste Berührung weckt nur den Bildschirm und löst keine Taste
-  aus. Auf liegenden Tablets ab 820 px steht die Uhr links, die Tasten rechts.
+  aus.
+
+### Anforderungen
+- **Mindestversion auf Home Assistant 2024.7.0 angehoben:** Die Karte wird über
+  `async_register_static_paths()` ausgeliefert, das es erst ab dieser Version
+  gibt. Schlägt die Registrierung fehl, wird das protokolliert und das Setup
+  läuft weiter — ohne Karte, aber mit voll funktionsfähiger Integration.
 
 ## [v260628] - 2026-06-28
 

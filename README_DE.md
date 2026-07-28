@@ -159,46 +159,53 @@ Die Integration erstellt drei Geräte in Home Assistant:
 
 ## Dashboard-Vorlagen
 
-`dashboards/nightstand.html` — ein eigenständiger Nachttischwecker für das Tablet neben dem Bett. Tiefschwarzer AMOLED-Hintergrund mit bernsteinfarbenen Akzenten, große Uhr und genau drei Tasten: Wasserbetttemperatur (Thermostat-Ring), Wecker und Schlafzimmerlampe.
+Die Integration bringt eine Lovelace-Karte mit, `custom:rejuvenation-nightstand`,
+und meldet sie selbst im Frontend an — nichts nach `/config/www` kopieren, keine
+Ressource von Hand eintragen, kein Token und keine zweite Anmeldung. Die Karte
+spricht über die Sitzung mit Home Assistant, in der du ohnehin angemeldet bist.
 
-Datei nach `/config/www/rejuvenation_bed/` kopieren und als Panel einbinden:
+Ein Weckerdisplay für das Tablet neben dem Bett: tiefschwarzer
+AMOLED-Hintergrund mit bernsteinfarbenen Akzenten, große Uhr und genau drei
+Tasten — Wasserbetttemperatur (Thermostat-Ring zum Ziehen), Wecker und
+Schlafzimmerlampe.
+
+Dashboard anlegen, den Raw-Konfigurationseditor öffnen und
+`dashboards/nightstand.yaml` einfügen, dann die Entity-IDs anpassen. Die
+Ansicht nutzt `type: panel`, damit die Karte den Bildschirm füllt; der Knopf in
+der Ecke der Karte schaltet in echtes Vollbild ohne Browserleisten.
 
 ```yaml
-panel_iframe:
-  nachttisch:
-    title: Nachttisch
-    icon: mdi:alarm
-    url: /local/rejuvenation_bed/nightstand.html
+views:
+  - type: panel
+    cards:
+      - type: custom:rejuvenation-nightstand
+        beds:
+          - name: Schlafzimmer · links
+            climate: climate.thermostat_bett_links
+            alarm: input_datetime.wecker_links
+            alarm_switch: input_boolean.wecker_links_aktiv
+            light: light.schlafzimmer
 ```
 
-**Oder als iframe-Card:**
-
-```yaml
-type: iframe
-url: /local/rejuvenation_bed/nightstand.html
-aspect_ratio: 100%
-```
-
-Das Zahnrad in der Kopfzeile öffnet die Einstellungen: Home-Assistant-Adresse,
-Long-Lived Access Token und die Entity-IDs. Beides liegt nur im lokalen Speicher
-des Browsers und geht ausschließlich an die eingetragene Adresse. Ohne Angaben
-läuft die Seite im Demomodus.
-
-Die Entity-IDs hängen an einem Bett-Profil, nicht an der Anzeige: Mehrere Betten
-im Haus — oder zwei Seiten desselben Betts — bekommen je einen Eintrag. Jedes
-Telefon merkt sich seinen eigenen, sodass jeder seine Seite vom eigenen Gerät aus
-bedient. Ab zwei Profilen steht der Bettname neben dem Zahnrad und wechselt
+Die Entity-IDs hängen an einem Bett-Eintrag, nicht an der Karte: Mehrere Betten
+im Haus — oder zwei Seiten desselben Betts — bekommen je einen. Jedes Gerät
+merkt sich seinen eigenen, sodass jeder seine Seite vom eigenen Telefon aus
+bedient. Ab zwei Einträgen steht der Bettname in der Kopfzeile und wechselt
 zwischen ihnen.
 
 Das Zifferblatt wechselt per Tipp auf die Uhr: Kontur (Standard — eine
 ausgefüllte Ziffer strahlt neben dem Kopfkissen zu viel Fläche ab), 7-Segment,
-LED-Matrix und Klappanzeige. Die Helligkeit der Uhr hat einen eigenen Regler in
-den Einstellungen.
+LED-Matrix und Klappanzeige. Die Helligkeit hat einen eigenen Regler. Beides
+gilt pro Gerät, ein Dashboard darf also auf jedem Bildschirm anders aussehen.
 
-Kleinigkeiten am Rand: Nach 45 Sekunden ohne Berührung dimmt die Oberfläche auf
-die blanke Uhrzeit herunter, und die Ziffern wandern minütlich ein paar Pixel,
-damit sich über Nacht nichts in ein OLED-Panel einbrennt. Die erste Berührung
-weckt nur auf und löst keine Taste aus.
+Nach 45 Sekunden ohne Berührung blendet alles außer der Uhr aus, und die Ziffern
+wandern minütlich ein paar Pixel, damit sich über Nacht nichts in ein OLED-Panel
+einbrennt. Die erste Berührung weckt nur auf und löst keine Taste aus.
+
+Der Wecker nutzt gewöhnliche Helfer (ein Datum/Zeit-Helfer auf »nur Zeit« sowie
+einen Schalter), anzulegen unter Einstellungen → Geräte & Dienste → Helfer. Sie
+gehören bewusst nicht zur Integration, damit deine bestehende Weck-Automation
+weiterläuft.
 
 ---
 

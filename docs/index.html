@@ -1571,33 +1571,33 @@ cp -r custom_components/rejuvenation_bed \
         <h2 class="section">Ein Wecker.<br/><em>Drei Tasten.</em></h2>
       </div>
       <p class="lede" style="max-width:440px">
-        Für das Tablet neben dem Bett. Im Repo unter <code class="inline">/dashboards/nightstand.html</code>. Entity-IDs an deine Installation anpassen.
+        Für das Tablet neben dem Bett. Die Karte bringt die Integration selbst mit — kein Kopieren nach <code class="inline">/config/www</code>, kein Ressourcen-Eintrag, kein Token.
       </p>
     </div>
 
     <div class="row cols-2">
       <div class="install-card">
-        <div class="tag-row" style="margin-bottom:12px"><span class="tg">Standalone · HTML</span><span class="tg" style="color:var(--heat)">AMOLED</span></div>
+        <div class="tag-row" style="margin-bottom:12px"><span class="tg">Lovelace-Karte</span><span class="tg" style="color:var(--heat)">AMOLED</span></div>
         <h4>Nachttischwecker</h4>
-        <p style="margin:8px 0 0;font-size:14px">Tiefschwarzer Hintergrund, bernsteinfarbene Akzente, große Uhr — darunter nur Wasserbett, Wecker und Schlafzimmerlampe. Nach 45 Sekunden ohne Berührung dimmt alles auf die blanke Uhrzeit herunter, die Ziffern wandern minütlich ein paar Pixel gegen Einbrennen.</p>
+        <p style="margin:8px 0 0;font-size:14px">Tiefschwarzer Hintergrund, bernsteinfarbene Akzente, große Uhr — darunter nur Wasserbett, Wecker und Schlafzimmerlampe. Vier Zifferblätter per Tipp auf die Uhr: Kontur, 7-Segment, LED-Matrix, Klappanzeige. Nach 45 Sekunden ohne Berührung bleibt nur die Uhr, die Ziffern wandern minütlich ein paar Pixel gegen Einbrennen.</p>
         <pre class="code">
-<span class="c"># Als Panel einbinden:</span>
-<span class="k">panel_iframe</span>:
-  <span class="k">nachttisch</span>:
-    <span class="k">title</span>: Nachttisch
-    <span class="k">icon</span>: mdi:alarm
-    <span class="k">url</span>: <span class="s">/local/rejuvenation_bed/nightstand.html</span></pre>
+<span class="c"># Ansicht auf "Panel (1 Karte)" stellen:</span>
+<span class="k">views</span>:
+  - <span class="k">type</span>: panel
+    <span class="k">cards</span>:
+      - <span class="k">type</span>: <span class="s">custom:rejuvenation-nightstand</span></pre>
       </div>
 
       <div class="install-card">
-        <div class="tag-row" style="margin-bottom:12px"><span class="tg">Einrichtung</span></div>
-        <h4>Verbinden</h4>
-        <p style="margin:8px 0 0;font-size:14px">Datei nach <code class="inline">/config/www/rejuvenation_bed/</code> kopieren. Ein Tipp auf die Statuszeile unten öffnet die Einrichtung — Adresse, Long-Lived Access Token und Entity-IDs. Beides bleibt im lokalen Speicher des Browsers und geht ausschließlich an die eingetragene Adresse. Ohne Angaben läuft die Seite im Demomodus.</p>
+        <div class="tag-row" style="margin-bottom:12px"><span class="tg">Mehrere Betten</span></div>
+        <h4>Jeder seine Seite</h4>
+        <p style="margin:8px 0 0;font-size:14px">Die Entities hängen an einem Bett-Eintrag, nicht an der Karte. Mehrere Betten im Haus — oder zwei Seiten desselben Betts — bekommen je einen; jedes Telefon merkt sich seinen eigenen. Der Vollbild-Knopf in der Ecke füllt den ganzen Schirm.</p>
         <pre class="code">
-<span class="c"># Oder als Karte:</span>
-<span class="k">type</span>: iframe
-<span class="k">url</span>: <span class="s">/local/rejuvenation_bed/nightstand.html</span>
-<span class="k">aspect_ratio</span>: <span class="s">100%</span></pre>
+<span class="k">beds</span>:
+  - <span class="k">name</span>: Schlafzimmer · links
+    <span class="k">climate</span>: <span class="s">climate.thermostat_bett_links</span>
+    <span class="k">alarm</span>: <span class="s">input_datetime.wecker_links</span>
+    <span class="k">light</span>: <span class="s">light.schlafzimmer</span></pre>
       </div>
     </div>
   </div>
