@@ -159,35 +159,35 @@ Die Integration erstellt drei Geräte in Home Assistant:
 
 ## Dashboard-Vorlagen
 
-Zwei fertige Dashboard-Vorlagen im `dashboards/`-Ordner:
+`dashboards/nightstand.html` — ein eigenständiger Nachttischwecker für das Tablet neben dem Bett. Tiefschwarzer AMOLED-Hintergrund mit bernsteinfarbenen Akzenten, große Uhr und genau drei Tasten: Wasserbetttemperatur (Thermostat-Ring), Wecker und Schlafzimmerlampe.
 
-### Lovelace YAML (Nightstand Cockpit)
-
-`dashboards/rejuvenation_bed_nightstand_cockpit.yaml` — Mobile/Tablet-freundliche Lovelace-Vorlage. Entity-IDs an deine Installation anpassen.
-
-### Standalone HTML (Premium Dashboard)
-
-`dashboards/premium_nightstand_dashboard.html` — Eigenständiges React/HTML-Dashboard mit Mini-Ansicht (< 800px).
-
-**Einbindung als Panel:**
+Datei nach `/config/www/rejuvenation_bed/` kopieren und als Panel einbinden:
 
 ```yaml
 panel_iframe:
-  waterbed_cockpit:
-    title: Wasserbett Cockpit
-    icon: mdi:bed-outline
-    url: /local/rejuvenation_bed/premium_nightstand_dashboard.html
+  nachttisch:
+    title: Nachttisch
+    icon: mdi:alarm
+    url: /local/rejuvenation_bed/nightstand.html
 ```
 
 **Oder als iframe-Card:**
 
 ```yaml
 type: iframe
-url: /local/rejuvenation_bed/premium_nightstand_dashboard.html
+url: /local/rejuvenation_bed/nightstand.html
 aspect_ratio: 100%
 ```
 
-Datei nach `/config/www/rejuvenation_bed/` kopieren.
+Ein Tipp auf die Statuszeile unten öffnet die Einrichtung: Home-Assistant-Adresse,
+Long-Lived Access Token und die Entity-IDs. Beides liegt nur im lokalen Speicher
+des Browsers und geht ausschließlich an die eingetragene Adresse. Ohne Angaben
+läuft die Seite im Demomodus.
+
+Kleinigkeiten am Rand: Nach 45 Sekunden ohne Berührung dimmt die Oberfläche auf
+die blanke Uhrzeit herunter, und die Ziffern wandern minütlich ein paar Pixel,
+damit sich über Nacht nichts in ein OLED-Panel einbrennt. Die erste Berührung
+weckt nur auf und löst keine Taste aus.
 
 ---
 

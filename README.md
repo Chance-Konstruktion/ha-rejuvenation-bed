@@ -337,45 +337,35 @@ Per zone (one zone for single beds, two for dual-core waterbeds):
 
 ## 🌒 Dashboards
 
-Two ready-made templates live in `dashboards/`.
+`dashboards/nightstand.html` — a standalone alarm-clock face for the tablet next to the bed. Pure-black AMOLED background with amber accents, a large drifting clock and exactly three keys: waterbed temperature (thermostat dial), alarm and bedroom lamp.
 
-<details>
-<summary><b>Lovelace YAML — Nightstand Cockpit</b></summary>
-
-<br>
-
-`dashboards/rejuvenation_bed_nightstand_cockpit.yaml` — mobile/tablet-friendly Lovelace template. Adjust the entity IDs to your installation.
-
-</details>
-
-<details>
-<summary><b>Standalone HTML — Premium Dashboard</b></summary>
-
-<br>
-
-`dashboards/premium_nightstand_dashboard.html` — standalone React/HTML dashboard with mini view below 800 px.
-
-Embed as a panel:
+Copy the file to `/config/www/rejuvenation_bed/` and embed it as a panel:
 
 ```yaml
 panel_iframe:
-  waterbed_cockpit:
-    title: Waterbed Cockpit
-    icon: mdi:bed-outline
-    url: /local/rejuvenation_bed/premium_nightstand_dashboard.html
+  nightstand:
+    title: Nightstand
+    icon: mdi:alarm
+    url: /local/rejuvenation_bed/nightstand.html
 ```
 
 Or as an iframe card:
 
 ```yaml
 type: iframe
-url: /local/rejuvenation_bed/premium_nightstand_dashboard.html
+url: /local/rejuvenation_bed/nightstand.html
 aspect_ratio: 100%
 ```
 
-Copy the file to `/config/www/rejuvenation_bed/`.
+Tap the status line at the bottom to enter your Home Assistant URL, a long-lived
+access token and the entity IDs. Both are stored in the browser's local storage
+and are only ever sent to the address you entered. Without them the page runs in
+demo mode so you can look at it before wiring anything up.
 
-</details>
+Details: the display dims to the bare clock after 45 seconds without a touch, and
+the digits drift a few pixels every minute so nothing burns into an OLED panel
+overnight. The first touch only wakes the screen — it never triggers a key by
+accident.
 
 ---
 
