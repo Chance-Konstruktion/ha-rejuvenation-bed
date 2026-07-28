@@ -3,7 +3,7 @@
 **Intelligente Bett-Heizungssteuerung für Home Assistant**
 
 [![HACS Badge](https://img.shields.io/badge/HACS-Default-orange.svg)](https://github.com/hacs/integration)
-[![Version](https://img.shields.io/badge/version-v260628-blue.svg)](https://github.com/Chance-Konstruktion/ha-rejuvenation-bed/releases)
+[![Version](https://img.shields.io/badge/version-v260728-blue.svg)](https://github.com/Chance-Konstruktion/ha-rejuvenation-bed/releases)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
 > ### → [**Zur gerenderten Editorial-README**](https://chance-konstruktion.github.io/ha-rejuvenation-bed/)
@@ -179,10 +179,21 @@ url: /local/rejuvenation_bed/nightstand.html
 aspect_ratio: 100%
 ```
 
-Ein Tipp auf die Statuszeile unten öffnet die Einrichtung: Home-Assistant-Adresse,
+Das Zahnrad in der Kopfzeile öffnet die Einstellungen: Home-Assistant-Adresse,
 Long-Lived Access Token und die Entity-IDs. Beides liegt nur im lokalen Speicher
 des Browsers und geht ausschließlich an die eingetragene Adresse. Ohne Angaben
 läuft die Seite im Demomodus.
+
+Die Entity-IDs hängen an einem Bett-Profil, nicht an der Anzeige: Mehrere Betten
+im Haus — oder zwei Seiten desselben Betts — bekommen je einen Eintrag. Jedes
+Telefon merkt sich seinen eigenen, sodass jeder seine Seite vom eigenen Gerät aus
+bedient. Ab zwei Profilen steht der Bettname neben dem Zahnrad und wechselt
+zwischen ihnen.
+
+Das Zifferblatt wechselt per Tipp auf die Uhr: Kontur (Standard — eine
+ausgefüllte Ziffer strahlt neben dem Kopfkissen zu viel Fläche ab), 7-Segment,
+LED-Matrix und Klappanzeige. Die Helligkeit der Uhr hat einen eigenen Regler in
+den Einstellungen.
 
 Kleinigkeiten am Rand: Nach 45 Sekunden ohne Berührung dimmt die Oberfläche auf
 die blanke Uhrzeit herunter, und die Ziffern wandern minütlich ein paar Pixel,

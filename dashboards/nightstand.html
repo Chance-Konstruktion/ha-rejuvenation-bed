@@ -44,6 +44,7 @@
       }
 
       body {
+        position: relative;
         display: flex;
         flex-direction: column;
         align-items: center;
@@ -53,6 +54,60 @@
           max(24px, env(safe-area-inset-bottom));
         gap: 26px;
         user-select: none;
+      }
+
+      /* ── Kopfzeile ──────────────────────────────────────────── */
+      .topbar {
+        position: absolute;
+        top: max(14px, env(safe-area-inset-top));
+        left: max(16px, env(safe-area-inset-left));
+        right: max(16px, env(safe-area-inset-right));
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        transition: opacity 1.4s ease;
+      }
+
+      .bedname,
+      .gear {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        padding: 8px 12px;
+        border: 1px solid transparent;
+        border-radius: 999px;
+        background: transparent;
+        color: var(--amber-deep);
+        font: inherit;
+        font-size: 11px;
+        letter-spacing: 0.22em;
+        text-transform: uppercase;
+        cursor: pointer;
+      }
+
+      .bedname svg {
+        width: 13px;
+        height: 13px;
+      }
+
+      .gear {
+        padding: 8px;
+      }
+
+      .gear svg {
+        width: 20px;
+        height: 20px;
+      }
+
+      .bedname:active,
+      .gear:active {
+        border-color: var(--amber-faint);
+      }
+
+      /* Bei nur einem Bett gibt es nichts zu wechseln. */
+      body.single-bed .bedname {
+        display: none;
       }
 
       /* ── Uhr ────────────────────────────────────────────────── */
@@ -498,7 +553,7 @@
         justify-content: center;
         padding: 24px;
         overflow-y: auto;
-        background: rgba(0, 0, 0, 0.94);
+        background: var(--bg);
       }
 
       .cfg.show {
@@ -550,6 +605,20 @@
         width: 100%;
       }
 
+      .cfg h3 {
+        margin: 18px 0 0;
+        font-size: 11px;
+        font-weight: 400;
+        letter-spacing: 0.26em;
+        text-transform: uppercase;
+        color: var(--amber);
+      }
+
+      .chip:disabled {
+        opacity: 0.35;
+        cursor: default;
+      }
+
       .hint {
         font-size: 11px;
         line-height: 1.6;
@@ -560,13 +629,15 @@
 
       /* ── Nachtruhe: Burn-in-Schutz ──────────────────────────── */
       body.dozing .deck,
-      body.dozing .status {
+      body.dozing .status,
+      body.dozing .topbar {
         opacity: 0;
         pointer-events: none;
       }
 
       body.dozing .deck,
       body.dozing .status,
+      body.dozing .topbar,
       body.dozing .clock {
         transition: opacity 1.4s ease;
       }
@@ -623,6 +694,19 @@
   </head>
 
   <body>
+    <header class="topbar" id="topbar">
+      <button class="bedname" id="bed-switch" type="button">
+        <span id="bed-label">Bett</span>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="m6 9 6 6 6-6" /></svg>
+      </button>
+      <button class="gear" id="btn-cfg" type="button" aria-label="Einstellungen">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <circle cx="12" cy="12" r="3.2" />
+          <path d="M12 2.6v2.2M12 19.2v2.2M4.2 12H2m20 0h-2.2M6.5 6.5 5 5m14 14-1.5-1.5M17.5 6.5 19 5M5 19l1.5-1.5" />
+        </svg>
+      </button>
+    </header>
+
     <div class="clock" id="clock">
       <div class="time" id="time"></div>
       <div class="date" id="date">&nbsp;</div>
@@ -723,20 +807,47 @@
       </div>
     </div>
 
+    <!-- Bett wählen -->
+    <div class="sheet" id="sheet-beds">
+      <h2>Welches Bett?</h2>
+      <div class="row" id="bed-list"></div>
+      <div class="row">
+        <button class="chip" type="button" data-close>Zurück</button>
+      </div>
+    </div>
+
     <!-- Einstellungen -->
     <div class="cfg" id="cfg">
       <form id="cfg-form">
+        <h3>Verbindung</h3>
         <p class="hint">
-          Zugriff auf Home Assistant. Der Token bleibt lokal im Browser
-          (localStorage) und wird nur an die eingetragene HA-Adresse gesendet.
-          Ohne Angaben läuft die Anzeige im Demomodus.
+          Adresse und Token gelten für dieses Gerät. Der Token bleibt lokal im
+          Browser (localStorage) und wird nur an die eingetragene Adresse
+          gesendet. Ohne Angaben läuft die Anzeige im Demomodus.
         </p>
         <label>Home-Assistant-URL<input name="haUrl" placeholder="http://homeassistant.local:8123" /></label>
         <label>Long-Lived Access Token<input name="token" type="password" placeholder="eyJhbGci…" /></label>
-        <label>Climate (Wasserbett)<input name="climate" placeholder="climate.thermostat_bett" /></label>
-        <label>Wecker (input_datetime)<input name="alarm" placeholder="input_datetime.wecker" /></label>
-        <label>Wecker-Schalter (optional)<input name="alarmSwitch" placeholder="input_boolean.wecker_aktiv" /></label>
+
+        <h3>Bett</h3>
+        <p class="hint">
+          Mehrere Betten oder zwei Seiten im selben Bett? Lege für jedes eine
+          Auswahl an. Jedes Telefon merkt sich seine eigene — dein Partner
+          stellt auf seinem Gerät einfach die andere Seite ein.
+        </p>
+        <label>Auswahl<select id="bed-select"></select></label>
+        <div class="row" style="justify-content: flex-start">
+          <button class="chip" type="button" id="bed-add">Hinzufügen</button>
+          <button class="chip" type="button" id="bed-remove">Entfernen</button>
+        </div>
+        <label>Bezeichnung<input name="name" placeholder="Schlafzimmer · links" /></label>
+        <label>Climate (Wasserbett)<input name="climate" placeholder="climate.thermostat_bett_links" /></label>
+        <label>Wecker (input_datetime)<input name="alarm" placeholder="input_datetime.wecker_links" /></label>
+        <label>Wecker-Schalter (optional)<input name="alarmSwitch" placeholder="input_boolean.wecker_links_aktiv" /></label>
         <label>Lampe<input name="light" placeholder="light.schlafzimmer" /></label>
+        <label>Min. Temperatur °C<input name="tempMin" inputmode="decimal" placeholder="20" /></label>
+        <label>Max. Temperatur °C<input name="tempMax" inputmode="decimal" placeholder="40" /></label>
+
+        <h3>Anzeige</h3>
         <label>Ziffernstil (oder auf die Uhr tippen)
           <select name="face">
             <option value="outline">Kontur</option>
@@ -746,8 +857,7 @@
           </select>
         </label>
         <label>Helligkeit der Uhr<input name="dim" type="range" min="25" max="100" step="5" /></label>
-        <label>Min. Temperatur °C<input name="tempMin" inputmode="decimal" placeholder="20" /></label>
-        <label>Max. Temperatur °C<input name="tempMax" inputmode="decimal" placeholder="40" /></label>
+
         <div class="row">
           <button class="chip primary" type="submit">Speichern</button>
           <button class="chip" type="button" id="cfg-cancel">Abbrechen</button>
@@ -763,32 +873,74 @@
       const pad = (n) => String(n).padStart(2, "0");
 
       /* ── Konfiguration ─────────────────────────────────────── */
-      const CFG_KEY = "rejuvenation.nightstand.v2";
-      const DEFAULTS = {
-        haUrl: "",
-        token: "",
+      /* Verbindung und Anzeige gelten fuer das Geraet, die Entities
+         haengen am jeweiligen Bett: mehrere Betten im Haus — oder
+         zwei Seiten desselben Betts — bekommen je einen Eintrag,
+         und jedes Telefon merkt sich, welcher seiner ist. */
+      const CFG_KEY = "rejuvenation.nightstand.v3";
+      const LEGACY_KEY = "rejuvenation.nightstand.v2";
+
+      const BED_FIELDS = [
+        "name", "climate", "alarm", "alarmSwitch", "light", "tempMin", "tempMax",
+      ];
+      const GLOBAL_FIELDS = ["haUrl", "token", "face", "dim"];
+
+      const BED_DEFAULTS = {
+        name: "Bett",
         climate: "",
         alarm: "",
         alarmSwitch: "",
         light: "",
         tempMin: "20",
         tempMax: "40",
+      };
+
+      const DEFAULTS = {
+        haUrl: "",
+        token: "",
         face: "outline",
         dim: "85",
+        active: 0,
+        beds: [{ ...BED_DEFAULTS }],
       };
 
       function loadCfg() {
         try {
-          return { ...DEFAULTS, ...JSON.parse(localStorage.getItem(CFG_KEY) || "{}") };
+          const raw = localStorage.getItem(CFG_KEY);
+          if (raw) {
+            const parsed = { ...DEFAULTS, ...JSON.parse(raw) };
+            if (!Array.isArray(parsed.beds) || !parsed.beds.length) {
+              parsed.beds = [{ ...BED_DEFAULTS }];
+            }
+            parsed.beds = parsed.beds.map((bed) => ({ ...BED_DEFAULTS, ...bed }));
+            parsed.active = clamp(parsed.active | 0, 0, parsed.beds.length - 1);
+            return parsed;
+          }
+          /* Aus der Zeit vor den Bett-Profilen: das eine vorhandene
+             Entity-Set wird zum ersten Bett. */
+          const legacy = JSON.parse(localStorage.getItem(LEGACY_KEY) || "{}");
+          const cfg = { ...DEFAULTS, beds: [{ ...BED_DEFAULTS }] };
+          GLOBAL_FIELDS.forEach((key) => {
+            if (legacy[key]) cfg[key] = legacy[key];
+          });
+          BED_FIELDS.forEach((key) => {
+            if (legacy[key]) cfg.beds[0][key] = legacy[key];
+          });
+          return cfg;
         } catch {
-          return { ...DEFAULTS };
+          return { ...DEFAULTS, beds: [{ ...BED_DEFAULTS }] };
         }
       }
 
+      function saveCfg() {
+        localStorage.setItem(CFG_KEY, JSON.stringify(cfg));
+      }
+
       let cfg = loadCfg();
+      const bed = () => cfg.beds[cfg.active] || cfg.beds[0];
       const isLive = () => Boolean(cfg.haUrl && cfg.token);
-      const tempMin = () => parseFloat(cfg.tempMin) || 20;
-      const tempMax = () => parseFloat(cfg.tempMax) || 40;
+      const tempMin = () => parseFloat(bed().tempMin) || 20;
+      const tempMax = () => parseFloat(bed().tempMax) || 40;
 
       /* ── Home-Assistant-REST ───────────────────────────────── */
       async function haGet(entity) {
@@ -978,7 +1130,7 @@
       function cycleFace() {
         const index = FACES.indexOf(cfg.face);
         cfg.face = FACES[(index + 1) % FACES.length];
-        localStorage.setItem(CFG_KEY, JSON.stringify(cfg));
+        saveCfg();
         lastFaceKey = "";
         paintClock();
         $("status").textContent = FACE_NAMES[cfg.face];
@@ -1079,9 +1231,9 @@
         clearTimeout(pushTimer);
         pushTimer = setTimeout(async () => {
           const value = pendingTarget;
-          if (cfg.climate) {
+          if (bed().climate) {
             await haCall("climate", "set_temperature", {
-              entity_id: cfg.climate,
+              entity_id: bed().climate,
               temperature: value,
             });
           } else if (!isLive()) {
@@ -1141,7 +1293,7 @@
       }
 
       function alarmActive() {
-        if (!cfg.alarmSwitch && isLive()) return Boolean(parseAlarm(alarmState));
+        if (!bed().alarmSwitch && isLive()) return Boolean(parseAlarm(alarmState));
         return alarmSwitchState ? alarmSwitchState.state === "on" : Boolean(parseAlarm(alarmState));
       }
 
@@ -1183,16 +1335,16 @@
 
       $("al-save").addEventListener("click", async () => {
         const time = `${pad(editHH)}:${pad(editMM)}:00`;
-        if (cfg.alarm) {
+        if (bed().alarm) {
           await haCall("input_datetime", "set_datetime", {
-            entity_id: cfg.alarm,
+            entity_id: bed().alarm,
             time,
           });
         } else if (!isLive()) {
           demo.alarm.state = time;
         }
-        if (cfg.alarmSwitch) {
-          await haCall("input_boolean", "turn_on", { entity_id: cfg.alarmSwitch });
+        if (bed().alarmSwitch) {
+          await haCall("input_boolean", "turn_on", { entity_id: bed().alarmSwitch });
         } else if (!isLive()) {
           demo.alarmSwitch.state = "on";
         }
@@ -1201,8 +1353,8 @@
       });
 
       $("al-clear").addEventListener("click", async () => {
-        if (cfg.alarmSwitch) {
-          await haCall("input_boolean", "turn_off", { entity_id: cfg.alarmSwitch });
+        if (bed().alarmSwitch) {
+          await haCall("input_boolean", "turn_off", { entity_id: bed().alarmSwitch });
         } else if (!isLive()) {
           demo.alarmSwitch.state = "off";
         }
@@ -1228,9 +1380,9 @@
 
       async function setBrightness(pct) {
         $("li-pct").textContent = String(pct);
-        if (cfg.light) {
+        if (bed().light) {
           await haCall("light", "turn_on", {
-            entity_id: cfg.light,
+            entity_id: bed().light,
             brightness_pct: pct,
           });
         } else if (!isLive()) {
@@ -1248,8 +1400,8 @@
       });
 
       $("li-toggle").addEventListener("click", async () => {
-        if (cfg.light) {
-          await haCall("light", "toggle", { entity_id: cfg.light });
+        if (bed().light) {
+          await haCall("light", "toggle", { entity_id: bed().light });
         } else if (!isLive()) {
           demo.light.state = demo.light.state === "on" ? "off" : "on";
         }
@@ -1259,9 +1411,9 @@
       /* Nachtlicht: 1 % in warmem Bernstein — genug, um den Weg
          zu sehen, ohne wach zu werden. */
       $("li-night").addEventListener("click", async () => {
-        if (cfg.light) {
+        if (bed().light) {
           await haCall("light", "turn_on", {
-            entity_id: cfg.light,
+            entity_id: bed().light,
             brightness_pct: 1,
             kelvin: 2000,
           });
@@ -1307,31 +1459,144 @@
         openSheet("sheet-alarm");
       });
 
-      /* ── Einstellungen ─────────────────────────────────────── */
-      const form = $("cfg-form");
+      /* ── Bett wechseln ─────────────────────────────────────── */
+      function bedTitle(entry, index) {
+        return (entry.name || "").trim() || `Bett ${index + 1}`;
+      }
 
-      $("status").addEventListener("click", () => {
-        Object.keys(DEFAULTS).forEach((key) => {
-          if (form.elements[key]) form.elements[key].value = cfg[key] || "";
+      function paintBedLabel() {
+        document.body.classList.toggle("single-bed", cfg.beds.length < 2);
+        $("bed-label").textContent = bedTitle(bed(), cfg.active);
+      }
+
+      function selectBed(index) {
+        cfg.active = clamp(index, 0, cfg.beds.length - 1);
+        saveCfg();
+        paintBedLabel();
+        closeSheets();
+        refresh();
+      }
+
+      $("bed-switch").addEventListener("click", () => {
+        const list = $("bed-list");
+        list.innerHTML = "";
+        cfg.beds.forEach((entry, index) => {
+          const chip = document.createElement("button");
+          chip.type = "button";
+          chip.className = "chip" + (index === cfg.active ? " primary" : "");
+          chip.textContent = bedTitle(entry, index);
+          chip.addEventListener("click", () => selectBed(index));
+          list.appendChild(chip);
         });
-        $("cfg").classList.add("show");
+        openSheet("sheet-beds");
       });
 
-      $("cfg-cancel").addEventListener("click", () => $("cfg").classList.remove("show"));
+      /* ── Einstellungen ─────────────────────────────────────── */
+      const form = $("cfg-form");
+      const bedSelect = $("bed-select");
+
+      /* Waehrend das Formular offen ist, wird auf einer Kopie
+         gearbeitet — Abbrechen soll wirklich nichts hinterlassen. */
+      let draft = null;
+      let draftIndex = 0;
+
+      function fillBedFields() {
+        const entry = draft.beds[draftIndex];
+        BED_FIELDS.forEach((key) => {
+          if (form.elements[key]) form.elements[key].value = entry[key] || "";
+        });
+      }
+
+      function captureBedFields() {
+        const entry = draft.beds[draftIndex];
+        BED_FIELDS.forEach((key) => {
+          if (form.elements[key]) entry[key] = form.elements[key].value.trim();
+        });
+      }
+
+      function fillBedSelect() {
+        bedSelect.innerHTML = "";
+        draft.beds.forEach((entry, index) => {
+          const option = document.createElement("option");
+          option.value = String(index);
+          option.textContent = bedTitle(entry, index);
+          bedSelect.appendChild(option);
+        });
+        bedSelect.value = String(draftIndex);
+        $("bed-remove").disabled = draft.beds.length < 2;
+      }
+
+      function openSettings() {
+        draft = JSON.parse(JSON.stringify(cfg));
+        draftIndex = draft.active;
+        GLOBAL_FIELDS.forEach((key) => {
+          if (form.elements[key]) form.elements[key].value = draft[key] || "";
+        });
+        fillBedSelect();
+        fillBedFields();
+        $("cfg").classList.add("show");
+      }
+
+      $("btn-cfg").addEventListener("click", openSettings);
+      $("status").addEventListener("click", openSettings);
+
+      /* Die Bezeichnung wandert live in die Auswahlliste, sonst
+         stuende dort noch "Bett 2", waehrend oben schon der
+         richtige Name steht. */
+      form.elements.name.addEventListener("input", () => {
+        const option = bedSelect.options[draftIndex];
+        if (option) {
+          option.textContent =
+            form.elements.name.value.trim() || `Bett ${draftIndex + 1}`;
+        }
+      });
+
+      bedSelect.addEventListener("change", () => {
+        captureBedFields();
+        draftIndex = clamp(+bedSelect.value, 0, draft.beds.length - 1);
+        fillBedSelect();
+        fillBedFields();
+      });
+
+      $("bed-add").addEventListener("click", () => {
+        captureBedFields();
+        draft.beds.push({ ...BED_DEFAULTS, name: `Bett ${draft.beds.length + 1}` });
+        draftIndex = draft.beds.length - 1;
+        fillBedSelect();
+        fillBedFields();
+        form.elements.name.focus();
+      });
+
+      $("bed-remove").addEventListener("click", () => {
+        if (draft.beds.length < 2) return;
+        draft.beds.splice(draftIndex, 1);
+        draftIndex = clamp(draftIndex, 0, draft.beds.length - 1);
+        fillBedSelect();
+        fillBedFields();
+      });
+
+      $("cfg-cancel").addEventListener("click", () => {
+        draft = null;
+        $("cfg").classList.remove("show");
+      });
 
       form.addEventListener("submit", (event) => {
         event.preventDefault();
-        const next = { ...DEFAULTS };
-        Object.keys(DEFAULTS).forEach((key) => {
-          if (form.elements[key]) next[key] = form.elements[key].value.trim();
+        captureBedFields();
+        GLOBAL_FIELDS.forEach((key) => {
+          if (form.elements[key]) draft[key] = form.elements[key].value.trim();
         });
-        next.haUrl = next.haUrl.replace(/\/+$/, "");
-        cfg = next;
-        localStorage.setItem(CFG_KEY, JSON.stringify(cfg));
+        draft.haUrl = draft.haUrl.replace(/\/+$/, "");
+        /* Das im Formular zuletzt gewaehlte Bett ist das dieses Geraets. */
+        draft.active = draftIndex;
+        cfg = draft;
+        draft = null;
+        saveCfg();
         $("cfg").classList.remove("show");
         lastFaceKey = "";
         applyDim();
         paintClock();
+        paintBedLabel();
         refresh();
       });
 
@@ -1339,10 +1604,10 @@
       async function refresh() {
         if (isLive()) {
           const [climate, alarm, alarmSwitch, light] = await Promise.all([
-            haGet(cfg.climate),
-            haGet(cfg.alarm),
-            haGet(cfg.alarmSwitch),
-            haGet(cfg.light),
+            haGet(bed().climate),
+            haGet(bed().alarm),
+            haGet(bed().alarmSwitch),
+            haGet(bed().light),
           ]);
           bedState = climate;
           alarmState = alarm;
@@ -1364,6 +1629,7 @@
 
       applyDim();
       paintClock();
+      paintBedLabel();
       paintAlarmSheet();
       refresh();
       scheduleDoze();
