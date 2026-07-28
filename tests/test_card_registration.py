@@ -34,6 +34,16 @@ def test_card_datei_wird_ausgeliefert():
     assert 'customElements.define("rejuvenation-nightstand"' in inhalt
 
 
+def test_manifest_deklariert_benutzte_komponenten():
+    """hassfest besteht darauf, dass benutzte Komponenten im Manifest stehen."""
+    import json
+
+    manifest = json.loads(Path("custom_components/rejuvenation_bed/manifest.json").read_text(encoding="utf-8"))
+    deps = manifest.get("dependencies", [])
+    assert "http" in deps, "async_register_static_paths() braucht die http-Komponente"
+    assert "frontend" in deps, "add_extra_js_url() braucht die frontend-Komponente"
+
+
 def test_registriert_pfad_und_frontend_url():
     hass = _hass()
     with patch("custom_components.rejuvenation_bed.frontend") as frontend:
