@@ -9,7 +9,7 @@
 Biorhythm-based temperature curve, learned bedtime prediction, solar surplus stored as heat, presence detection without extra sensors, and a fail-safe that survives every sensor it depends on. Works with waterbeds, heating pads and heated mattress toppers.
 
 [![HACS](https://img.shields.io/badge/HACS-Default-E8A33D.svg?style=flat-square)](https://github.com/hacs/integration)
-[![Version](https://img.shields.io/badge/version-v260628-B47326.svg?style=flat-square)](https://github.com/Chance-Konstruktion/ha-rejuvenation-bed/releases)
+[![Version](https://img.shields.io/badge/version-v260728-B47326.svg?style=flat-square)](https://github.com/Chance-Konstruktion/ha-rejuvenation-bed/releases)
 [![License](https://img.shields.io/badge/license-MIT-7BA968.svg?style=flat-square)](LICENSE)
 [![Home Assistant](https://img.shields.io/badge/Home%20Assistant-2024.6+-41BDF5.svg?style=flat-square)](https://www.home-assistant.io/)
 
@@ -337,45 +337,53 @@ Per zone (one zone for single beds, two for dual-core waterbeds):
 
 ## 🌒 Dashboards
 
-Two ready-made templates live in `dashboards/`.
+The integration ships a Lovelace card, `custom:rejuvenation-nightstand`, and
+registers it with the frontend itself — nothing to copy into `/config/www`, no
+resource to add by hand, no token and no second login. It talks to Home
+Assistant through the same session you are already signed in to.
 
-<details>
-<summary><b>Lovelace YAML — Nightstand Cockpit</b></summary>
+An alarm-clock face for the tablet next to the bed: pure-black AMOLED
+background with amber accents, a large clock, and exactly three keys —
+waterbed temperature (a draggable thermostat ring), alarm and bedroom lamp.
 
-<br>
-
-`dashboards/rejuvenation_bed_nightstand_cockpit.yaml` — mobile/tablet-friendly Lovelace template. Adjust the entity IDs to your installation.
-
-</details>
-
-<details>
-<summary><b>Standalone HTML — Premium Dashboard</b></summary>
-
-<br>
-
-`dashboards/premium_nightstand_dashboard.html` — standalone React/HTML dashboard with mini view below 800 px.
-
-Embed as a panel:
+Create a dashboard, open its raw configuration editor and paste
+`dashboards/nightstand.yaml`, adjusting the entity IDs. The view uses
+`type: panel` so the card fills the screen; the button in the card's corner
+takes it to true fullscreen without browser chrome.
 
 ```yaml
-panel_iframe:
-  waterbed_cockpit:
-    title: Waterbed Cockpit
-    icon: mdi:bed-outline
-    url: /local/rejuvenation_bed/premium_nightstand_dashboard.html
+views:
+  - type: panel
+    cards:
+      - type: custom:rejuvenation-nightstand
+        beds:
+          - name: Bedroom · left
+            climate: climate.thermostat_bed_left
+            alarm: input_datetime.alarm_left
+            alarm_switch: input_boolean.alarm_left_active
+            light: light.bedroom
 ```
 
-Or as an iframe card:
+Entity IDs belong to a bed entry rather than to the card, so several beds in
+one house — or two sides of the same bed — each get their own. Every device
+remembers which one is its own, so you and your partner control your own sides
+from your own phones. With more than one entry the bed's name appears in the
+header and switches between them.
 
-```yaml
-type: iframe
-url: /local/rejuvenation_bed/premium_nightstand_dashboard.html
-aspect_ratio: 100%
-```
+The clock face is switchable by tapping the clock: outline (the default — a
+filled digit throws too much light next to a pillow), 7-segment, 5x7 LED matrix
+and split-flap. Brightness has its own slider. Both are per device, so one
+dashboard can look different on every screen.
 
-Copy the file to `/config/www/rejuvenation_bed/`.
+After 45 seconds without a touch everything but the clock fades away, and the
+digits drift a few pixels every minute so nothing burns into an OLED panel
+overnight. The first touch only wakes the screen — it never triggers a key by
+accident.
 
-</details>
+The alarm uses ordinary helpers (a date/time helper set to "time only" plus a
+toggle), created under Settings -> Devices & Services -> Helpers. They are
+deliberately not part of the integration so your existing wake-up automation
+keeps working.
 
 ---
 

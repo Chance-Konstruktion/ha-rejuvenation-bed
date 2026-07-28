@@ -4,6 +4,45 @@ Alle Änderungen am Rejuvenation Bed Projekt.
 
 ## [Unreleased]
 
+## [v260728] - 2026-07-28
+
+### Dashboard
+- **Nachttischwecker als echte Lovelace-Karte:** Die Integration liefert
+  `custom:rejuvenation-nightstand` mit und meldet die Karte beim Start selbst im
+  Frontend an — kein Kopieren nach `/config/www`, kein Ressourcen-Eintrag von
+  Hand, kein Long-Lived Token und keine zweite Anmeldung. Die Karte spricht über
+  das `hass`-Objekt mit Home Assistant, also über die Sitzung, in der man
+  ohnehin angemeldet ist. Die frühere eigenständige HTML-Seite entfällt damit,
+  ebenso die beiden alten Dashboard-Vorlagen (`premium_nightstand_dashboard.html`
+  sowie der 1,5 MB große Export `Dashboard _claudedesign.html`). Beispiel-
+  Dashboard: `dashboards/nightstand.yaml`, als `type: panel` bildschirmfüllend,
+  mit Vollbild-Knopf in der Karte.
+- **Drei Tasten wie am Bett:** Wasserbetttemperatur als ziehbarer
+  Thermostat-Ring, Wecker (Stunde/Minute stellen, ausschalten) und
+  Schlafzimmerlampe (Helligkeit, An/Aus, Nachtlicht mit 1 % bei 2000 K).
+  Tiefschwarzer AMOLED-Hintergrund, Akzente ausschließlich in gedecktem
+  Bernstein.
+- **Vier Zifferblätter:** Kontur (Standard, nur Umriss ohne Leuchtschleier —
+  eine ausgefüllte Ziffer strahlt neben dem Kopfkissen zu viel Fläche ab),
+  7-Segment im Weckerradio-Stil der frühen 80er inklusive sichtbarer
+  unbeleuchteter Segmente, 5×7-LED-Matrix der 90er und Klappanzeige. Umschalten
+  per Tipp auf die Uhr, dazu ein eigener Helligkeitsregler. Beides gilt pro
+  Gerät, ein Dashboard darf also auf jedem Bildschirm anders aussehen.
+- **Mehrere Betten und Seiten:** Die Entities hängen an einem Bett-Eintrag der
+  Kartenkonfiguration. Mehrere Betten im Haus — oder zwei Seiten desselben
+  Betts — bekommen je einen Eintrag; jedes Gerät merkt sich seinen eigenen,
+  sodass beide Seiten unabhängig vom jeweiligen Telefon bedient werden.
+- **Nachtbetrieb:** Nach 45 Sekunden ohne Berührung blendet alles außer der Uhr
+  aus, und die Ziffern wandern minütlich einige Pixel gegen Einbrennen auf
+  OLED-Panels. Die erste Berührung weckt nur den Bildschirm und löst keine Taste
+  aus.
+
+### Anforderungen
+- **Mindestversion auf Home Assistant 2024.7.0 angehoben:** Die Karte wird über
+  `async_register_static_paths()` ausgeliefert, das es erst ab dieser Version
+  gibt. Schlägt die Registrierung fehl, wird das protokolliert und das Setup
+  läuft weiter — ohne Karte, aber mit voll funktionsfähiger Integration.
+
 ## [v260628] - 2026-06-28
 
 ### Dokumentation
