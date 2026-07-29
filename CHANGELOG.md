@@ -4,6 +4,27 @@ Alle Änderungen am Rejuvenation Bed Projekt.
 
 ## [Unreleased]
 
+### Dashboard
+- **Nachtlicht funktioniert wieder:** `light.turn_on` bekam die Farbtemperatur
+  als `kelvin` — ein altes Alias, das neuere Kerne mit »extra keys not allowed
+  @ data['kelvin']« abweisen. Der Parameter heißt jetzt `color_temp_kelvin` und
+  wird nur gesendet, wenn die Lampe Farbtemperatur überhaupt kennt (sonst
+  scheitert der ganze Aufruf), begrenzt auf ihren eigenen Kelvin-Bereich. Steht
+  als Lampe ein Schalter, ruft die Karte dessen eigene Dienste und lässt Dimmer
+  und Nachtlicht-Knopf weg, statt `light.turn_on` auf eine Nicht-Lampe zu
+  werfen.
+- **Kleinstschirme:** Auf dem Außendisplay eines Falters (bis etwa 420 Punkte
+  Kantenlänge) erzwang die Karte eine Mindesthöhe und schnitt die drei Tasten
+  unten ab. Sie erkennt solche Schirme jetzt an ihrer eigenen Größe und
+  schrumpft auf eine kompakte Fassung: Kopfzeile im Fluss statt schwebend,
+  kleinere Ziffern und Tasten, scrollende Overlays, keine Mindesthöhe.
+- **Editor schlägt nur Passendes vor:** Die Auswahlfelder filtern nicht mehr
+  bloß nach Domain, sondern nach Eignung — Weckzeit nur aus Datum/Zeit-Helfern
+  mit Uhrzeit und Sensoren mit Zeitstempel, Thermostat nur aus Klima-Entitäten
+  mit Zieltemperatur. Bereits eingetragene Entitäten bleiben wählbar, auch wenn
+  sie gerade nicht erreichbar sind, und der Editor baut sich beim ersten
+  `hass`-Objekt einmal neu auf, damit die Listen von Anfang an stehen.
+
 ## [v260728] - 2026-07-28
 
 ### Dashboard
