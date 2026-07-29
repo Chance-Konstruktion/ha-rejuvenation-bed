@@ -95,7 +95,30 @@ def test_karte_bringt_grafischen_editor_mit():
     inhalt = _karte()
     assert "static getConfigElement()" in inhalt
     assert 'customElements.define("rejuvenation-nightstand-editor"' in inhalt
-    assert 'selector: { entity: { domain: "climate" } }' in inhalt
+    assert "function entityPicker(" in inhalt
+    assert "include_entities" in inhalt, "es werden nur passende Entities vorgeschlagen"
+
+
+def test_editor_filtert_weckzeit_auf_zeitstempel():
+    """Unter sensor. liegt zu viel — als Weckzeit taugen nur Zeit-Entities."""
+    inhalt = _karte()
+    assert "has_time" in inhalt
+    assert '"timestamp"' in inhalt
+
+
+def test_nachtlicht_nutzt_gueltigen_dienstparameter():
+    """light.turn_on kennt color_temp_kelvin; »kelvin« weist der Kern ab."""
+    inhalt = _karte()
+    assert "color_temp_kelvin" in inhalt
+    assert "kelvin: 2000" not in inhalt
+
+
+def test_karte_passt_auf_kleinstschirme():
+    """Aussendisplay eines Falters: nichts darf unten abgeschnitten werden."""
+    inhalt = _karte()
+    assert "TINY_MAX_PX" in inhalt
+    assert ".root.is-tiny" in inhalt
+    assert "min-height: 0" in inhalt
 
 
 def test_uhr_wechselt_nicht_mehr_per_tipp():

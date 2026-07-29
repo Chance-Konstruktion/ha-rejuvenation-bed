@@ -28,6 +28,10 @@ const LAYOUT_NAMES = {
 const WIDE_MIN_PX = 720;
 const WIDE_MIN_RATIO = 1.25;
 
+/* Bis zu dieser Kantenlaenge ist der Schirm ein Aussendisplay oder eine
+   Kachel — dort zaehlt jeder Punkt, und nichts darf abgeschnitten werden. */
+const TINY_MAX_PX = 420;
+
 const FACE_NAMES = {
   outline: "Kontur",
   segment: "7-Segment · 80er",
@@ -451,6 +455,53 @@ const STYLE = `
   .root.is-wide .deck { grid-column: 2; grid-row: 1; margin-top: 0; }
   .root.is-wide .status { grid-column: 1 / -1; grid-row: 2; }
 
+  /* ── Kleinstschirm ──
+     Aussendisplay eines Falters, Smartwatch-artige Kacheln: rund 350 x 380
+     Punkte. Die Karte darf dort keine Mindesthoehe erzwingen, sonst laeuft
+     der Inhalt unten aus dem Rahmen und die drei Tasten sind nicht mehr
+     erreichbar (overflow: hidden schneidet sie einfach ab). */
+  .root.is-tiny {
+    min-height: 0;
+    gap: 8px;
+    padding: 10px 10px 12px;
+    border-radius: 0;
+  }
+
+  .root.is-tiny .topbar {
+    position: static;
+    top: auto; left: auto; right: auto;
+  }
+  .root.is-tiny .icon-btn { padding: 5px 8px; font-size: 9px; letter-spacing: 0.14em; }
+  .root.is-tiny .icon-btn svg { width: 15px; height: 15px; }
+  .root.is-tiny .clock { margin: 2px 0; }
+  .root.is-tiny .time { font-size: clamp(42px, 24vw, 88px); }
+  .root.is-tiny .date { margin-top: 5px; font-size: 9px; letter-spacing: 0.22em; }
+  .root.is-tiny .deck { max-width: none; gap: 7px; }
+  .root.is-tiny .key { gap: 10px; padding: 8px 11px; border-radius: 14px; }
+  .root.is-tiny .key .glyph { width: 20px; height: 20px; }
+  .root.is-tiny .key .label { font-size: 8px; letter-spacing: 0.14em; }
+  .root.is-tiny .key .value { margin-top: 1px; font-size: 15px; }
+  .root.is-tiny .key .aux { font-size: 10px; }
+  .root.is-tiny .status { display: none; }
+
+  /* Die Overlays scrollen auf so wenig Hoehe, statt zu klemmen. */
+  .root.is-tiny .sheet {
+    gap: 12px;
+    padding: 12px;
+    justify-content: flex-start;
+    overflow-y: auto;
+  }
+  .root.is-tiny .dial { width: min(46vh, 180px); }
+  .root.is-tiny .dial .target { font-size: 34px; }
+  .root.is-tiny .dial .target sup { font-size: 14px; }
+  .root.is-tiny .dial .actual { font-size: 10px; }
+  .root.is-tiny .stepper { gap: 14px; }
+  .root.is-tiny .stepper button { width: 44px; height: 44px; font-size: 20px; }
+  .root.is-tiny .bignum { font-size: 40px; }
+  .root.is-tiny .chip { padding: 8px 14px; font-size: 12px; }
+  .root.is-tiny .missing { font-size: 11px; }
+  .root.is-tiny input[type="range"] { width: 92%; height: 34px; }
+
   /* ── Nachtruhe ── */
   .root.dozing .deck,
   .root.dozing .status,
@@ -460,6 +511,12 @@ const STYLE = `
   .root.dozing .topbar,
   .root.dozing .clock { transition: opacity 1.4s ease; }
   .root.dozing .clock { opacity: 0.42; }
+
+  /* Sicherheitsnetz, bevor die Karte sich selbst gemessen hat: auf einem
+     flachen Schirm darf die Mindesthoehe den Inhalt nie herausdruecken. */
+  @media (max-height: 460px) {
+    .root { min-height: 0; }
+  }
 
   @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
 `;
@@ -702,6 +759,16 @@ class RejuvenationNightstandCard extends HTMLElement {
      einer Panel-Ansicht ist beides gleich, in einer schmalen Spalte nicht. */
   _applyLayout() {
     if (!this._built) return;
+    const root = this.$("root");
+    const box = root.getBoundingClientRect();
+    const width = box.width || this.clientWidth;
+    /* Ohne eigene Hoehe (Karte noch nicht gelayoutet) hilft das Fenster. */
+    const height =
+      box.height || this.clientHeight || (window.visualViewport && window.visualViewport.height) ||
+      window.innerHeight || 1;
+
+    const tiny = Boolean(width) && (width <= TINY_MAX_PX || height <= TINY_MAX_PX);
+
     const layout = this._layout;
     let wide;
     if (layout === "wide") {
@@ -709,12 +776,11 @@ class RejuvenationNightstandCard extends HTMLElement {
     } else if (layout === "tall") {
       wide = false;
     } else {
-      const box = this.$("root").getBoundingClientRect();
-      const width = box.width || this.clientWidth;
-      const height = box.height || this.clientHeight || 1;
-      wide = width >= WIDE_MIN_PX && width / height >= WIDE_MIN_RATIO;
+      wide = !tiny && width >= WIDE_MIN_PX && width / height >= WIDE_MIN_RATIO;
     }
-    this.$("root").classList.toggle("is-wide", wide);
+
+    root.classList.toggle("is-wide", wide);
+    root.classList.toggle("is-tiny", tiny);
   }
 
   get _bed() {
@@ -1098,27 +1164,61 @@ class RejuvenationNightstandCard extends HTMLElement {
     this.$("a-light").textContent = this._bed.light && !on ? "aus" : "";
     this.$("li-pct").textContent = String(pct || 0);
     if (pct) this.$("li-range").value = String(pct);
+
+    /* Ein Schalter kennt kein Dimmen und kein Nachtlicht — dann bleiben die
+       beiden Bedienelemente weg, statt Dienste zu rufen, die es nicht gibt. */
+    const dimmable = this._lightDomain === "light";
+    this.$("li-range").style.display = dimmable ? "" : "none";
+    this.$("li-night").style.display = dimmable ? "" : "none";
+  }
+
+  /* Als Lampe darf auch ein Schalter eingetragen sein — dann gibt es weder
+     light.turn_on noch Helligkeit, und der Dienst kommt aus der Entity-ID. */
+  get _lightDomain() {
+    return String(this._bed.light || "").split(".")[0];
+  }
+
+  _lightSupports(mode) {
+    const state = this._state(this._bed.light);
+    const modes = (state && state.attributes.supported_color_modes) || [];
+    return Array.isArray(modes) && modes.includes(mode);
   }
 
   _setBrightness(pct) {
     if (!this._bed.light) return;
+    if (this._lightDomain !== "light") {
+      this._call(this._lightDomain, pct ? "turn_on" : "turn_off", { entity_id: this._bed.light });
+      return;
+    }
     this._call("light", "turn_on", { entity_id: this._bed.light, brightness_pct: pct });
   }
 
   _toggleLight() {
     if (!this._bed.light) return;
-    this._call("light", "toggle", { entity_id: this._bed.light });
+    this._call(this._lightDomain, "toggle", { entity_id: this._bed.light });
   }
 
-  /* 1 % in warmem Bernstein — genug fuer den Weg ins Bad, ohne
-     davon wach zu werden. */
+  /* 1 % in warmem Bernstein — genug fuer den Weg ins Bad, ohne davon wach zu
+     werden. Die Farbtemperatur heisst im Dienst color_temp_kelvin; "kelvin"
+     war ein Alias und wird von neueren Kernen als unbekannter Schluessel
+     abgewiesen. Gesendet wird sie nur, wenn die Lampe sie ueberhaupt kennt —
+     sonst laesst light.turn_on den ganzen Aufruf scheitern. */
   _nightLight() {
     if (!this._bed.light) return;
-    this._call("light", "turn_on", {
-      entity_id: this._bed.light,
-      brightness_pct: 1,
-      kelvin: 2000,
-    });
+    if (this._lightDomain !== "light") {
+      this._call(this._lightDomain, "turn_on", { entity_id: this._bed.light });
+      this._closeSheets();
+      return;
+    }
+
+    const data = { entity_id: this._bed.light, brightness_pct: 1 };
+    if (this._lightSupports("color_temp")) {
+      const state = this._state(this._bed.light);
+      const min = Number((state && state.attributes.min_color_temp_kelvin) || 0) || 2000;
+      const max = Number((state && state.attributes.max_color_temp_kelvin) || 0) || 6500;
+      data.color_temp_kelvin = Math.round(clamp(2000, min, max));
+    }
+    this._call("light", "turn_on", data);
     this._closeSheets();
   }
 
@@ -1236,12 +1336,73 @@ const GLOBAL_SCHEMA = [
   { name: "dim", selector: { number: { min: 25, max: 100, step: 5, mode: "slider" } } },
 ];
 
-const BED_SCHEMA = [
-  { name: "name", selector: { text: {} } },
-  { name: "climate", selector: { entity: { domain: "climate" } } },
-  { name: "alarm", selector: { entity: { domain: ["input_datetime", "sensor"] } } },
-  { name: "alarm_switch", selector: { entity: { domain: ["input_boolean", "switch"] } } },
-  { name: "light", selector: { entity: { domain: ["light", "switch"] } } },
+/* Welche Entity passt in welches Feld? Die Domain allein reicht nicht: unter
+ * sensor. liegen zehntausend Dinge, von denen genau die Zeitstempel eine
+ * Weckzeit sein koennen. Was hier durchfaellt, wird gar nicht vorgeschlagen. */
+const BED_MATCH = {
+  /* Ein Thermostat ohne Zieltemperatur waere eine Uhr ohne Zeiger. */
+  climate: (id, state) =>
+    id.startsWith("climate.") &&
+    (state.attributes.temperature !== undefined || state.attributes.min_temp !== undefined),
+
+  alarm: (id, state) => {
+    if (id.startsWith("input_datetime.")) return state.attributes.has_time === true;
+    if (!id.startsWith("sensor.")) return false;
+    return (
+      state.attributes.device_class === "timestamp" ||
+      /^\d{1,2}:\d{2}(:\d{2})?$/.test(String(state.state))
+    );
+  },
+
+  alarm_switch: (id) => id.startsWith("input_boolean.") || id.startsWith("switch."),
+
+  /* Eine Lampe darf auch ein Schalter sein — dann faellt nur das Dimmen weg. */
+  light: (id) => id.startsWith("light.") || id.startsWith("switch."),
+};
+
+const BED_DOMAINS = {
+  climate: "climate",
+  alarm: ["input_datetime", "sensor"],
+  alarm_switch: ["input_boolean", "switch"],
+  light: ["light", "switch"],
+};
+
+/* Passende Entities werden als Liste mitgegeben; findet sich keine (oder ist
+ * hass noch nicht da), bleibt es beim Domain-Filter — lieber zu viel
+ * vorschlagen als ein leeres Auswahlfeld. */
+function entityPicker(field, hass, current) {
+  const selector = { entity: { domain: BED_DOMAINS[field] } };
+  if (!hass || !hass.states) return { name: field, selector };
+
+  const match = BED_MATCH[field];
+  const fits = Object.keys(hass.states).filter((id) => {
+    try {
+      return match(id, hass.states[id]);
+    } catch {
+      return false;
+    }
+  });
+  /* Was schon eingetragen ist, bleibt waehlbar — sonst leert das Auswahlfeld
+     eine Konfiguration, nur weil die Entity gerade nicht erreichbar ist. */
+  if (current && !fits.includes(current)) fits.push(current);
+  if (!fits.length) return { name: field, selector };
+
+  return { name: field, selector: { entity: { include_entities: fits.sort() } } };
+}
+
+function bedSchema(hass, bed) {
+  const pick = (field) => entityPicker(field, hass, bed ? bed[field] : "");
+  return [
+    { name: "name", selector: { text: {} } },
+    pick("climate"),
+    pick("alarm"),
+    pick("alarm_switch"),
+    pick("light"),
+    ...BED_NUMBERS,
+  ];
+}
+
+const BED_NUMBERS = [
   {
     name: "temp_min",
     selector: { number: { min: 10, max: 40, step: 0.5, mode: "box", unit_of_measurement: "°C" } },
@@ -1307,9 +1468,13 @@ class RejuvenationNightstandCardEditor extends HTMLElement {
     this._render();
   }
 
+  /* Beim ersten hass entstehen die Vorschlagslisten — bis dahin kennt der
+     Editor keine Entities und muss danach einmal neu aufbauen. */
   set hass(hass) {
+    const first = !this._hass;
     this._hass = hass;
     this._forms.forEach((form) => (form.hass = hass));
+    if (first) this._render(true);
   }
 
   get _globalData() {
@@ -1374,6 +1539,7 @@ class RejuvenationNightstandCardEditor extends HTMLElement {
     const hint = document.createElement("p");
     hint.className = "hint";
     hint.textContent =
+      "Vorgeschlagen wird nur, was in das jeweilige Feld passt. " +
       "Zifferblatt und Helligkeit sind nur die Vorgabe — jedes Geraet darf sie in der Karte selbst ueberstimmen.";
     wrap.appendChild(hint);
 
@@ -1399,7 +1565,7 @@ class RejuvenationNightstandCardEditor extends HTMLElement {
 
       const form = document.createElement("ha-form");
       form.hass = this._hass;
-      form.schema = BED_SCHEMA;
+      form.schema = bedSchema(this._hass, bed);
       form.data = bed;
       form.computeLabel = label;
       form.addEventListener("value-changed", (event) => {

@@ -379,7 +379,13 @@ header and switches between them.
 The card has a visual editor: add it through **Add card → Rejuvenation
 Nachttischwecker** and pick the entities from dropdowns — one block per bed,
 with buttons to add and remove beds. No entity IDs to type, no YAML required;
-the raw editor above stays available for anyone who prefers it.
+the raw editor above stays available for anyone who prefers it. On a card that
+already exists the same editor opens through **Edit → pencil icon**.
+
+Only entities that actually fit are offered: for the alarm, date/time helpers
+with a time and sensors carrying a timestamp; for the thermostat, climate
+entities with a target temperature; for the lamp, lights or switches. Anything
+already configured stays selectable even while its entity is unavailable.
 
 Clock face, brightness and layout live in the gear icon in the card's corner.
 Faces: outline (the default — a filled digit throws too much light next to a
@@ -389,7 +395,10 @@ settings are per device, so one dashboard can look different on every screen.
 
 **Layout** is *Automatic* by default: on a wide screen the clock moves to the
 left and the three keys line up beside it, on a portrait tablet everything
-stays stacked. *Portrait* and *Widescreen* force one of the two.
+stays stacked. *Portrait* and *Widescreen* force one of the two. On a very small
+screen — a foldable's cover display, a watch-sized tile, up to roughly 420 points
+per edge — the card switches to a compact version without a minimum height, so
+the three keys stay reachable instead of being clipped off the bottom.
 
 After 45 seconds without a touch everything but the clock fades away, and the
 digits drift a few pixels every minute so nothing burns into an OLED panel
