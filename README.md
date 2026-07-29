@@ -376,10 +376,20 @@ remembers which one is its own, so you and your partner control your own sides
 from your own phones. With more than one entry the bed's name appears in the
 header and switches between them.
 
-The clock face is switchable by tapping the clock: outline (the default — a
-filled digit throws too much light next to a pillow), 7-segment, 5x7 LED matrix
-and split-flap. Brightness has its own slider. Both are per device, so one
-dashboard can look different on every screen.
+The card has a visual editor: add it through **Add card → Rejuvenation
+Nachttischwecker** and pick the entities from dropdowns — one block per bed,
+with buttons to add and remove beds. No entity IDs to type, no YAML required;
+the raw editor above stays available for anyone who prefers it.
+
+Clock face, brightness and layout live in the gear icon in the card's corner.
+Faces: outline (the default — a filled digit throws too much light next to a
+pillow), 7-segment, 5x7 LED matrix and split-flap. Tapping the clock
+deliberately does nothing — half asleep you hit it too easily. All three
+settings are per device, so one dashboard can look different on every screen.
+
+**Layout** is *Automatic* by default: on a wide screen the clock moves to the
+left and the three keys line up beside it, on a portrait tablet everything
+stays stacked. *Portrait* and *Widescreen* force one of the two.
 
 After 45 seconds without a touch everything but the clock fades away, and the
 digits drift a few pixels every minute so nothing burns into an OLED panel
