@@ -86,6 +86,31 @@ def test_fehler_beim_registrieren_wird_geschluckt():
     assert CARD_REGISTERED not in hass.data
 
 
+def _karte() -> str:
+    return (Path("custom_components/rejuvenation_bed/frontend") / CARD_FILENAME).read_text(encoding="utf-8")
+
+
+def test_karte_bringt_grafischen_editor_mit():
+    """Entities werden ausgewählt, nicht als Entity-ID abgetippt."""
+    inhalt = _karte()
+    assert "static getConfigElement()" in inhalt
+    assert 'customElements.define("rejuvenation-nightstand-editor"' in inhalt
+    assert 'selector: { entity: { domain: "climate" } }' in inhalt
+
+
+def test_uhr_wechselt_nicht_mehr_per_tipp():
+    """Das Zifferblatt gehört in die Einstellungen — nachts trifft man die Uhr zu leicht."""
+    inhalt = _karte()
+    assert "_cycleFace" not in inhalt
+    assert '$("clock").addEventListener' not in inhalt
+
+
+def test_layout_kennt_breitbild():
+    inhalt = _karte()
+    assert 'LAYOUTS = ["auto", "tall", "wide"]' in inhalt
+    assert ".root.is-wide" in inhalt
+
+
 @pytest.mark.parametrize("stelle", ["climate", "input_datetime", "input_boolean", "light"])
 def test_karte_ruft_erwartete_dienste(stelle):
     """Die Karte spricht Dienste an, keine REST-Endpunkte mit Token."""
