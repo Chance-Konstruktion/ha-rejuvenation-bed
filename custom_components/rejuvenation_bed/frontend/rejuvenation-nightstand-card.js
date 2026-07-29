@@ -17,6 +17,17 @@
  */
 
 const FACES = ["outline", "segment", "matrix", "flip"];
+const LAYOUTS = ["auto", "tall", "wide"];
+const LAYOUT_NAMES = {
+  auto: "Automatisch",
+  tall: "Hochkant",
+  wide: "Breitbild",
+};
+
+/* Ab dieser Breite und diesem Seitenverhaeltnis lohnt die zweite Spalte. */
+const WIDE_MIN_PX = 720;
+const WIDE_MIN_RATIO = 1.25;
+
 const FACE_NAMES = {
   outline: "Kontur",
   segment: "7-Segment · 80er",
@@ -422,6 +433,24 @@ const STYLE = `
 
   .missing { font-size: 13px; line-height: 1.6; color: var(--amber-deep); text-align: center; max-width: 320px; }
 
+  /* ── Breitbild ──
+     Auf einem quer stehenden Tablet steht die Uhr links und die drei Tasten
+     rechts daneben, statt dass beides in der Mitte um die Hoehe kaempft. */
+  .root.is-wide {
+    display: grid;
+    grid-template-columns: 1.1fr minmax(300px, 0.9fr);
+    grid-template-rows: 1fr auto;
+    align-items: center;
+    justify-items: center;
+    gap: 20px 40px;
+    padding: 56px 42px 26px;
+  }
+
+  .root.is-wide .clock { grid-column: 1; grid-row: 1; margin: 0; }
+  .root.is-wide .time { font-size: clamp(72px, 11vw, 190px); }
+  .root.is-wide .deck { grid-column: 2; grid-row: 1; margin-top: 0; }
+  .root.is-wide .status { grid-column: 1 / -1; grid-row: 2; }
+
   /* ── Nachtruhe ── */
   .root.dozing .deck,
   .root.dozing .status,
@@ -542,8 +571,11 @@ const TEMPLATE = `
     </div>
 
     <div class="sheet" id="sheet-prefs">
-      <h2>Anzeige</h2>
+      <h2>Zifferblatt</h2>
       <div class="row" id="face-list"></div>
+      <h2>Layout</h2>
+      <div class="row" id="layout-list"></div>
+      <h2>Helligkeit</h2>
       <div class="bignum" style="font-size:34px"><span id="dim-pct">85</span><span style="font-size:18px">%</span></div>
       <input type="range" id="dim-range" min="25" max="100" step="5" value="85"/>
       <p class="missing">Gilt nur für dieses Gerät — jeder stellt seine Uhr so hell, wie er sie nachts erträgt.</p>
@@ -609,6 +641,11 @@ class RejuvenationNightstandCard extends HTMLElement {
     return { type: "custom:rejuvenation-nightstand", beds: [{ name: "Bett" }] };
   }
 
+  /* Der grafische Editor: Entities werden ausgewaehlt, nicht getippt. */
+  static getConfigElement() {
+    return document.createElement("rejuvenation-nightstand-editor");
+  }
+
   set hass(hass) {
     this._hass = hass;
     if (!this._built) this._build();
@@ -622,6 +659,10 @@ class RejuvenationNightstandCard extends HTMLElement {
   }
 
   disconnectedCallback() {
+    if (this._sizeObserver) {
+      this._sizeObserver.disconnect();
+      this._sizeObserver = null;
+    }
     clearInterval(this._tick);
     clearTimeout(this._dozeTimer);
     clearTimeout(this._pushTimer);
@@ -631,9 +672,9 @@ class RejuvenationNightstandCard extends HTMLElement {
   /* ── Geraeteeinstellungen ───────────────────────────────────── */
   _loadPrefs() {
     try {
-      return { face: "", dim: "", bed: 0, ...JSON.parse(localStorage.getItem(PREF_KEY) || "{}") };
+      return { face: "", dim: "", layout: "", bed: 0, ...JSON.parse(localStorage.getItem(PREF_KEY) || "{}") };
     } catch {
-      return { face: "", dim: "", bed: 0 };
+      return { face: "", dim: "", layout: "", bed: 0 };
     }
   }
 
@@ -651,6 +692,29 @@ class RejuvenationNightstandCard extends HTMLElement {
 
   get _dim() {
     return clamp(parseInt(this._prefs.dim, 10) || 85, 25, 100);
+  }
+
+  get _layout() {
+    return LAYOUTS.includes(this._prefs.layout) ? this._prefs.layout : "auto";
+  }
+
+  /* "auto" richtet sich nach der Karte selbst, nicht nach dem Fenster: in
+     einer Panel-Ansicht ist beides gleich, in einer schmalen Spalte nicht. */
+  _applyLayout() {
+    if (!this._built) return;
+    const layout = this._layout;
+    let wide;
+    if (layout === "wide") {
+      wide = true;
+    } else if (layout === "tall") {
+      wide = false;
+    } else {
+      const box = this.$("root").getBoundingClientRect();
+      const width = box.width || this.clientWidth;
+      const height = box.height || this.clientHeight || 1;
+      wide = width >= WIDE_MIN_PX && width / height >= WIDE_MIN_RATIO;
+    }
+    this.$("root").classList.toggle("is-wide", wide);
   }
 
   get _bed() {
@@ -699,7 +763,6 @@ class RejuvenationNightstandCard extends HTMLElement {
       $("root").addEventListener(evt, (event) => this._wake(event), true),
     );
 
-    $("clock").addEventListener("click", () => this._cycleFace());
     $("btn-full").addEventListener("click", () => this._toggleFullscreen());
     $("btn-prefs").addEventListener("click", () => this._openPrefs());
     $("bed-switch").addEventListener("click", () => this._openBeds());
@@ -754,7 +817,17 @@ class RejuvenationNightstandCard extends HTMLElement {
     });
 
     this._paintClock();
+    this._applyLayout();
+    this._observeSize();
     this._scheduleDoze();
+  }
+
+  /* Dreht jemand das Tablet oder geht die Karte in den Vollbildmodus, aendert
+     sich nur die Groesse — davon erfaehrt man sonst nichts. */
+  _observeSize() {
+    if (this._sizeObserver || typeof ResizeObserver === "undefined") return;
+    this._sizeObserver = new ResizeObserver(() => this._applyLayout());
+    this._sizeObserver.observe(this.$("root"));
   }
 
   /* ── Nachtruhe ──────────────────────────────────────────────── */
@@ -845,14 +918,9 @@ class RejuvenationNightstandCard extends HTMLElement {
     this.$("clock").style.opacity = String(this._dim / 100);
   }
 
-  _cycleFace() {
-    const index = FACES.indexOf(this._face);
-    this._prefs.face = FACES[(index + 1) % FACES.length];
-    this._savePrefs();
-    this._lastFaceKey = "";
-    this._paintClock();
-    this._flash(FACE_NAMES[this._face]);
-  }
+  /* Das Zifferblatt wechselt ausschliesslich ueber die Anzeige-Einstellungen.
+     Ein Tipp auf die Uhr tut bewusst nichts: nachts trifft man sie im Halbschlaf
+     zu leicht und stand dann vor einem anderen Ziffernbild. */
 
   _flash(text) {
     this.$("status").textContent = text;
@@ -1101,6 +1169,23 @@ class RejuvenationNightstandCard extends HTMLElement {
       });
       list.appendChild(chip);
     });
+
+    const layouts = this.$("layout-list");
+    layouts.innerHTML = "";
+    LAYOUTS.forEach((layout) => {
+      const chip = document.createElement("button");
+      chip.type = "button";
+      chip.className = "chip" + (layout === this._layout ? " primary" : "");
+      chip.textContent = LAYOUT_NAMES[layout];
+      chip.addEventListener("click", () => {
+        this._prefs.layout = layout;
+        this._savePrefs();
+        this._applyLayout();
+        this._openPrefs();
+      });
+      layouts.appendChild(chip);
+    });
+
     this.$("dim-range").value = String(this._dim);
     this.$("dim-pct").textContent = String(this._dim);
     this._openSheet("sheet-prefs");
@@ -1131,11 +1216,221 @@ class RejuvenationNightstandCard extends HTMLElement {
   }
 }
 
+/* ── Grafischer Editor ───────────────────────────────────────────
+ *
+ * Die Entities gehoeren in die Karten-Konfiguration, nicht in die
+ * Geraete-Einstellungen: sie sind fuer alle Bildschirme dieselben.
+ * Hier kommen sie aus Auswahlfeldern, damit niemand Entity-IDs abtippt.
+ */
+
+const GLOBAL_SCHEMA = [
+  {
+    name: "face",
+    selector: {
+      select: {
+        mode: "dropdown",
+        options: FACES.map((face) => ({ value: face, label: FACE_NAMES[face] })),
+      },
+    },
+  },
+  { name: "dim", selector: { number: { min: 25, max: 100, step: 5, mode: "slider" } } },
+];
+
+const BED_SCHEMA = [
+  { name: "name", selector: { text: {} } },
+  { name: "climate", selector: { entity: { domain: "climate" } } },
+  { name: "alarm", selector: { entity: { domain: ["input_datetime", "sensor"] } } },
+  { name: "alarm_switch", selector: { entity: { domain: ["input_boolean", "switch"] } } },
+  { name: "light", selector: { entity: { domain: ["light", "switch"] } } },
+  {
+    name: "temp_min",
+    selector: { number: { min: 10, max: 40, step: 0.5, mode: "box", unit_of_measurement: "°C" } },
+  },
+  {
+    name: "temp_max",
+    selector: { number: { min: 10, max: 45, step: 0.5, mode: "box", unit_of_measurement: "°C" } },
+  },
+];
+
+const EDITOR_LABELS = {
+  face: "Zifferblatt (Vorgabe)",
+  dim: "Helligkeit in Prozent (Vorgabe)",
+  name: "Bezeichnung",
+  climate: "Bett-Thermostat",
+  alarm: "Weckzeit",
+  alarm_switch: "Wecker aktiv",
+  light: "Schlafzimmerlampe",
+  temp_min: "Kleinste Temperatur",
+  temp_max: "Groesste Temperatur",
+};
+
+const EDITOR_STYLE = `
+  .rjv-ed { display: flex; flex-direction: column; gap: 16px; }
+  .rjv-ed .bed {
+    padding: 14px 16px;
+    border: 1px solid var(--divider-color, rgba(127,127,127,0.35));
+    border-radius: 12px;
+  }
+  .rjv-ed .bed-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-bottom: 8px;
+    font-weight: 500;
+  }
+  .rjv-ed .hint { margin: 0; font-size: 13px; color: var(--secondary-text-color, #888); }
+  .rjv-ed button {
+    padding: 8px 14px;
+    border: 1px solid var(--divider-color, rgba(127,127,127,0.35));
+    border-radius: 999px;
+    background: transparent;
+    color: var(--primary-color, #03a9f4);
+    font: inherit;
+    cursor: pointer;
+  }
+  .rjv-ed button.danger { color: var(--error-color, #db4437); }
+`;
+
+class RejuvenationNightstandCardEditor extends HTMLElement {
+  constructor() {
+    super();
+    this._config = { beds: [{}] };
+    this._hass = null;
+    this._forms = [];
+    this._bedCount = -1;
+  }
+
+  setConfig(config) {
+    const beds = Array.isArray(config.beds) && config.beds.length ? config.beds : [{}];
+    this._config = { ...config, beds };
+    this._render();
+  }
+
+  set hass(hass) {
+    this._hass = hass;
+    this._forms.forEach((form) => (form.hass = hass));
+  }
+
+  get _globalData() {
+    return { face: this._config.face || "outline", dim: this._config.dim || 85 };
+  }
+
+  _emit(config) {
+    this._config = config;
+    this.dispatchEvent(
+      new CustomEvent("config-changed", { detail: { config }, bubbles: true, composed: true }),
+    );
+  }
+
+  _setBed(index, value) {
+    const beds = this._config.beds.map((bed, i) => (i === index ? { ...bed, ...value } : bed));
+    this._emit({ ...this._config, beds });
+  }
+
+  _addBed() {
+    this._emit({ ...this._config, beds: [...this._config.beds, {}] });
+    this._render(true);
+  }
+
+  _removeBed(index) {
+    const beds = this._config.beds.filter((_, i) => i !== index);
+    this._emit({ ...this._config, beds: beds.length ? beds : [{}] });
+    this._render(true);
+  }
+
+  /* Neu aufgebaut wird nur, wenn sich die Zahl der Betten aendert — sonst
+     verliert das Feld, in dem gerade getippt wird, den Fokus. */
+  _render(force) {
+    const beds = this._config.beds;
+    if (!force && this._bedCount === beds.length && this._forms.length) {
+      this._forms[0].data = this._globalData;
+      beds.forEach((bed, index) => {
+        const form = this._forms[index + 1];
+        if (form) form.data = bed;
+      });
+      return;
+    }
+
+    this._bedCount = beds.length;
+    this._forms = [];
+    this.innerHTML = `<style>${EDITOR_STYLE}</style><div class="rjv-ed" id="ed"></div>`;
+    const wrap = this.querySelector("#ed");
+
+    const label = (item) => EDITOR_LABELS[item.name] || item.name;
+
+    const globals = document.createElement("ha-form");
+    globals.hass = this._hass;
+    globals.schema = GLOBAL_SCHEMA;
+    globals.data = this._globalData;
+    globals.computeLabel = label;
+    globals.addEventListener("value-changed", (event) => {
+      event.stopPropagation();
+      this._emit({ ...this._config, ...event.detail.value });
+    });
+    this._forms.push(globals);
+    wrap.appendChild(globals);
+
+    const hint = document.createElement("p");
+    hint.className = "hint";
+    hint.textContent =
+      "Zifferblatt und Helligkeit sind nur die Vorgabe — jedes Geraet darf sie in der Karte selbst ueberstimmen.";
+    wrap.appendChild(hint);
+
+    beds.forEach((bed, index) => {
+      const box = document.createElement("div");
+      box.className = "bed";
+
+      const head = document.createElement("div");
+      head.className = "bed-head";
+      const title = document.createElement("span");
+      title.textContent = bed.name || `Bett ${index + 1}`;
+      head.appendChild(title);
+
+      if (beds.length > 1) {
+        const remove = document.createElement("button");
+        remove.type = "button";
+        remove.className = "danger";
+        remove.textContent = "Entfernen";
+        remove.addEventListener("click", () => this._removeBed(index));
+        head.appendChild(remove);
+      }
+      box.appendChild(head);
+
+      const form = document.createElement("ha-form");
+      form.hass = this._hass;
+      form.schema = BED_SCHEMA;
+      form.data = bed;
+      form.computeLabel = label;
+      form.addEventListener("value-changed", (event) => {
+        event.stopPropagation();
+        this._setBed(index, event.detail.value);
+      });
+      this._forms.push(form);
+      box.appendChild(form);
+      wrap.appendChild(box);
+    });
+
+    const add = document.createElement("button");
+    add.type = "button";
+    add.textContent = "Bett hinzufuegen";
+    add.addEventListener("click", () => this._addBed());
+    wrap.appendChild(add);
+
+    const beds_hint = document.createElement("p");
+    beds_hint.className = "hint";
+    beds_hint.textContent =
+      "Ein Eintrag je Bett oder je Bettseite. Ab zwei Eintraegen merkt sich jedes Geraet, welcher seiner ist.";
+    wrap.appendChild(beds_hint);
+  }
+}
+
 /* Das Skript kann mehrfach ins Frontend geraten (Reload der Integration,
  * zweiter Tab, alter Ressourcen-Eintrag aus /config/www). Ein zweites
  * define() wuerde werfen und die Karte im Dashboard verschwinden lassen. */
 if (!customElements.get("rejuvenation-nightstand")) {
   customElements.define("rejuvenation-nightstand", RejuvenationNightstandCard);
+  customElements.define("rejuvenation-nightstand-editor", RejuvenationNightstandCardEditor);
 
   window.customCards = window.customCards || [];
   window.customCards.push({

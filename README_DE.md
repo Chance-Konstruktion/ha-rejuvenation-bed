@@ -200,10 +200,22 @@ merkt sich seinen eigenen, sodass jeder seine Seite vom eigenen Telefon aus
 bedient. Ab zwei Einträgen steht der Bettname in der Kopfzeile und wechselt
 zwischen ihnen.
 
-Das Zifferblatt wechselt per Tipp auf die Uhr: Kontur (Standard — eine
-ausgefüllte Ziffer strahlt neben dem Kopfkissen zu viel Fläche ab), 7-Segment,
-LED-Matrix und Klappanzeige. Die Helligkeit hat einen eigenen Regler. Beides
-gilt pro Gerät, ein Dashboard darf also auf jedem Bildschirm anders aussehen.
+Die Karte bringt einen grafischen Editor mit: über **Karte hinzufügen →
+Rejuvenation Nachttischwecker** werden die Entitäten aus Auswahlfeldern gewählt
+— ein Block je Bett, mit Knöpfen zum Hinzufügen und Entfernen. Keine Entity-IDs
+abtippen, kein YAML nötig; der Raw-Editor oben bleibt für alle, die ihn lieber
+mögen.
+
+Zifferblatt, Helligkeit und Layout stehen hinter dem Zahnrad in der Ecke der
+Karte. Zifferblätter: Kontur (Standard — eine ausgefüllte Ziffer strahlt neben
+dem Kopfkissen zu viel Fläche ab), 7-Segment, LED-Matrix und Klappanzeige. Ein
+Tipp auf die Uhr tut bewusst nichts — im Halbschlaf trifft man sie zu leicht.
+Alle drei Einstellungen gelten pro Gerät, ein Dashboard darf also auf jedem
+Bildschirm anders aussehen.
+
+**Layout** steht auf *Automatisch*: auf einem breiten Schirm rückt die Uhr nach
+links und die drei Tasten daneben, auf einem hochkant stehenden Tablet bleibt
+alles untereinander. *Hochkant* und *Breitbild* erzwingen eines von beidem.
 
 Nach 45 Sekunden ohne Berührung blendet alles außer der Uhr aus, und die Ziffern
 wandern minütlich ein paar Pixel, damit sich über Nacht nichts in ein OLED-Panel
