@@ -4,6 +4,8 @@ Alle Änderungen am Rejuvenation Bed Projekt.
 
 ## [Unreleased]
 
+## [v260801] - 2026-08-01
+
 ### Dashboard
 - **Nachtlicht funktioniert wieder:** `light.turn_on` bekam die Farbtemperatur
   als `kelvin` — ein altes Alias, das neuere Kerne mit »extra keys not allowed
