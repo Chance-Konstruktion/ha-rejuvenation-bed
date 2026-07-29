@@ -346,6 +346,12 @@ An alarm-clock face for the tablet next to the bed: pure-black AMOLED
 background with amber accents, a large clock, and exactly three keys —
 waterbed temperature (a draggable thermostat ring), alarm and bedroom lamp.
 
+> ⚠️ **Requirement:** the card only exists from version **260728** on. After
+> updating in HACS, restart Home Assistant so the integration can register the
+> card, then hard-reload the browser (Ctrl+Shift+R; on a tablet clear the app
+> cache). Without that the dashboard reports `Custom element doesn't exist:
+> rejuvenation-nightstand`.
+
 Create a dashboard, open its raw configuration editor and paste
 `dashboards/nightstand.yaml`, adjusting the entity IDs. The view uses
 `type: panel` so the card fills the screen; the button in the card's corner

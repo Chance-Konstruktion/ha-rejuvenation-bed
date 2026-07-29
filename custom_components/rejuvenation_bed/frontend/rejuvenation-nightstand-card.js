@@ -1131,15 +1131,20 @@ class RejuvenationNightstandCard extends HTMLElement {
   }
 }
 
-customElements.define("rejuvenation-nightstand", RejuvenationNightstandCard);
+/* Das Skript kann mehrfach ins Frontend geraten (Reload der Integration,
+ * zweiter Tab, alter Ressourcen-Eintrag aus /config/www). Ein zweites
+ * define() wuerde werfen und die Karte im Dashboard verschwinden lassen. */
+if (!customElements.get("rejuvenation-nightstand")) {
+  customElements.define("rejuvenation-nightstand", RejuvenationNightstandCard);
 
-window.customCards = window.customCards || [];
-window.customCards.push({
-  type: "rejuvenation-nightstand",
-  name: "Rejuvenation Nachttischwecker",
-  description:
-    "AMOLED-Weckerdisplay mit drei Tasten: Wasserbett, Wecker, Schlafzimmerlampe.",
-  preview: false,
-});
+  window.customCards = window.customCards || [];
+  window.customCards.push({
+    type: "rejuvenation-nightstand",
+    name: "Rejuvenation Nachttischwecker",
+    description:
+      "AMOLED-Weckerdisplay mit drei Tasten: Wasserbett, Wecker, Schlafzimmerlampe.",
+    preview: false,
+  });
 
-console.info("%c REJUVENATION-NIGHTSTAND ", "background:#000;color:#ffb454");
+  console.info("%c REJUVENATION-NIGHTSTAND ", "background:#000;color:#ffb454");
+}
