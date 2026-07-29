@@ -204,7 +204,14 @@ Die Karte bringt einen grafischen Editor mit: über **Karte hinzufügen →
 Rejuvenation Nachttischwecker** werden die Entitäten aus Auswahlfeldern gewählt
 — ein Block je Bett, mit Knöpfen zum Hinzufügen und Entfernen. Keine Entity-IDs
 abtippen, kein YAML nötig; der Raw-Editor oben bleibt für alle, die ihn lieber
-mögen.
+mögen. Derselbe Editor öffnet sich bei einer bestehenden Karte über **Bearbeiten
+→ Stift-Symbol**.
+
+Vorgeschlagen wird nur, was in das jeweilige Feld passt: als Weckzeit
+ausschließlich Datum/Zeit-Helfer mit Uhrzeit und Sensoren mit Zeitstempel, als
+Thermostat nur Klima-Entitäten mit Zieltemperatur, als Lampe Lichter oder
+Schalter. Ist etwas bereits eingetragen, bleibt es wählbar, auch wenn die
+Entität gerade nicht erreichbar ist.
 
 Zifferblatt, Helligkeit und Layout stehen hinter dem Zahnrad in der Ecke der
 Karte. Zifferblätter: Kontur (Standard — eine ausgefüllte Ziffer strahlt neben
@@ -215,7 +222,11 @@ Bildschirm anders aussehen.
 
 **Layout** steht auf *Automatisch*: auf einem breiten Schirm rückt die Uhr nach
 links und die drei Tasten daneben, auf einem hochkant stehenden Tablet bleibt
-alles untereinander. *Hochkant* und *Breitbild* erzwingen eines von beidem.
+alles untereinander. *Hochkant* und *Breitbild* erzwingen eines von beidem. Auf
+einem Kleinstschirm — Außendisplay eines Falters, Smartwatch-artige Kachel, bis
+etwa 420 Punkte Kantenlänge — schrumpft die Karte automatisch auf eine kompakte
+Fassung ohne Mindesthöhe, damit die drei Tasten erreichbar bleiben statt unten
+abgeschnitten zu werden.
 
 Nach 45 Sekunden ohne Berührung blendet alles außer der Uhr aus, und die Ziffern
 wandern minütlich ein paar Pixel, damit sich über Nacht nichts in ein OLED-Panel
