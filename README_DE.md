@@ -169,6 +169,13 @@ AMOLED-Hintergrund mit bernsteinfarbenen Akzenten, große Uhr und genau drei
 Tasten — Wasserbetttemperatur (Thermostat-Ring zum Ziehen), Wecker und
 Schlafzimmerlampe.
 
+> ⚠️ **Voraussetzung:** Die Karte gibt es erst ab Version **260728**. Nach dem
+> Update in HACS muss Home Assistant neu gestartet werden, damit die
+> Integration die Karte anmeldet — und der Browser braucht anschließend einen
+> harten Reload (Strg+Umschalt+R, auf dem Tablet die App-Daten/Cache leeren).
+> Ohne das meldet das Dashboard `Custom element doesn't exist:
+> rejuvenation-nightstand`.
+
 Dashboard anlegen, den Raw-Konfigurationseditor öffnen und
 `dashboards/nightstand.yaml` einfügen, dann die Entity-IDs anpassen. Die
 Ansicht nutzt `type: panel`, damit die Karte den Bildschirm füllt; der Knopf in
