@@ -5,6 +5,19 @@ Alle Änderungen am Rejuvenation Bed Projekt.
 ## [Unreleased]
 
 ### Dashboard
+- **Overlays auf Kleinstschirmen bedienbar:** Auf dem Außendisplay eines
+  Falters verdeckt die Kamera den unteren Rand — genau dort standen
+  »Speichern«, »Fertig« und »Zurück«. Die Knöpfe sitzen jetzt in einer Leiste
+  ganz oben, die beim Scrollen stehen bleibt; der Inhalt scrollt darunter
+  durch.
+- **Zwei Helligkeiten:** Solange die Karte bedient wird, leuchtet die Uhr voll
+  — so hell wie der übrige Text. Bleibt es still und bleibt nur noch die Uhr
+  stehen, dunkelt sie auf einen zweiten, getrennt einstellbaren Wert ab. Beide
+  Regler stehen in den Anzeige-Einstellungen; der Ruhe-Regler zeigt sich beim
+  Ziehen sofort an der Uhr. Die Abdunklung in der Nachtruhe wirkte bisher gar
+  nicht: die fest gesetzte Opazität der Uhr überstimmte die CSS-Regel.
+
+### Dashboard
 - **»Konfigurationsfehler« statt Karte:** Die Karte wurde nur als zusätzliches
   Frontend-Skript geladen. Darauf wartet Lovelace nicht — baut das Dashboard
   seine Karten, bevor das Skript durch ist, ersetzt es die noch unbekannte

@@ -225,3 +225,30 @@ def test_karte_ruft_erwartete_dienste(stelle):
     assert f'"{stelle}"' in inhalt
     assert "Authorization" not in inhalt
     assert "Bearer" not in inhalt
+
+
+def test_overlay_knoepfe_stehen_oben():
+    """Auf dem Aussendisplay verdeckt die Kamera den unteren Rand — dort waeren
+    Speichern und Fertig nicht mehr zu treffen."""
+    inhalt = _karte()
+    assert ".sheet .bar {" in inhalt
+    assert "position: sticky" in inhalt
+    assert ".sheet-body {" in inhalt
+    # Der Inhalt scrollt unter der Leiste durch, statt zu klemmen.
+    assert "overscroll-behavior: contain" in inhalt
+
+
+def test_zwei_helligkeiten():
+    """Uhr hell wie der Text, in der Nachtruhe abgedunkelt — beides einstellbar."""
+    inhalt = _karte()
+    assert 'id="dim-range"' in inhalt
+    assert 'id="doze-range"' in inhalt
+    assert "get _dozeDim()" in inhalt
+    assert "parseInt(this._prefs.dim, 10) || 100" in inhalt, "aktiv leuchtet die Uhr voll"
+
+
+def test_nachtruhe_dimmt_nicht_mehr_per_css():
+    """Die inline gesetzte Opazitaet der Uhr schlaegt jede Klassenregel."""
+    inhalt = _karte()
+    assert ".root.dozing .clock { opacity: 0.42; }" not in inhalt
+    assert "dozing ? this._dozeDim : this._dim" in inhalt
