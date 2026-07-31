@@ -1608,4 +1608,29 @@ if (!customElements.get("rejuvenation-nightstand")) {
   });
 
   console.info("%c REJUVENATION-NIGHTSTAND ", "background:#000;color:#ffb454");
+
+  /* Kommt das Skript zu spaet (langsames Geraet, Aussendisplay eines
+   * Falters), hat Lovelace die Karte schon durch "Konfigurationsfehler"
+   * ersetzt. Diese Fehlerkarten bleiben stehen, bis jemand neu laedt —
+   * ein ll-rebuild baut sie an Ort und Stelle neu auf. */
+  const rebuildErrorCards = () => {
+    try {
+      const seen = new Set();
+      const walk = (root) => {
+        if (!root || seen.has(root)) return;
+        seen.add(root);
+        root.querySelectorAll("hui-error-card").forEach((card) => {
+          const type = card._config && card._config.origConfig && card._config.origConfig.type;
+          if (type !== "custom:rejuvenation-nightstand") return;
+          card.dispatchEvent(new Event("ll-rebuild", { bubbles: true, composed: true }));
+        });
+        root.querySelectorAll("*").forEach((el) => el.shadowRoot && walk(el.shadowRoot));
+      };
+      walk(document);
+    } catch {
+      /* Nur Kosmetik — im Zweifel hilft weiterhin ein Neuladen der Seite. */
+    }
+  };
+  rebuildErrorCards();
+  setTimeout(rebuildErrorCards, 2500);
 }
