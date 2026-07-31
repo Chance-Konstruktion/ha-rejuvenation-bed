@@ -1,9 +1,9 @@
 {
   "domain": "rejuvenation_bed",
   "name": "Rejuvenation Bed",
+  "after_dependencies": ["lovelace"],
   "codeowners": ["@Chance-Konstruktion"],
   "config_flow": true,
-  "after_dependencies": ["lovelace"],
   "dependencies": ["http", "frontend"],
   "documentation": "https://github.com/Chance-Konstruktion/ha-rejuvenation-bed",
   "integration_type": "device",
