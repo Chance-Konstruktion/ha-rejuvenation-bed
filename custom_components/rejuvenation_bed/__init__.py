@@ -20,6 +20,9 @@ PLATFORMS: list[str] = ["climate", "sensor", "binary_sensor", "switch"]
 # Eintrag, kein Kopieren nach /config/www.
 CARD_FILENAME = "rejuvenation-nightstand-card.js"
 CARD_URL = f"/{DOMAIN}/{CARD_FILENAME}"
+# Lovelace lädt seine Ressourcen, *bevor* es die Karten baut. Die Version im
+# URL erneuert den Browser-Cache nach einem Update der Integration.
+CARD_RESOURCE_URL = f"{CARD_URL}?v={SW_VERSION}"
 CARD_REGISTERED = f"{DOMAIN}_card_registered"
 
 MODEL_WASSERBETT = "Smart Wasserbett Controller"
@@ -135,13 +138,55 @@ async def _async_register_card(hass: HomeAssistant) -> None:
 
     try:
         await hass.http.async_register_static_paths([StaticPathConfig(CARD_URL, str(card_path), cache_headers=False)])
-        frontend.add_extra_js_url(hass, CARD_URL)
+
+        # Bevorzugt als Lovelace-Ressource: darauf wartet das Dashboard, bevor
+        # es die Karten baut. Ein reines add_extra_js_url() wird nebenher
+        # geladen — auf langsamen Geräten (Aussendisplay eines Falters) ist die
+        # Karte dann noch nicht definiert und das Dashboard zeigt
+        # "Konfigurationsfehler".
+        als_ressource = await _async_register_lovelace_resource(hass)
+        if not als_ressource:
+            # YAML-Modus o.ä.: dort pflegt der Nutzer resources selbst, das
+            # Extra-Skript bleibt der einzige Weg.
+            frontend.add_extra_js_url(hass, CARD_URL)
+
         hass.data[CARD_REGISTERED] = True
-        _LOGGER.debug("Nachttisch-Karte unter %s registriert", CARD_URL)
+        _LOGGER.debug("Nachttisch-Karte unter %s registriert (Ressource: %s)", CARD_URL, als_ressource)
     except Exception as err:  # pragma: no cover - defensiv, nie fatal
         # Ohne Karte bleibt die Integration voll funktionsfähig; nur das
         # fertige Dashboard fehlt. Das darf das Setup nicht abbrechen.
         _LOGGER.warning("Nachttisch-Karte konnte nicht registriert werden: %s", err)
+
+
+async def _async_register_lovelace_resource(hass: HomeAssistant) -> bool:
+    """Die Karte in die Lovelace-Ressourcen eintragen.
+
+    Gibt True zurück, wenn der Eintrag steht. Im YAML-Modus (oder wenn
+    Lovelace noch gar nicht geladen ist) geht das nicht — dann False.
+    """
+    lovelace = hass.data.get("lovelace")
+    resources = getattr(lovelace, "resources", None)
+    if resources is None and isinstance(lovelace, dict):
+        resources = lovelace.get("resources")
+    # Nur die Storage-Variante kann Einträge anlegen.
+    if resources is None or not hasattr(resources, "async_create_item"):
+        return False
+
+    if not getattr(resources, "loaded", False):
+        await resources.async_load()
+        resources.loaded = True
+
+    for item in resources.async_items():
+        url = str(item.get("url", ""))
+        if url.split("?")[0] != CARD_URL:
+            continue
+        if url != CARD_RESOURCE_URL:
+            # Nach einem Update zeigt der alte Eintrag auf die alte Version.
+            await resources.async_update_item(item["id"], {"url": CARD_RESOURCE_URL})
+        return True
+
+    await resources.async_create_item({"res_type": "module", "url": CARD_RESOURCE_URL})
+    return True
 
 
 async def _async_options_updated(hass: HomeAssistant, entry: ConfigEntry):
