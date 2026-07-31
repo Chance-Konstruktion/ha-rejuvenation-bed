@@ -339,14 +339,42 @@ const STYLE = `
     z-index: 5;
     display: none;
     flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 26px;
-    padding: 28px;
+    align-items: stretch;
     background: var(--bg);
+    overflow-y: auto;
+    overscroll-behavior: contain;
   }
   .sheet.show { display: flex; animation: rise 0.28s ease; }
   @keyframes rise { from { opacity: 0; transform: translateY(14px); } }
+
+  /* Speichern, Zurueck und Fertig stehen oben und bleiben beim Scrollen
+     stehen. Unten waeren sie auf dem Aussendisplay eines Falters nicht mehr
+     zu treffen — dort verdeckt die Kamera den unteren Rand. */
+  .sheet .bar {
+    position: sticky;
+    top: 0;
+    z-index: 2;
+    flex: none;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 16px 22px;
+    background: var(--bg);
+    border-bottom: 1px solid var(--amber-faint);
+  }
+
+  .sheet-body {
+    flex: 1 1 auto;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 26px;
+    padding: 24px 22px max(28px, env(safe-area-inset-bottom));
+  }
 
   .sheet h2 {
     margin: 0;
@@ -485,11 +513,12 @@ const STYLE = `
   .root.is-tiny .status { display: none; }
 
   /* Die Overlays scrollen auf so wenig Hoehe, statt zu klemmen. */
-  .root.is-tiny .sheet {
+  .root.is-tiny .sheet .bar { padding: 8px 10px; gap: 6px; }
+  .root.is-tiny .sheet .bar .chip { padding: 8px 14px; font-size: 12px; }
+  .root.is-tiny .sheet-body {
     gap: 12px;
-    padding: 12px;
+    padding: 12px 10px max(16px, env(safe-area-inset-bottom));
     justify-content: flex-start;
-    overflow-y: auto;
   }
   .root.is-tiny .dial { width: min(46vh, 180px); }
   .root.is-tiny .dial .target { font-size: 34px; }
@@ -510,7 +539,8 @@ const STYLE = `
   .root.dozing .status,
   .root.dozing .topbar,
   .root.dozing .clock { transition: opacity 1.4s ease; }
-  .root.dozing .clock { opacity: 0.42; }
+  /* Wie stark die Uhr in der Nachtruhe abdunkelt, steht in den
+     Einstellungen — gesetzt wird es an der Uhr selbst. */
 
   /* Sicherheitsnetz, bevor die Karte sich selbst gemessen hat: auf einem
      flachen Schirm darf die Mindesthoehe den Inhalt nie herausdruecken. */
@@ -578,7 +608,11 @@ const TEMPLATE = `
     <div class="status" id="status">&nbsp;</div>
 
     <div class="sheet" id="sheet-bed">
-      <h2>Wasserbett</h2>
+      <div class="bar">
+        <h2>Wasserbett</h2>
+        <div class="row"><button class="chip" type="button" data-close>Fertig</button></div>
+      </div>
+      <div class="sheet-body">
       <div class="dial" id="dial">
         <svg viewBox="0 0 200 200">
           <circle class="track" cx="100" cy="100" r="86" id="arc-track"/>
@@ -593,50 +627,70 @@ const TEMPLATE = `
         <button type="button" id="t-minus" aria-label="Kälter">−</button>
         <button type="button" id="t-plus" aria-label="Wärmer">+</button>
       </div>
-      <div class="row"><button class="chip" type="button" data-close>Fertig</button></div>
+      </div>
     </div>
 
     <div class="sheet" id="sheet-alarm">
-      <h2>Wecker</h2>
-      <div class="bignum"><span class="unit sel" id="al-hh">07</span>:<span class="unit" id="al-mm">00</span></div>
-      <div class="stepper">
-        <button type="button" id="al-minus" aria-label="Früher">−</button>
-        <button type="button" id="al-plus" aria-label="Später">+</button>
+      <div class="bar">
+        <h2>Wecker</h2>
+        <div class="row">
+          <button class="chip primary" type="button" id="al-save">Stellen</button>
+          <button class="chip" type="button" id="al-clear">Aus</button>
+          <button class="chip" type="button" data-close>Zurück</button>
+        </div>
       </div>
-      <div class="row">
-        <button class="chip primary" type="button" id="al-save">Stellen</button>
-        <button class="chip" type="button" id="al-clear">Aus</button>
-        <button class="chip" type="button" data-close>Zurück</button>
+      <div class="sheet-body">
+        <div class="bignum"><span class="unit sel" id="al-hh">07</span>:<span class="unit" id="al-mm">00</span></div>
+        <div class="stepper">
+          <button type="button" id="al-minus" aria-label="Früher">−</button>
+          <button type="button" id="al-plus" aria-label="Später">+</button>
+        </div>
       </div>
     </div>
 
     <div class="sheet" id="sheet-light">
-      <h2>Schlafzimmerlampe</h2>
-      <div class="bignum"><span id="li-pct">0</span><span style="font-size:24px">%</span></div>
-      <input type="range" id="li-range" min="1" max="100" step="1" value="40"/>
-      <div class="row">
-        <button class="chip primary" type="button" id="li-toggle">An / Aus</button>
-        <button class="chip" type="button" id="li-night">Nachtlicht</button>
-        <button class="chip" type="button" data-close>Zurück</button>
+      <div class="bar">
+        <h2>Schlafzimmerlampe</h2>
+        <div class="row">
+          <button class="chip primary" type="button" id="li-toggle">An / Aus</button>
+          <button class="chip" type="button" id="li-night">Nachtlicht</button>
+          <button class="chip" type="button" data-close>Zurück</button>
+        </div>
+      </div>
+      <div class="sheet-body">
+        <div class="bignum"><span id="li-pct">0</span><span style="font-size:24px">%</span></div>
+        <input type="range" id="li-range" min="1" max="100" step="1" value="40"/>
       </div>
     </div>
 
     <div class="sheet" id="sheet-beds">
-      <h2>Welches Bett?</h2>
-      <div class="row" id="bed-list"></div>
-      <div class="row"><button class="chip" type="button" data-close>Zurück</button></div>
+      <div class="bar">
+        <h2>Welches Bett?</h2>
+        <div class="row"><button class="chip" type="button" data-close>Zurück</button></div>
+      </div>
+      <div class="sheet-body">
+        <div class="row" id="bed-list"></div>
+      </div>
     </div>
 
     <div class="sheet" id="sheet-prefs">
-      <h2>Zifferblatt</h2>
-      <div class="row" id="face-list"></div>
-      <h2>Layout</h2>
-      <div class="row" id="layout-list"></div>
-      <h2>Helligkeit</h2>
-      <div class="bignum" style="font-size:34px"><span id="dim-pct">85</span><span style="font-size:18px">%</span></div>
-      <input type="range" id="dim-range" min="25" max="100" step="5" value="85"/>
-      <p class="missing">Gilt nur für dieses Gerät — jeder stellt seine Uhr so hell, wie er sie nachts erträgt.</p>
-      <div class="row"><button class="chip" type="button" data-close>Fertig</button></div>
+      <div class="bar">
+        <h2>Einstellungen</h2>
+        <div class="row"><button class="chip primary" type="button" data-close>Fertig</button></div>
+      </div>
+      <div class="sheet-body">
+        <h2>Zifferblatt</h2>
+        <div class="row" id="face-list"></div>
+        <h2>Layout</h2>
+        <div class="row" id="layout-list"></div>
+        <h2>Helligkeit · aktiv</h2>
+        <div class="bignum" style="font-size:34px"><span id="dim-pct">100</span><span style="font-size:18px">%</span></div>
+        <input type="range" id="dim-range" min="25" max="100" step="5" value="100"/>
+        <h2>Helligkeit · Ruhe</h2>
+        <div class="bignum" style="font-size:34px"><span id="doze-pct">45</span><span style="font-size:18px">%</span></div>
+        <input type="range" id="doze-range" min="5" max="100" step="5" value="45"/>
+        <p class="missing">Bedient jemand die Karte, leuchtet die Uhr mit der ersten Helligkeit — so hell wie der übrige Text. Bleibt es eine Weile still, bleibt nur die Uhr stehen und dunkelt auf die zweite ab. Gilt nur für dieses Gerät und wird sofort übernommen.</p>
+      </div>
     </div>
   </div>
 `;
@@ -653,6 +707,7 @@ class RejuvenationNightstandCard extends HTMLElement {
     this._pushTimer = null;
     this._brightTimer = null;
     this._dozeTimer = null;
+    this._dozePeek = null;
     this._driftMinute = -1;
     this._editHH = 7;
     this._editMM = 0;
@@ -686,6 +741,7 @@ class RejuvenationNightstandCard extends HTMLElement {
       this._prefs.face = config.face;
     }
     if (config.dim && !this._prefs.dim) this._prefs.dim = String(config.dim);
+    if (config.doze && !this._prefs.doze) this._prefs.doze = String(config.doze);
     this._lastFaceKey = "";
     if (this._built) this._render();
   }
@@ -722,6 +778,7 @@ class RejuvenationNightstandCard extends HTMLElement {
     }
     clearInterval(this._tick);
     clearTimeout(this._dozeTimer);
+    clearTimeout(this._dozePeek);
     clearTimeout(this._pushTimer);
     clearTimeout(this._brightTimer);
   }
@@ -729,9 +786,9 @@ class RejuvenationNightstandCard extends HTMLElement {
   /* ── Geraeteeinstellungen ───────────────────────────────────── */
   _loadPrefs() {
     try {
-      return { face: "", dim: "", layout: "", bed: 0, ...JSON.parse(localStorage.getItem(PREF_KEY) || "{}") };
+      return { face: "", dim: "", doze: "", layout: "", bed: 0, ...JSON.parse(localStorage.getItem(PREF_KEY) || "{}") };
     } catch {
-      return { face: "", dim: "", layout: "", bed: 0 };
+      return { face: "", dim: "", doze: "", layout: "", bed: 0 };
     }
   }
 
@@ -747,8 +804,16 @@ class RejuvenationNightstandCard extends HTMLElement {
     return FACES.includes(this._prefs.face) ? this._prefs.face : "outline";
   }
 
+  /* Am Tag leuchtet die Uhr wie der uebrige Text — alles andere sieht nach
+     ausgegrauter Anzeige aus. */
   get _dim() {
-    return clamp(parseInt(this._prefs.dim, 10) || 85, 25, 100);
+    return clamp(parseInt(this._prefs.dim, 10) || 100, 25, 100);
+  }
+
+  /* In der Nachtruhe steht nur noch die Uhr da, und die darf niemanden
+     wecken. */
+  get _dozeDim() {
+    return clamp(parseInt(this._prefs.doze, 10) || 45, 5, 100);
   }
 
   get _layout() {
@@ -882,6 +947,17 @@ class RejuvenationNightstandCard extends HTMLElement {
       this._savePrefs();
     });
 
+    /* Der Ruhe-Regler zeigt sich sofort an der Uhr, auch wenn die Karte
+       gerade wach ist — sonst stellt man blind ein. */
+    $("doze-range").addEventListener("input", (event) => {
+      this._prefs.doze = event.target.value;
+      $("doze-pct").textContent = event.target.value;
+      this.$("clock").style.opacity = String(this._dozeDim / 100);
+      clearTimeout(this._dozePeek);
+      this._dozePeek = setTimeout(() => this._applyDim(), 900);
+      this._savePrefs();
+    });
+
     this._paintClock();
     this._applyLayout();
     this._observeSize();
@@ -901,10 +977,11 @@ class RejuvenationNightstandCard extends HTMLElement {
     if (!this._built) return;
     clearTimeout(this._dozeTimer);
     this.$("root").classList.remove("dozing");
-    this._dozeTimer = setTimeout(
-      () => this.$("root").classList.add("dozing"),
-      DOZE_AFTER,
-    );
+    this._applyDim();
+    this._dozeTimer = setTimeout(() => {
+      this.$("root").classList.add("dozing");
+      this._applyDim();
+    }, DOZE_AFTER);
   }
 
   _wake(event) {
@@ -981,7 +1058,8 @@ class RejuvenationNightstandCard extends HTMLElement {
   }
 
   _applyDim() {
-    this.$("clock").style.opacity = String(this._dim / 100);
+    const dozing = this.$("root").classList.contains("dozing");
+    this.$("clock").style.opacity = String((dozing ? this._dozeDim : this._dim) / 100);
   }
 
   /* Das Zifferblatt wechselt ausschliesslich ueber die Anzeige-Einstellungen.
@@ -1288,6 +1366,8 @@ class RejuvenationNightstandCard extends HTMLElement {
 
     this.$("dim-range").value = String(this._dim);
     this.$("dim-pct").textContent = String(this._dim);
+    this.$("doze-range").value = String(this._dozeDim);
+    this.$("doze-pct").textContent = String(this._dozeDim);
     this._openSheet("sheet-prefs");
   }
 
@@ -1334,6 +1414,7 @@ const GLOBAL_SCHEMA = [
     },
   },
   { name: "dim", selector: { number: { min: 25, max: 100, step: 5, mode: "slider" } } },
+  { name: "doze", selector: { number: { min: 5, max: 100, step: 5, mode: "slider" } } },
 ];
 
 /* Welche Entity passt in welches Feld? Die Domain allein reicht nicht: unter
@@ -1416,6 +1497,7 @@ const BED_NUMBERS = [
 const EDITOR_LABELS = {
   face: "Zifferblatt (Vorgabe)",
   dim: "Helligkeit in Prozent (Vorgabe)",
+  doze: "Helligkeit in der Nachtruhe in Prozent (Vorgabe)",
   name: "Bezeichnung",
   climate: "Bett-Thermostat",
   alarm: "Weckzeit",
