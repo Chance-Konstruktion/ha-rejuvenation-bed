@@ -4,6 +4,20 @@ Alle Änderungen am Rejuvenation Bed Projekt.
 
 ## [Unreleased]
 
+### Dashboard
+- **»Konfigurationsfehler« statt Karte:** Die Karte wurde nur als zusätzliches
+  Frontend-Skript geladen. Darauf wartet Lovelace nicht — baut das Dashboard
+  seine Karten, bevor das Skript durch ist, ersetzt es die noch unbekannte
+  Karte durch eine Fehlerkarte. Auf schnellen Rechnern ging das meist gerade so
+  auf, auf dem Außendisplay eines Falters nie. Die Integration trägt sich jetzt
+  als Lovelace-Ressource ein; darauf wartet das Dashboard, bevor es rendert.
+  Die Versionsnummer im Ressourcen-URL sorgt außerdem dafür, dass der Browser
+  nach einem Update nicht die alte Karte aus dem Cache holt. Im YAML-Modus, wo
+  Ressourcen von Hand gepflegt werden, bleibt es beim Extra-Skript.
+- **Späte Fehlerkarten heilen sich:** Kommt das Skript doch einmal zu spät, baut
+  es die bereits gezeigten Fehlerkarten selbst neu auf, statt bis zum nächsten
+  Neuladen der Seite stehen zu bleiben.
+
 ## [v260801] - 2026-08-01
 
 ### Dashboard
