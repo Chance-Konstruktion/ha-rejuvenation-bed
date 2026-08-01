@@ -152,13 +152,14 @@ The coordinator is the only thing that talks to Home Assistant; every module bel
 
 ### 1 · Install via HACS
 
+Rejuvenation Bed is listed in the HACS default repository — no custom
+repository needed.
+
 ```
-HACS → Integrations → ⋮ → Custom Repositories
-URL:      https://github.com/Chance-Konstruktion/ha-rejuvenation-bed
-Category: Integration
+HACS → Integrations → Search "Rejuvenation Bed" → Install
 ```
 
-Then **Install → Restart Home Assistant**.
+Then **Restart Home Assistant**.
 
 ### 2 · Add the integration
 
