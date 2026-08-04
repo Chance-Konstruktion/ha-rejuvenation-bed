@@ -430,6 +430,14 @@ screen — a foldable's cover display, a watch-sized tile, up to roughly 420 poi
 per edge — the card switches to a compact version without a minimum height, so
 the three keys stay reachable instead of being clipped off the bottom.
 
+**From a cover display to a desktop.** The card is built for the whole span:
+from a Galaxy Z Flip 5's cover display (720 × 748 pixels, roughly 360 × 374
+points to the card) through phones and tablets up to a 2K desktop monitor
+(2560 × 1440). At the bottom end it
+shrinks to the compact version, at the top the clock grows and the three keys
+move beside it — same card, same configuration, no second dashboard for the
+small screen.
+
 After 45 seconds without a touch everything but the clock fades away, and the
 digits drift a few pixels every minute so nothing burns into an OLED panel
 overnight. The first touch only wakes the screen — it never triggers a key by

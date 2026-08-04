@@ -259,6 +259,14 @@ etwa 420 Punkte Kantenlänge — schrumpft die Karte automatisch auf eine kompak
 Fassung ohne Mindesthöhe, damit die drei Tasten erreichbar bleiben statt unten
 abgeschnitten zu werden.
 
+**Vom Außendisplay bis zum Schreibtisch.** Die Karte ist auf der ganzen
+Spannweite gebaut: vom Außendisplay eines Galaxy Z Flip 5 (720 × 748 Pixel, für
+die Karte rund 360 × 374 Punkte) über Telefon und Tablet bis zum
+2K-Desktopmonitor (2560 × 1440). Unten
+schrumpft sie auf die kompakte Fassung, oben wächst die Uhr mit und die drei
+Tasten rücken neben sie — dieselbe Karte, dieselbe Konfiguration, kein zweites
+Dashboard für den kleinen Schirm.
+
 Nach 45 Sekunden ohne Berührung blendet alles außer der Uhr aus, und die Ziffern
 wandern minütlich ein paar Pixel, damit sich über Nacht nichts in ein OLED-Panel
 einbrennt. Die erste Berührung weckt nur auf und löst keine Taste aus.

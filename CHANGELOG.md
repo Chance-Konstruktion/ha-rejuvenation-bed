@@ -4,7 +4,12 @@ Alle Änderungen am Rejuvenation Bed Projekt.
 
 ## [Unreleased]
 
+## [v260804] - 2026-08-04
+
 ### Dashboard
+- **Vom Außendisplay bis zum Schreibtisch dokumentiert:** Die Karte ist auf der
+  ganzen Spannweite gebaut — vom Außendisplay eines Galaxy Z Flip 5 bis zum
+  2K-Desktopmonitor. Stand bisher nirgends.
 - **Lampe: Regler statt Menü.** Ein Tipp auf die Lampe klappt den Dimmer direkt
   unter der Taste auf, statt ein Vollbild-Overlay über die Karte zu ziehen.
   »An / Aus« und »Nachtlicht« stehen daneben. Nachts will man dimmen, nicht
