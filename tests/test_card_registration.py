@@ -205,16 +205,21 @@ def test_karte_passt_auf_kleinstschirme():
     assert "min-height: 0" in inhalt
 
 
-def test_uhr_wechselt_nicht_mehr_per_tipp():
-    """Der Tipp auf die Uhr regelt die Helligkeit — das Zifferblatt bleibt in den Einstellungen."""
+def test_uhr_reagiert_nicht_auf_einen_tipp():
+    """Ein Dashboard, das bei jeder Berührung ein Menü aufklappt, ist keins."""
     inhalt = _karte()
     assert "_cycleFace" not in inhalt
-    assert '$("clock").addEventListener("click", () => this._toggleClockDrawer())' in inhalt
+    assert '$("clock").addEventListener("click"' not in inhalt
 
 
-def test_uhr_hat_helligkeitsregler_direkt_unter_der_uhr():
-    """Ein Tipp auf die Uhr klappt Aktiv- und Ruhe-Regler auf, ohne Umweg über ein Menü."""
+def test_uhr_gibt_ihre_helligkeitsregler_erst_beim_halten_frei():
+    """Gedrückt halten öffnet Aktiv- und Ruhe-Regler; dieselben stehen in den Einstellungen."""
     inhalt = _karte()
+    assert "_armClockHold" in inhalt
+    assert "CLOCK_HOLD_MS" in inhalt
+    # Wischen ist kein Halten, und langes Halten darf kein Kontextmenü werfen.
+    assert 'clock.addEventListener("pointermove"' in inhalt
+    assert '"contextmenu"' in inhalt
     assert 'id="drawer-clock"' in inhalt
     assert 'id="cd-dim-range"' in inhalt
     assert 'id="cd-doze-range"' in inhalt

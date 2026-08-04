@@ -235,10 +235,14 @@ Entität gerade nicht erreichbar ist.
 
 **Ein Tipp, ein Regler.** Die Lampe öffnet kein Menü mehr, sondern klappt den
 Dimmer direkt unter der Taste auf — daneben »An / Aus« und »Nachtlicht«. Ein
-Tipp auf die Uhr klappt genauso ihre beiden Helligkeitsregler auf: *Aktiv* für
-den Betrieb, *Ruhe* für die abgedunkelte Nachtruhe. Ein zweiter Tipp schließt
-wieder, und wenn die Karte in die Nachtruhe geht, schließen offene Regler von
-selbst.
+zweiter Tipp schließt wieder, und wenn die Karte in die Nachtruhe geht,
+schließen offene Regler von selbst.
+
+Die Uhr bleibt beim Antippen still: dort kommen die beiden Helligkeitsregler
+(*Aktiv* für den Betrieb, *Ruhe* für die abgedunkelte Nachtruhe) erst, wenn man
+sie gut eine halbe Sekunde gedrückt hält. Wischen gilt nicht als Halten.
+Dieselben Regler stehen auch hinter dem Zahnrad, für alle, die lieber suchen
+als halten.
 
 Zifferblatt, Helligkeit und Layout stehen hinter dem Zahnrad in der Ecke der
 Karte. Zifferblätter: Kontur (Standard — eine ausgefüllte Ziffer strahlt neben

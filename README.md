@@ -408,10 +408,14 @@ entities with a target temperature; for the lamp, lights or switches. Anything
 already configured stays selectable even while its entity is unavailable.
 
 **One tap, one slider.** The lamp no longer opens a menu: it unfolds a dimmer
-right below the key, next to "An / Aus" and "Nachtlicht". Tapping the clock
-unfolds its two brightness sliders the same way — *Aktiv* for use, *Ruhe* for
-the dimmed night state. A second tap closes them again, and when the card falls
-into its night state any open slider closes by itself.
+right below the key, next to "An / Aus" and "Nachtlicht". A second tap closes it
+again, and when the card falls into its night state any open slider closes by
+itself.
+
+The clock stays silent on a tap: its two brightness sliders (*Aktiv* for use,
+*Ruhe* for the dimmed night state) appear only after holding it for a good half
+second, and a swipe does not count as a hold. The same sliders also live behind
+the gear icon.
 
 Clock face, brightness and layout live in the gear icon in the card's corner.
 Faces: outline (the default — a filled digit throws too much light next to a

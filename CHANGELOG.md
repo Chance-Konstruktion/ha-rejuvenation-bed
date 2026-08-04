@@ -9,12 +9,13 @@ Alle Änderungen am Rejuvenation Bed Projekt.
   unter der Taste auf, statt ein Vollbild-Overlay über die Karte zu ziehen.
   »An / Aus« und »Nachtlicht« stehen daneben. Nachts will man dimmen, nicht
   navigieren — und der Daumen soll dabei die Uhr nicht verdecken.
-- **Uhr: Helligkeit direkt am Griff.** Ein Tipp auf die Uhr klappt ihre beiden
-  Helligkeitsregler auf (*Aktiv* und *Ruhe*). Sie schreiben dieselbe Einstellung
-  wie die Regler in den Anzeige-Einstellungen und halten sich gegenseitig auf
-  Stand. Das Zifferblatt wechselt weiterhin nur über die Einstellungen: im
-  Halbschlaf trifft man die Uhr zu leicht. Offene Regler schließen sich, sobald
-  die Karte in die Nachtruhe geht.
+- **Uhr: Helligkeit auf Gedrückthalten.** Wer die Uhr gut eine halbe Sekunde
+  hält, bekommt ihre beiden Helligkeitsregler (*Aktiv* und *Ruhe*); ein Tipp tut
+  weiterhin nichts, und Wischen gilt nicht als Halten. Die Regler schreiben
+  dieselbe Einstellung wie die in den Anzeige-Einstellungen und halten sich
+  gegenseitig auf Stand. Das Zifferblatt wechselt weiterhin nur über die
+  Einstellungen. Offene Regler schließen sich, sobald die Karte in die Nachtruhe
+  geht.
 - **Karte findet ihre Entitäten selbst.** Thermostat, Weckzeit, Wecker-Schalter
   und Lampe stehen jetzt als Attribut am Status-Sensor jeder Zone. Fehlt in der
   Karte ein Eintrag, holt sie ihn von dort — bei zwei Zonen entstehen so von

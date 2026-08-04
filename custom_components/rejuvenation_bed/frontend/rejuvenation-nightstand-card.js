@@ -51,6 +51,9 @@ const ENTITY_NAMES = {
 const PREF_KEY = "rejuvenation.nightstand.prefs";
 const DOZE_AFTER = 45000;
 
+/* So lange muss die Uhr gehalten werden, bis die Helligkeitsregler kommen. */
+const CLOCK_HOLD_MS = 650;
+
 const TAGE = [
   "Sonntag", "Montag", "Dienstag", "Mittwoch", "Donnerstag", "Freitag", "Samstag",
 ];
@@ -666,7 +669,10 @@ const TEMPLATE = `
     </div>
 
     <div class="clock-drawer" id="drawer-clock">
-      <div class="head"><h2>Uhr · Helligkeit</h2></div>
+      <div class="head">
+        <h2>Uhr · Helligkeit</h2>
+        <button class="chip" type="button" id="cd-close">Fertig</button>
+      </div>
       <div class="lane">
         <span class="lane-label">Aktiv</span>
         <input type="range" id="cd-dim-range" min="25" max="100" step="5" value="100"
@@ -894,6 +900,7 @@ class RejuvenationNightstandCard extends HTMLElement {
     clearTimeout(this._dozePeek);
     clearTimeout(this._pushTimer);
     clearTimeout(this._brightTimer);
+    clearTimeout(this._holdTimer);
   }
 
   /* ── Geraeteeinstellungen ───────────────────────────────────── */
@@ -1070,7 +1077,8 @@ class RejuvenationNightstandCard extends HTMLElement {
     $("k-bed").addEventListener("click", () => this._openSheet("sheet-bed"));
     $("k-light").addEventListener("click", () => this._toggleDrawer("slot-light"));
     $("k-alarm").addEventListener("click", () => this._openAlarm());
-    $("clock").addEventListener("click", () => this._toggleClockDrawer());
+    this._armClockHold($("clock"));
+    $("cd-close").addEventListener("click", () => this._closeDrawers());
 
     this.shadowRoot.querySelectorAll("[data-close]").forEach((btn) =>
       btn.addEventListener("click", () => this._closeSheets()),
@@ -1257,15 +1265,40 @@ class RejuvenationNightstandCard extends HTMLElement {
     ["doze-pct", "cd-doze-pct"].forEach((id) => (this.$(id).textContent = doze));
   }
 
-  /* Ein Tipp auf die Uhr klappt die beiden Helligkeitsregler auf. Das
-     Zifferblatt wechselt weiterhin nur ueber die Einstellungen: nachts trifft
-     man die Uhr im Halbschlaf zu leicht und staende dann vor einem anderen
-     Ziffernbild. */
-  _toggleClockDrawer() {
+  /* Die Uhr reagiert erst auf laengeres Gedruecktehalten. Ein Tipp tut
+     weiterhin nichts: nachts streift man die Uhr im Halbschlaf zu leicht, und
+     ein Dashboard, das bei jeder Beruehrung etwas aufklappt, ist keins. Wer
+     lieber sucht als haelt, findet dieselben Regler in den Einstellungen. */
+  _armClockHold(clock) {
+    const cancel = () => clearTimeout(this._holdTimer);
+
+    clock.addEventListener("pointerdown", (event) => {
+      cancel();
+      const startX = event.clientX;
+      const startY = event.clientY;
+      this._holdTimer = setTimeout(() => this._openClockDrawer(), CLOCK_HOLD_MS);
+
+      /* Wer scrollt oder wischt, wollte nicht halten. */
+      this._holdMove = (move) => {
+        if (Math.abs(move.clientX - startX) > 12 || Math.abs(move.clientY - startY) > 12) cancel();
+      };
+      clock.addEventListener("pointermove", this._holdMove);
+    });
+
+    ["pointerup", "pointercancel", "pointerleave"].forEach((name) =>
+      clock.addEventListener(name, () => {
+        cancel();
+        if (this._holdMove) clock.removeEventListener("pointermove", this._holdMove);
+      }),
+    );
+
+    /* Auf dem Tablet wirft langes Halten sonst das Kontextmenue auf. */
+    clock.addEventListener("contextmenu", (event) => event.preventDefault());
+  }
+
+  _openClockDrawer() {
     const drawer = this.$("drawer-clock");
-    const open = !drawer.classList.contains("open");
     this._closeDrawers();
-    if (!open) return;
     this._syncDimUI();
     drawer.classList.add("open");
   }
