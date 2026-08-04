@@ -39,6 +39,15 @@ const FACE_NAMES = {
   flip: "Klappanzeige",
 };
 
+/* Kurznamen der vier Ziele — in der Statuszeile, in den Einstellungen und im
+   Karten-Editor steht dasselbe Wort fuer dieselbe Sache. */
+const ENTITY_NAMES = {
+  climate: "Thermostat",
+  alarm: "Weckzeit",
+  alarm_switch: "Wecker aktiv",
+  light: "Lampe",
+};
+
 const PREF_KEY = "rejuvenation.nightstand.prefs";
 const DOZE_AFTER = 45000;
 
@@ -332,6 +341,52 @@ const STYLE = `
     min-height: 12px;
   }
 
+  /* ── Schubladen ──
+     Ein Tipp auf die Lampe klappt den Regler direkt unter der Taste auf.
+     Ein Vollbildmenue waere nachts der falsche Weg: man will dimmen, nicht
+     navigieren — und der Daumen soll dabei die Uhr nicht verdecken. */
+  .slot { display: flex; flex-direction: column; }
+  .slot.open > .key { border-color: var(--amber-deep); }
+
+  .drawer, .clock-drawer {
+    display: none;
+    flex-direction: column;
+    gap: 8px;
+    margin-top: 8px;
+    padding: 12px 16px 14px;
+    border: 1px solid var(--amber-faint);
+    border-radius: 18px;
+  }
+  .slot.open > .drawer, .clock-drawer.open { display: flex; animation: rise 0.22s ease; }
+
+  .drawer .head, .clock-drawer .head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 12px;
+  }
+  .drawer .head .num { font-size: 30px; font-weight: 200; color: var(--amber); }
+  .drawer .head .num small { font-size: 15px; }
+
+  /* Ein Regler je Zeile: Beschriftung links, Wert rechts, dazwischen der
+     ganze Rest der Breite — so trifft man ihn auch im Halbschlaf. */
+  .lane { display: flex; align-items: center; gap: 12px; }
+  .lane .lane-label {
+    flex: 0 0 auto;
+    min-width: 52px;
+    font-size: 10px;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: var(--amber-deep);
+  }
+  .lane .lane-val { flex: 0 0 auto; min-width: 48px; text-align: right; font-size: 15px; color: var(--amber); }
+  .lane input[type="range"] { flex: 1 1 auto; width: auto; min-width: 0; height: 38px; }
+
+  .drawer .row, .clock-drawer .row { justify-content: flex-start; }
+  .drawer .chip, .clock-drawer .chip { padding: 9px 16px; font-size: 13px; }
+
+  .clock-drawer { width: min(100%, 460px); }
+
   /* ── Overlays ── */
   .sheet {
     position: absolute;
@@ -376,7 +431,7 @@ const STYLE = `
     padding: 24px 22px max(28px, env(safe-area-inset-bottom));
   }
 
-  .sheet h2 {
+  .sheet h2, .drawer h2, .clock-drawer h2 {
     margin: 0;
     font-size: 12px;
     font-weight: 400;
@@ -465,13 +520,35 @@ const STYLE = `
 
   .missing { font-size: 13px; line-height: 1.6; color: var(--amber-deep); text-align: center; max-width: 320px; }
 
+  /* Welche Entity gerade an welcher Taste haengt — sonst raet man, ob die
+     Karte oder die Integration die Lampe liefert. */
+  .entities { display: flex; flex-direction: column; gap: 6px; width: min(100%, 420px); }
+  .entities .ent {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 14px;
+    font-size: 12px;
+  }
+  .entities .ent .k { flex: 0 0 auto; letter-spacing: 0.18em; text-transform: uppercase; color: var(--amber-deep); }
+  .entities .ent .v {
+    flex: 1 1 auto;
+    min-width: 0;
+    text-align: right;
+    color: var(--amber-soft);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .entities .ent .v.none { color: var(--amber-deep); }
+
   /* ── Breitbild ──
      Auf einem quer stehenden Tablet steht die Uhr links und die drei Tasten
      rechts daneben, statt dass beides in der Mitte um die Hoehe kaempft. */
   .root.is-wide {
     display: grid;
     grid-template-columns: 1.1fr minmax(300px, 0.9fr);
-    grid-template-rows: 1fr auto;
+    grid-template-rows: 1fr auto auto;
     align-items: center;
     justify-items: center;
     gap: 20px 40px;
@@ -481,7 +558,8 @@ const STYLE = `
   .root.is-wide .clock { grid-column: 1; grid-row: 1; margin: 0; }
   .root.is-wide .time { font-size: clamp(72px, 11vw, 190px); }
   .root.is-wide .deck { grid-column: 2; grid-row: 1; margin-top: 0; }
-  .root.is-wide .status { grid-column: 1 / -1; grid-row: 2; }
+  .root.is-wide .clock-drawer { grid-column: 1; grid-row: 2; }
+  .root.is-wide .status { grid-column: 1 / -1; grid-row: 3; }
 
   /* ── Kleinstschirm ──
      Aussendisplay eines Falters, Smartwatch-artige Kacheln: rund 350 x 380
@@ -511,6 +589,17 @@ const STYLE = `
   .root.is-tiny .key .value { margin-top: 1px; font-size: 15px; }
   .root.is-tiny .key .aux { font-size: 10px; }
   .root.is-tiny .status { display: none; }
+
+  .root.is-tiny .drawer,
+  .root.is-tiny .clock-drawer { gap: 6px; margin-top: 5px; padding: 8px 10px 10px; border-radius: 12px; }
+  .root.is-tiny .drawer .head .num { font-size: 20px; }
+  .root.is-tiny .drawer .head .num small { font-size: 11px; }
+  .root.is-tiny .lane { gap: 8px; }
+  .root.is-tiny .lane .lane-label { min-width: 0; font-size: 8px; letter-spacing: 0.12em; }
+  .root.is-tiny .lane .lane-val { min-width: 38px; font-size: 12px; }
+  .root.is-tiny .lane input[type="range"] { width: auto; height: 30px; }
+  .root.is-tiny .drawer .chip,
+  .root.is-tiny .clock-drawer .chip { padding: 6px 11px; font-size: 11px; }
 
   /* Die Overlays scrollen auf so wenig Hoehe, statt zu klemmen. */
   .root.is-tiny .sheet .bar { padding: 8px 10px; gap: 6px; }
@@ -576,33 +665,69 @@ const TEMPLATE = `
       <div class="date" id="date">&nbsp;</div>
     </div>
 
+    <div class="clock-drawer" id="drawer-clock">
+      <div class="head"><h2>Uhr · Helligkeit</h2></div>
+      <div class="lane">
+        <span class="lane-label">Aktiv</span>
+        <input type="range" id="cd-dim-range" min="25" max="100" step="5" value="100"
+          aria-label="Helligkeit der Uhr"/>
+        <span class="lane-val"><span id="cd-dim-pct">100</span> %</span>
+      </div>
+      <div class="lane">
+        <span class="lane-label">Ruhe</span>
+        <input type="range" id="cd-doze-range" min="5" max="100" step="5" value="45"
+          aria-label="Helligkeit der Uhr in der Nachtruhe"/>
+        <span class="lane-val"><span id="cd-doze-pct">45</span> %</span>
+      </div>
+    </div>
+
     <div class="deck">
-      <button class="key" id="k-bed" type="button">
-        <svg class="glyph" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M3 17h18M3 17v-4a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v4M3 17v3M21 17v3"/>
-          <path d="M6 11V8a1 1 0 0 1 1-1h3a1 1 0 0 1 1 1v3"/>
-          <path d="M2 14c1.4 0 1.4-1.2 2.8-1.2S6.2 14 7.6 14" opacity="0.55"/>
-        </svg>
-        <span class="body"><span class="label">Wasserbett</span><span class="value" id="v-bed">--,-°</span></span>
-        <span class="aux" id="a-bed"></span>
-      </button>
+      <div class="slot" id="slot-bed">
+        <button class="key" id="k-bed" type="button">
+          <svg class="glyph" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M3 17h18M3 17v-4a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v4M3 17v3M21 17v3"/>
+            <path d="M6 11V8a1 1 0 0 1 1-1h3a1 1 0 0 1 1 1v3"/>
+            <path d="M2 14c1.4 0 1.4-1.2 2.8-1.2S6.2 14 7.6 14" opacity="0.55"/>
+          </svg>
+          <span class="body"><span class="label">Wasserbett</span><span class="value" id="v-bed">--,-°</span></span>
+          <span class="aux" id="a-bed"></span>
+        </button>
+      </div>
 
-      <button class="key" id="k-alarm" type="button">
-        <svg class="glyph" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round">
-          <circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 2M5 3 2.5 5.5M19 3l2.5 2.5"/>
-        </svg>
-        <span class="body"><span class="label">Wecker</span><span class="value" id="v-alarm">Aus</span></span>
-        <span class="aux" id="a-alarm"></span>
-      </button>
+      <div class="slot" id="slot-alarm">
+        <button class="key" id="k-alarm" type="button">
+          <svg class="glyph" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round">
+            <circle cx="12" cy="13" r="8"/><path d="M12 9v4l2.5 2M5 3 2.5 5.5M19 3l2.5 2.5"/>
+          </svg>
+          <span class="body"><span class="label">Wecker</span><span class="value" id="v-alarm">Aus</span></span>
+          <span class="aux" id="a-alarm"></span>
+        </button>
+      </div>
 
-      <button class="key" id="k-light" type="button">
-        <svg class="glyph" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round">
-          <path d="M9 18h6M10 21h4"/>
-          <path d="M12 3a6 6 0 0 0-3.5 10.9c.6.4 1 1.1 1 1.8v.3h5v-.3c0-.7.4-1.4 1-1.8A6 6 0 0 0 12 3Z"/>
-        </svg>
-        <span class="body"><span class="label">Schlafzimmerlampe</span><span class="value" id="v-light">Aus</span></span>
-        <span class="aux" id="a-light"></span>
-      </button>
+      <div class="slot" id="slot-light">
+        <button class="key" id="k-light" type="button">
+          <svg class="glyph" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M9 18h6M10 21h4"/>
+            <path d="M12 3a6 6 0 0 0-3.5 10.9c.6.4 1 1.1 1 1.8v.3h5v-.3c0-.7.4-1.4 1-1.8A6 6 0 0 0 12 3Z"/>
+          </svg>
+          <span class="body"><span class="label">Schlafzimmerlampe</span><span class="value" id="v-light">Aus</span></span>
+          <span class="aux" id="a-light"></span>
+        </button>
+        <div class="drawer" id="drawer-light">
+          <div class="head">
+            <span class="num"><span id="li-pct">0</span><small> %</small></span>
+            <div class="row">
+              <button class="chip" type="button" id="li-toggle">An / Aus</button>
+              <button class="chip" type="button" id="li-night">Nachtlicht</button>
+            </div>
+          </div>
+          <div class="lane">
+            <input type="range" id="li-range" min="1" max="100" step="1" value="40"
+              aria-label="Helligkeit der Lampe"/>
+          </div>
+          <p class="missing" id="li-hint" style="display:none"></p>
+      </div>
+      </div>
     </div>
 
     <div class="status" id="status">&nbsp;</div>
@@ -648,21 +773,6 @@ const TEMPLATE = `
       </div>
     </div>
 
-    <div class="sheet" id="sheet-light">
-      <div class="bar">
-        <h2>Schlafzimmerlampe</h2>
-        <div class="row">
-          <button class="chip primary" type="button" id="li-toggle">An / Aus</button>
-          <button class="chip" type="button" id="li-night">Nachtlicht</button>
-          <button class="chip" type="button" data-close>Zurück</button>
-        </div>
-      </div>
-      <div class="sheet-body">
-        <div class="bignum"><span id="li-pct">0</span><span style="font-size:24px">%</span></div>
-        <input type="range" id="li-range" min="1" max="100" step="1" value="40"/>
-      </div>
-    </div>
-
     <div class="sheet" id="sheet-beds">
       <div class="bar">
         <h2>Welches Bett?</h2>
@@ -689,6 +799,9 @@ const TEMPLATE = `
         <h2>Helligkeit · Ruhe</h2>
         <div class="bignum" style="font-size:34px"><span id="doze-pct">45</span><span style="font-size:18px">%</span></div>
         <input type="range" id="doze-range" min="5" max="100" step="5" value="45"/>
+        <h2>Entitäten</h2>
+        <div class="entities" id="entity-list"></div>
+        <p class="missing" id="entity-hint"></p>
         <p class="missing">Bedient jemand die Karte, leuchtet die Uhr mit der ersten Helligkeit — so hell wie der übrige Text. Bleibt es eine Weile still, bleibt nur die Uhr stehen und dunkelt auf die zweite ab. Gilt nur für dieses Gerät und wird sofort übernommen.</p>
       </div>
     </div>
@@ -848,17 +961,73 @@ class RejuvenationNightstandCard extends HTMLElement {
     root.classList.toggle("is-tiny", tiny);
   }
 
+  /* ── Betten ─────────────────────────────────────────────────────
+     Was in der Karte steht, gilt. Was dort fehlt, holt sich die Karte aus
+     der Integration: die Status-Sensoren tragen die Entities der Zone als
+     Attribut bei sich. So genuegt es, Wecker und Lampe einmal in den
+     Integrations-Optionen zu waehlen — jede Karte findet sie danach von
+     selbst, auch die auf dem zweiten Tablet. */
+  _discovered() {
+    if (!this._hass) return [];
+    if (this._discoveryHass === this._hass) return this._discoveryCache;
+
+    const found = [];
+    Object.keys(this._hass.states).forEach((id) => {
+      const state = this._hass.states[id];
+      const cfg = state && state.attributes && state.attributes.rejuvenation_nightstand;
+      if (!cfg || typeof cfg !== "object") return;
+      if (!cfg.climate && !cfg.alarm && !cfg.light) return;
+      found.push({ ...cfg, _source: id });
+    });
+    found.sort((a, b) =>
+      (a.zone == null ? 99 : a.zone) - (b.zone == null ? 99 : b.zone) ||
+      String(a._source).localeCompare(String(b._source)),
+    );
+
+    this._discoveryHass = this._hass;
+    this._discoveryCache = found;
+    return found;
+  }
+
+  get _beds() {
+    const configured = (this._config && this._config.beds) || [{}];
+    const found = this._discovered();
+    if (!found.length) return configured;
+
+    /* Steht in der Karte kein einziges Ziel, uebernimmt die Integration die
+       ganze Liste — die Karte laeuft dann ohne jede Konfiguration. */
+    const useful = configured.filter((bed) => bed.climate || bed.alarm || bed.light);
+    if (!useful.length) return found;
+
+    return configured.map((bed, index) => {
+      const match = found.find((f) => f.climate && f.climate === bed.climate) || found[index];
+      if (!match) return bed;
+      const set = {};
+      Object.keys(bed).forEach((key) => {
+        if (bed[key] !== undefined && bed[key] !== null && bed[key] !== "") set[key] = bed[key];
+      });
+      return { ...match, ...set };
+    });
+  }
+
   get _bed() {
-    const beds = (this._config && this._config.beds) || [{}];
+    const beds = this._beds;
     return beds[clamp(this._bedIndex, 0, beds.length - 1)] || {};
   }
 
+  /* Ohne eigene Angabe zaehlt, was das Thermostat selbst zulaesst. */
+  _climateLimit(attr, fallback) {
+    const state = this._state(this._bed.climate);
+    const value = state && state.attributes ? parseFloat(state.attributes[attr]) : NaN;
+    return isNaN(value) ? fallback : value;
+  }
+
   get _tempMin() {
-    return parseFloat(this._bed.temp_min) || 20;
+    return parseFloat(this._bed.temp_min) || this._climateLimit("min_temp", 20);
   }
 
   get _tempMax() {
-    return parseFloat(this._bed.temp_max) || 40;
+    return parseFloat(this._bed.temp_max) || this._climateLimit("max_temp", 40);
   }
 
   _state(entity) {
@@ -899,8 +1068,9 @@ class RejuvenationNightstandCard extends HTMLElement {
     $("bed-switch").addEventListener("click", () => this._openBeds());
 
     $("k-bed").addEventListener("click", () => this._openSheet("sheet-bed"));
-    $("k-light").addEventListener("click", () => this._openSheet("sheet-light"));
+    $("k-light").addEventListener("click", () => this._toggleDrawer("slot-light"));
     $("k-alarm").addEventListener("click", () => this._openAlarm());
+    $("clock").addEventListener("click", () => this._toggleClockDrawer());
 
     this.shadowRoot.querySelectorAll("[data-close]").forEach((btn) =>
       btn.addEventListener("click", () => this._closeSheets()),
@@ -940,23 +1110,16 @@ class RejuvenationNightstandCard extends HTMLElement {
     $("li-toggle").addEventListener("click", () => this._toggleLight());
     $("li-night").addEventListener("click", () => this._nightLight());
 
-    $("dim-range").addEventListener("input", (event) => {
-      this._prefs.dim = event.target.value;
-      $("dim-pct").textContent = event.target.value;
-      this._applyDim();
-      this._savePrefs();
-    });
-
-    /* Der Ruhe-Regler zeigt sich sofort an der Uhr, auch wenn die Karte
-       gerade wach ist — sonst stellt man blind ein. */
-    $("doze-range").addEventListener("input", (event) => {
-      this._prefs.doze = event.target.value;
-      $("doze-pct").textContent = event.target.value;
-      this.$("clock").style.opacity = String(this._dozeDim / 100);
-      clearTimeout(this._dozePeek);
-      this._dozePeek = setTimeout(() => this._applyDim(), 900);
-      this._savePrefs();
-    });
+    /* Beide Helligkeitsregler gibt es zweimal: unter der Uhr fuer den
+       schnellen Griff, in den Einstellungen im Zusammenhang. Sie schreiben
+       dieselbe Einstellung und halten sich gegenseitig auf Stand. */
+    ["dim-range", "cd-dim-range"].forEach((id) =>
+      $(id).addEventListener("input", (event) => this._setDim(event.target.value)),
+    );
+    ["doze-range", "cd-doze-range"].forEach((id) =>
+      $(id).addEventListener("input", (event) => this._setDoze(event.target.value)),
+    );
+    this._syncDimUI();
 
     this._paintClock();
     this._applyLayout();
@@ -980,6 +1143,9 @@ class RejuvenationNightstandCard extends HTMLElement {
     this._applyDim();
     this._dozeTimer = setTimeout(() => {
       this.$("root").classList.add("dozing");
+      /* In der Nachtruhe bleibt nur die Uhr — offene Regler gehoeren zu, sonst
+         leuchten sie unter der abgedunkelten Anzeige weiter. */
+      this._closeDrawers();
       this._applyDim();
     }, DOZE_AFTER);
   }
@@ -1062,9 +1228,61 @@ class RejuvenationNightstandCard extends HTMLElement {
     this.$("clock").style.opacity = String((dozing ? this._dozeDim : this._dim) / 100);
   }
 
-  /* Das Zifferblatt wechselt ausschliesslich ueber die Anzeige-Einstellungen.
-     Ein Tipp auf die Uhr tut bewusst nichts: nachts trifft man sie im Halbschlaf
-     zu leicht und stand dann vor einem anderen Ziffernbild. */
+  /* ── Helligkeit der Uhr ─────────────────────────────────────── */
+  _setDim(value) {
+    this._prefs.dim = String(value);
+    this._syncDimUI();
+    this._applyDim();
+    this._savePrefs();
+  }
+
+  /* Der Ruhe-Regler zeigt sich sofort an der Uhr, auch wenn die Karte gerade
+     wach ist — sonst stellt man blind ein. Nach einer kurzen Vorschau geht es
+     zurueck auf die Helligkeit, die gerade gilt. */
+  _setDoze(value) {
+    this._prefs.doze = String(value);
+    this._syncDimUI();
+    this.$("clock").style.opacity = String(this._dozeDim / 100);
+    clearTimeout(this._dozePeek);
+    this._dozePeek = setTimeout(() => this._applyDim(), 900);
+    this._savePrefs();
+  }
+
+  _syncDimUI() {
+    const dim = String(this._dim);
+    const doze = String(this._dozeDim);
+    ["dim-range", "cd-dim-range"].forEach((id) => (this.$(id).value = dim));
+    ["dim-pct", "cd-dim-pct"].forEach((id) => (this.$(id).textContent = dim));
+    ["doze-range", "cd-doze-range"].forEach((id) => (this.$(id).value = doze));
+    ["doze-pct", "cd-doze-pct"].forEach((id) => (this.$(id).textContent = doze));
+  }
+
+  /* Ein Tipp auf die Uhr klappt die beiden Helligkeitsregler auf. Das
+     Zifferblatt wechselt weiterhin nur ueber die Einstellungen: nachts trifft
+     man die Uhr im Halbschlaf zu leicht und staende dann vor einem anderen
+     Ziffernbild. */
+  _toggleClockDrawer() {
+    const drawer = this.$("drawer-clock");
+    const open = !drawer.classList.contains("open");
+    this._closeDrawers();
+    if (!open) return;
+    this._syncDimUI();
+    drawer.classList.add("open");
+  }
+
+  /* ── Schubladen ─────────────────────────────────────────────── */
+  _toggleDrawer(slotId) {
+    const slot = this.$(slotId);
+    const open = !slot.classList.contains("open");
+    this._closeDrawers();
+    if (open) slot.classList.add("open");
+  }
+
+  _closeDrawers() {
+    this.shadowRoot
+      .querySelectorAll(".slot.open, .clock-drawer.open")
+      .forEach((el) => el.classList.remove("open"));
+  }
 
   _flash(text) {
     this.$("status").textContent = text;
@@ -1246,8 +1464,17 @@ class RejuvenationNightstandCard extends HTMLElement {
     /* Ein Schalter kennt kein Dimmen und kein Nachtlicht — dann bleiben die
        beiden Bedienelemente weg, statt Dienste zu rufen, die es nicht gibt. */
     const dimmable = this._lightDomain === "light";
-    this.$("li-range").style.display = dimmable ? "" : "none";
+    this.$("li-range").parentElement.style.display = dimmable ? "" : "none";
     this.$("li-night").style.display = dimmable ? "" : "none";
+    this.$("li-toggle").style.display = this._bed.light ? "" : "none";
+
+    /* Ohne Lampe waere die Schublade leer — dann steht dort, wo sie herkommt. */
+    const hint = this.$("li-hint");
+    hint.style.display = this._bed.light ? "none" : "";
+    hint.textContent = this._bed.light
+      ? ""
+      : "Keine Lampe hinterlegt. Karte bearbeiten (Stift → Karte) oder in den " +
+        "Integrations-Optionen unter Schlaf-Profil eine Lampe wählen.";
   }
 
   /* Als Lampe darf auch ein Schalter eingetragen sein — dann gibt es weder
@@ -1285,7 +1512,7 @@ class RejuvenationNightstandCard extends HTMLElement {
     if (!this._bed.light) return;
     if (this._lightDomain !== "light") {
       this._call(this._lightDomain, "turn_on", { entity_id: this._bed.light });
-      this._closeSheets();
+      this._closeDrawers();
       return;
     }
 
@@ -1297,12 +1524,13 @@ class RejuvenationNightstandCard extends HTMLElement {
       data.color_temp_kelvin = Math.round(clamp(2000, min, max));
     }
     this._call("light", "turn_on", data);
-    this._closeSheets();
+    this._closeDrawers();
   }
 
   /* ── Overlays ───────────────────────────────────────────────── */
   _openSheet(id) {
     this._closeSheets();
+    this._closeDrawers();
     this.$(id).classList.add("show");
   }
 
@@ -1313,7 +1541,7 @@ class RejuvenationNightstandCard extends HTMLElement {
   _openBeds() {
     const list = this.$("bed-list");
     list.innerHTML = "";
-    this._config.beds.forEach((entry, index) => {
+    this._beds.forEach((entry, index) => {
       const chip = document.createElement("button");
       chip.type = "button";
       chip.className = "chip" + (index === this._bedIndex ? " primary" : "");
@@ -1364,10 +1592,8 @@ class RejuvenationNightstandCard extends HTMLElement {
       layouts.appendChild(chip);
     });
 
-    this.$("dim-range").value = String(this._dim);
-    this.$("dim-pct").textContent = String(this._dim);
-    this.$("doze-range").value = String(this._dozeDim);
-    this.$("doze-pct").textContent = String(this._dozeDim);
+    this._syncDimUI();
+    this._paintEntityList();
     this._openSheet("sheet-prefs");
   }
 
@@ -1375,13 +1601,40 @@ class RejuvenationNightstandCard extends HTMLElement {
   _paintStatus() {
     const missing = ["climate", "alarm", "light"].filter((key) => !this._bed[key]);
     this.$("status").textContent = missing.length
-      ? `Nicht konfiguriert: ${missing.join(", ")}`
+      ? `Ohne ${missing.map((key) => ENTITY_NAMES[key]).join(" · ")} — Zahnrad → Entitäten`
       : " ";
+  }
+
+  /* Die Einstellungen zeigen, was gerade an den Tasten haengt und woher es
+     kommt — sonst sucht man den Fehler in der Karte, obwohl die Integration
+     die Entity liefert (oder umgekehrt). */
+  _paintEntityList() {
+    const list = this.$("entity-list");
+    list.innerHTML = "";
+    const bed = this._bed;
+    ["climate", "alarm", "alarm_switch", "light"].forEach((key) => {
+      const row = document.createElement("div");
+      row.className = "ent";
+      const name = document.createElement("span");
+      name.className = "k";
+      name.textContent = ENTITY_NAMES[key];
+      const value = document.createElement("span");
+      value.className = "v" + (bed[key] ? "" : " none");
+      value.textContent = bed[key] || "nicht gesetzt";
+      row.append(name, value);
+      list.appendChild(row);
+    });
+
+    this.$("entity-hint").textContent = bed._source
+      ? "Kommt aus der Integration (Einstellungen → Geräte & Dienste → Rejuvenation Bed " +
+        "→ Konfigurieren → Schlaf-Profil). Was in der Karte steht, hat Vorrang."
+      : "Steht in der Karte: Dashboard bearbeiten → Stift an der Karte. Leer gelassene " +
+        "Felder holt sich die Karte aus den Integrations-Optionen (Schlaf-Profil).";
   }
 
   _render() {
     if (!this._built || !this._config) return;
-    const beds = this._config.beds;
+    const beds = this._beds;
     this._bedIndex = clamp(this._bedIndex, 0, beds.length - 1);
     this.$("root").classList.toggle("single-bed", beds.length < 2);
     this.$("bed-label").textContent =
@@ -1507,6 +1760,26 @@ const EDITOR_LABELS = {
   temp_max: "Groesste Temperatur",
 };
 
+/* ha-form gehoert zum Frontend, wird aber erst geladen, wenn irgendetwas es
+ * braucht. Wird der Karten-Editor als Erstes geoeffnet, ist das Element noch
+ * unbekannt und die Felder blieben leer. Ein eingebauter Karten-Editor zieht
+ * das Paket nach; danach steht ha-form auch uns zur Verfuegung. */
+async function ensureHaForm() {
+  if (customElements.get("ha-form")) return true;
+  try {
+    const helpers = await window.loadCardHelpers();
+    const card = await helpers.createCardElement({ type: "entities", entities: [] });
+    if (card && card.constructor.getConfigElement) await card.constructor.getConfigElement();
+    await Promise.race([
+      customElements.whenDefined("ha-form"),
+      new Promise((resolve) => setTimeout(resolve, 3000)),
+    ]);
+  } catch {
+    /* Faellt zurueck auf die einfachen Eingabefelder. */
+  }
+  return Boolean(customElements.get("ha-form"));
+}
+
 const EDITOR_STYLE = `
   .rjv-ed { display: flex; flex-direction: column; gap: 16px; }
   .rjv-ed .bed {
@@ -1533,6 +1806,18 @@ const EDITOR_STYLE = `
     cursor: pointer;
   }
   .rjv-ed button.danger { color: var(--error-color, #db4437); }
+  .rjv-ed .prow { display: flex; align-items: center; gap: 12px; margin: 10px 0; }
+  .rjv-ed .prow span { flex: 0 0 40%; font-size: 14px; }
+  .rjv-ed .prow input {
+    flex: 1 1 auto;
+    min-width: 0;
+    padding: 8px 10px;
+    border: 1px solid var(--divider-color, rgba(127,127,127,0.35));
+    border-radius: 8px;
+    background: transparent;
+    color: inherit;
+    font: inherit;
+  }
 `;
 
 class RejuvenationNightstandCardEditor extends HTMLElement {
@@ -1550,6 +1835,12 @@ class RejuvenationNightstandCardEditor extends HTMLElement {
     this._render();
   }
 
+  connectedCallback() {
+    if (customElements.get("ha-form") || this._loadingForms) return;
+    this._loadingForms = true;
+    ensureHaForm().then(() => this._render(true));
+  }
+
   /* Beim ersten hass entstehen die Vorschlagslisten — bis dahin kennt der
      Editor keine Entities und muss danach einmal neu aufbauen. */
   set hass(hass) {
@@ -1559,8 +1850,15 @@ class RejuvenationNightstandCardEditor extends HTMLElement {
     if (first) this._render(true);
   }
 
+  /* Alles, was ha-form anzeigt, muss auch drinstehen: fehlt ein Schluessel,
+     meldet das Formular beim ersten Tippen "undefined" zurueck und die
+     Vorgabe verschwindet aus der Konfiguration. */
   get _globalData() {
-    return { face: this._config.face || "outline", dim: this._config.dim || 85 };
+    return {
+      face: this._config.face || "outline",
+      dim: Number(this._config.dim) || 100,
+      doze: Number(this._config.doze) || 45,
+    };
   }
 
   _emit(config) {
@@ -1586,6 +1884,77 @@ class RejuvenationNightstandCardEditor extends HTMLElement {
     this._render(true);
   }
 
+  /* Ein Formular — entweder das von Home Assistant oder, solange das nicht
+     geladen werden konnte, schlichte Eingabefelder mit Vorschlagsliste. Ohne
+     diesen Rueckfall stuende hier eine leere Flaeche und die Karte waere nur
+     noch ueber YAML zu aendern. */
+  _makeForm(schema, data, onChange) {
+    if (!customElements.get("ha-form")) return this._plainForm(schema, data, onChange);
+
+    const form = document.createElement("ha-form");
+    form.hass = this._hass;
+    form.schema = schema;
+    form.data = data;
+    form.computeLabel = (item) => EDITOR_LABELS[item.name] || item.name;
+    form.addEventListener("value-changed", (event) => {
+      event.stopPropagation();
+      onChange(event.detail.value);
+    });
+    return form;
+  }
+
+  _suggestions(item) {
+    const selector = item.selector || {};
+    if (selector.select) return (selector.select.options || []).map((o) => o.value || o);
+    if (!selector.entity) return [];
+    if (selector.entity.include_entities) return selector.entity.include_entities;
+
+    const domains = [].concat(selector.entity.domain || []);
+    if (!this._hass || !domains.length) return [];
+    return Object.keys(this._hass.states)
+      .filter((id) => domains.includes(id.split(".")[0]))
+      .sort();
+  }
+
+  _plainForm(schema, data, onChange) {
+    const box = document.createElement("div");
+    schema.forEach((item) => {
+      const row = document.createElement("label");
+      row.className = "prow";
+
+      const caption = document.createElement("span");
+      caption.textContent = EDITOR_LABELS[item.name] || item.name;
+
+      const input = document.createElement("input");
+      const numeric = Boolean(item.selector && item.selector.number);
+      input.type = numeric ? "number" : "text";
+      input.value = data[item.name] == null ? "" : String(data[item.name]);
+
+      const options = this._suggestions(item);
+      if (options.length) {
+        const listId = `rjv-${item.name}-${Math.random().toString(36).slice(2, 8)}`;
+        const list = document.createElement("datalist");
+        list.id = listId;
+        options.forEach((value) => {
+          const option = document.createElement("option");
+          option.value = value;
+          list.appendChild(option);
+        });
+        row.appendChild(list);
+        input.setAttribute("list", listId);
+      }
+
+      input.addEventListener("change", () => {
+        const raw = input.value.trim();
+        onChange({ [item.name]: numeric && raw !== "" ? Number(raw) : raw });
+      });
+
+      row.append(caption, input);
+      box.appendChild(row);
+    });
+    return box;
+  }
+
   /* Neu aufgebaut wird nur, wenn sich die Zahl der Betten aendert — sonst
      verliert das Feld, in dem gerade getippt wird, den Fokus. */
   _render(force) {
@@ -1604,17 +1973,9 @@ class RejuvenationNightstandCardEditor extends HTMLElement {
     this.innerHTML = `<style>${EDITOR_STYLE}</style><div class="rjv-ed" id="ed"></div>`;
     const wrap = this.querySelector("#ed");
 
-    const label = (item) => EDITOR_LABELS[item.name] || item.name;
-
-    const globals = document.createElement("ha-form");
-    globals.hass = this._hass;
-    globals.schema = GLOBAL_SCHEMA;
-    globals.data = this._globalData;
-    globals.computeLabel = label;
-    globals.addEventListener("value-changed", (event) => {
-      event.stopPropagation();
-      this._emit({ ...this._config, ...event.detail.value });
-    });
+    const globals = this._makeForm(GLOBAL_SCHEMA, this._globalData, (value) =>
+      this._emit({ ...this._config, ...value }),
+    );
     this._forms.push(globals);
     wrap.appendChild(globals);
 
@@ -1622,7 +1983,8 @@ class RejuvenationNightstandCardEditor extends HTMLElement {
     hint.className = "hint";
     hint.textContent =
       "Vorgeschlagen wird nur, was in das jeweilige Feld passt. " +
-      "Zifferblatt und Helligkeit sind nur die Vorgabe — jedes Geraet darf sie in der Karte selbst ueberstimmen.";
+      "Zifferblatt und Helligkeit sind nur die Vorgabe \u2014 jedes Geraet darf sie in der Karte selbst ueberstimmen. " +
+      "Leer gelassene Entities holt sich die Karte aus den Optionen der Integration.";
     wrap.appendChild(hint);
 
     beds.forEach((bed, index) => {
@@ -1645,15 +2007,9 @@ class RejuvenationNightstandCardEditor extends HTMLElement {
       }
       box.appendChild(head);
 
-      const form = document.createElement("ha-form");
-      form.hass = this._hass;
-      form.schema = bedSchema(this._hass, bed);
-      form.data = bed;
-      form.computeLabel = label;
-      form.addEventListener("value-changed", (event) => {
-        event.stopPropagation();
-        this._setBed(index, event.detail.value);
-      });
+      const form = this._makeForm(bedSchema(this._hass, bed), bed, (value) =>
+        this._setBed(index, value),
+      );
       this._forms.push(form);
       box.appendChild(form);
       wrap.appendChild(box);

@@ -195,6 +195,25 @@ views:
             light: light.schlafzimmer
 ```
 
+**Ohne Eintrag geht es auch:** Was in der Karte fehlt, holt sie sich aus der
+Integration. Thermostat, Weckzeit, Wecker-Schalter und Lampe stehen als Attribut
+am Status-Sensor jeder Zone; die Karte liest sie dort aus. Wecker-Schalter und
+Lampe werden dafür einmal unter **Einstellungen → Geräte & Dienste →
+Rejuvenation Bed → Konfigurieren → 🌡️ Schlaf-Profil** gewählt — danach genügt
+im Dashboard:
+
+```yaml
+views:
+  - type: panel
+    cards:
+      - type: custom:rejuvenation-nightstand
+```
+
+Bei zwei Zonen entstehen so von selbst zwei Bett-Einträge. Was in der Karte
+steht, hat immer Vorrang; leer gelassene Felder kommen aus der Integration.
+Welche Entität gerade an welcher Taste hängt und woher sie stammt, zeigt das
+Zahnrad unter **Entitäten**.
+
 Die Entity-IDs hängen an einem Bett-Eintrag, nicht an der Karte: Mehrere Betten
 im Haus — oder zwei Seiten desselben Betts — bekommen je einen. Jedes Gerät
 merkt sich seinen eigenen, sodass jeder seine Seite vom eigenen Telefon aus
@@ -214,12 +233,19 @@ Thermostat nur Klima-Entitäten mit Zieltemperatur, als Lampe Lichter oder
 Schalter. Ist etwas bereits eingetragen, bleibt es wählbar, auch wenn die
 Entität gerade nicht erreichbar ist.
 
+**Ein Tipp, ein Regler.** Die Lampe öffnet kein Menü mehr, sondern klappt den
+Dimmer direkt unter der Taste auf — daneben »An / Aus« und »Nachtlicht«. Ein
+Tipp auf die Uhr klappt genauso ihre beiden Helligkeitsregler auf: *Aktiv* für
+den Betrieb, *Ruhe* für die abgedunkelte Nachtruhe. Ein zweiter Tipp schließt
+wieder, und wenn die Karte in die Nachtruhe geht, schließen offene Regler von
+selbst.
+
 Zifferblatt, Helligkeit und Layout stehen hinter dem Zahnrad in der Ecke der
 Karte. Zifferblätter: Kontur (Standard — eine ausgefüllte Ziffer strahlt neben
-dem Kopfkissen zu viel Fläche ab), 7-Segment, LED-Matrix und Klappanzeige. Ein
-Tipp auf die Uhr tut bewusst nichts — im Halbschlaf trifft man sie zu leicht.
-Alle drei Einstellungen gelten pro Gerät, ein Dashboard darf also auf jedem
-Bildschirm anders aussehen.
+dem Kopfkissen zu viel Fläche ab), 7-Segment, LED-Matrix und Klappanzeige. Das
+Zifferblatt wechselt weiterhin nur hier — im Halbschlaf trifft man die Uhr zu
+leicht. Alle drei Einstellungen gelten pro Gerät, ein Dashboard darf also auf
+jedem Bildschirm anders aussehen.
 
 **Layout** steht auf *Automatisch*: auf einem breiten Schirm rückt die Uhr nach
 links und die drei Tasten daneben, auf einem hochkant stehenden Tablet bleibt

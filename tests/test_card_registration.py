@@ -206,10 +206,46 @@ def test_karte_passt_auf_kleinstschirme():
 
 
 def test_uhr_wechselt_nicht_mehr_per_tipp():
-    """Das Zifferblatt gehört in die Einstellungen — nachts trifft man die Uhr zu leicht."""
+    """Der Tipp auf die Uhr regelt die Helligkeit — das Zifferblatt bleibt in den Einstellungen."""
     inhalt = _karte()
     assert "_cycleFace" not in inhalt
-    assert '$("clock").addEventListener' not in inhalt
+    assert '$("clock").addEventListener("click", () => this._toggleClockDrawer())' in inhalt
+
+
+def test_uhr_hat_helligkeitsregler_direkt_unter_der_uhr():
+    """Ein Tipp auf die Uhr klappt Aktiv- und Ruhe-Regler auf, ohne Umweg über ein Menü."""
+    inhalt = _karte()
+    assert 'id="drawer-clock"' in inhalt
+    assert 'id="cd-dim-range"' in inhalt
+    assert 'id="cd-doze-range"' in inhalt
+    # Beide Reglerpaare schreiben dieselbe Einstellung.
+    assert "_setDim(event.target.value)" in inhalt
+    assert "_setDoze(event.target.value)" in inhalt
+
+
+def test_lampe_oeffnet_regler_statt_menue():
+    """Ein Tipp auf die Lampe zeigt sofort den Dimmer — kein Vollbild-Overlay mehr."""
+    inhalt = _karte()
+    assert '_toggleDrawer("slot-light")' in inhalt
+    assert 'id="drawer-light"' in inhalt
+    assert 'id="sheet-light"' not in inhalt
+    assert '_openSheet("sheet-light")' not in inhalt
+
+
+def test_karte_findet_entities_der_integration():
+    """Ohne Eintrag in der Karte kommen Thermostat, Wecker und Lampe aus der Integration."""
+    inhalt = _karte()
+    assert "rejuvenation_nightstand" in inhalt
+    assert "_discovered()" in inhalt
+
+
+def test_editor_laedt_ha_form_nach():
+    """Wird der Karten-Editor zuerst geöffnet, ist ha-form noch unbekannt."""
+    inhalt = _karte()
+    assert "ensureHaForm" in inhalt
+    assert "loadCardHelpers" in inhalt
+    # Rückfall auf einfache Eingabefelder, falls das Formular nicht kommt.
+    assert "_plainForm" in inhalt
 
 
 def test_layout_kennt_breitbild():

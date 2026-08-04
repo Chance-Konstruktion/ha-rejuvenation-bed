@@ -112,6 +112,30 @@ class TestZoneSettingsNavigation:
         assert result["step_id"] == "init"
         assert flow._options["zone_0_warm_from"] == "22:30"
 
+    def test_nightstand_entities_land_in_zone_options(self):
+        """Wecker-Schalter und Lampe für die Nachttisch-Karte, pro Bettseite."""
+        flow, _ = _make_flow([{"heater": "switch.a"}, {"heater": "switch.b"}])
+        _run(flow.async_step_zone_settings_right())
+        _run(
+            flow.async_step_edit_zone_settings(
+                {
+                    "warm_from": "22:00",
+                    "alarm_entity": "input_datetime.wecker_rechts",
+                    "alarm_switch_entity": "input_boolean.wecker_rechts_aktiv",
+                    "light_entity": "light.schlafzimmer",
+                }
+            )
+        )
+        assert flow._options["zone_1_alarm_switch_entity"] == "input_boolean.wecker_rechts_aktiv"
+        assert flow._options["zone_1_light_entity"] == "light.schlafzimmer"
+
+    def test_nightstand_entities_can_be_cleared(self):
+        flow, _ = _make_flow([{"heater": "switch.a"}])
+        flow._options["zone_0_light_entity"] = "light.alt"
+        _run(flow.async_step_zone_settings_left())
+        _run(flow.async_step_edit_zone_settings({"warm_from": "22:00", "light_entity": ""}))
+        assert "zone_0_light_entity" not in flow._options
+
 
 class TestZoneSensorsWorkingCopy:
     def test_zone_sensors_saved_to_working_copy_not_entry(self):
