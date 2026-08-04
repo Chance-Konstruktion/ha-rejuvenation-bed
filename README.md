@@ -371,6 +371,25 @@ views:
             light: light.bedroom
 ```
 
+**Or configure nothing at all.** Whatever the card is missing, it takes from the
+integration: each zone's status sensor carries thermostat, alarm time, alarm
+switch and lamp as an attribute, and the card reads them from there. Pick the
+alarm switch and the lamp once under **Settings → Devices & Services →
+Rejuvenation Bed → Configure → 🌡️ Sleep Profile**, and the dashboard needs no
+more than:
+
+```yaml
+views:
+  - type: panel
+    cards:
+      - type: custom:rejuvenation-nightstand
+```
+
+Two zones produce two bed entries by themselves. Anything written in the card
+always wins; fields left empty come from the integration. The gear icon shows
+under **Entitäten** which entity currently sits behind each key and where it
+came from.
+
 Entity IDs belong to a bed entry rather than to the card, so several beds in
 one house — or two sides of the same bed — each get their own. Every device
 remembers which one is its own, so you and your partner control your own sides
@@ -388,11 +407,21 @@ with a time and sensors carrying a timestamp; for the thermostat, climate
 entities with a target temperature; for the lamp, lights or switches. Anything
 already configured stays selectable even while its entity is unavailable.
 
+**One tap, one slider.** The lamp no longer opens a menu: it unfolds a dimmer
+right below the key, next to "An / Aus" and "Nachtlicht". A second tap closes it
+again, and when the card falls into its night state any open slider closes by
+itself.
+
+The clock stays silent on a tap: its two brightness sliders (*Aktiv* for use,
+*Ruhe* for the dimmed night state) appear only after holding it for a good half
+second, and a swipe does not count as a hold. The same sliders also live behind
+the gear icon.
+
 Clock face, brightness and layout live in the gear icon in the card's corner.
 Faces: outline (the default — a filled digit throws too much light next to a
-pillow), 7-segment, 5x7 LED matrix and split-flap. Tapping the clock
-deliberately does nothing — half asleep you hit it too easily. All three
-settings are per device, so one dashboard can look different on every screen.
+pillow), 7-segment, 5x7 LED matrix and split-flap. The face still changes only
+here — half asleep you hit the clock too easily. All three settings are per
+device, so one dashboard can look different on every screen.
 
 **Layout** is *Automatic* by default: on a wide screen the clock moves to the
 left and the three keys line up beside it, on a portrait tablet everything

@@ -132,7 +132,9 @@
           "sleep_temp": "Sleep onset temperature",
           "deep_sleep_temp": "Deep sleep temperature",
           "wake_temp": "Wake-up temperature",
-          "sleep_stage_entity": "Sleep stage sensor"
+          "sleep_stage_entity": "Sleep stage sensor",
+          "alarm_switch_entity": "Alarm active switch",
+          "light_entity": "Bedroom light"
         },
         "data_description": {
           "warm_from": "When should this side start being warm? Preheating starts automatically earlier.",
@@ -143,7 +145,9 @@
           "sleep_temp": "Temperature at sleep onset. Empty = seasonal automatic (summer ~27°C, winter ~29°C).",
           "deep_sleep_temp": "Coolest point during deep sleep. Empty = seasonal automatic (summer ~26°C, winter ~27.5°C).",
           "wake_temp": "Temperature at wake-up. Empty = seasonal automatic (summer ~28°C, winter ~30°C).",
-          "sleep_stage_entity": "Sleep stages from Fitbit, Withings or Apple Watch. Overrides the biorhythm curve."
+          "sleep_stage_entity": "Sleep stages from Fitbit, Withings or Apple Watch. Overrides the biorhythm curve.",
+          "alarm_switch_entity": "Optional helper (toggle/switch) that tells the nightstand card whether the alarm is armed.",
+          "light_entity": "Light or switch for the nightstand card — it appears there as the third key."
         }
       },
       "mode_settings": {

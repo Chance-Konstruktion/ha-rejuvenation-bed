@@ -5,6 +5,7 @@ from homeassistant.components.sensor import (
     SensorStateClass,
 )
 from homeassistant.const import UnitOfTemperature, UnitOfEnergy
+from homeassistant.helpers import entity_registry as er
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 from .const import DOMAIN
 from .device_info import (
@@ -187,10 +188,16 @@ class BedTemperatureSensor(RejuvenationBedZoneSensor):
 class BedStatusSensor(RejuvenationBedZoneSensor):
     """Zeigt den aktuellen Betriebsmodus der Zone (Textform)."""
 
+    # Die Entity-Liste für die Karte ändert sich nur beim Umkonfigurieren —
+    # in der Langzeit-Datenbank hätte sie bei jedem Statuswechsel nichts
+    # verloren.
+    _unrecorded_attributes = frozenset({"rejuvenation_nightstand"})
+
     def __init__(self, coordinator, zone_idx, display_name):
         super().__init__(coordinator, zone_idx)
         self.zone_idx = zone_idx
         self.internal_zone_name = f"Zone {zone_idx + 1}"
+        self._display_name = display_name
         self._attr_name = f"Bett{display_name} Status"
         self._attr_unique_id = f"{coordinator.config_entry.entry_id}_zone_{zone_idx}_mode"
         self._attr_icon = "mdi:bed-clock"
@@ -215,6 +222,54 @@ class BedStatusSensor(RejuvenationBedZoneSensor):
         if zone_data.get("active"):
             return "Heizen"
         return "Bereit"
+
+    # ─────────────────────────────────────────────────────────────
+    # Nachttisch-Karte
+    #
+    # Die Lovelace-Karte kennt die Integration nicht, aber sie sieht alle
+    # Zustände. Darum trägt der Status-Sensor die Entities seiner Zone als
+    # Attribut bei sich: Thermostat, Weckzeit, Wecker-Schalter, Lampe. Die
+    # Karte findet sie darüber von selbst und muss nicht in jedem Dashboard
+    # erneut mit denselben Entity-IDs gefüttert werden.
+    # ─────────────────────────────────────────────────────────────
+
+    @property
+    def extra_state_attributes(self):
+        return {"rejuvenation_nightstand": self._nightstand_config()}
+
+    def _nightstand_config(self):
+        entry = self.coordinator.config_entry
+        options = entry.options
+        prefix = f"zone_{self.zone_idx}_"
+
+        def _opt(key):
+            # Zonen-Wert vor globalem Wert — wie im Options-Flow.
+            return options.get(f"{prefix}{key}") or options.get(key) or None
+
+        config = {
+            "zone": self.zone_idx,
+            "name": f"Bett{self._display_name}".strip(),
+            "climate": self._climate_entity_id(),
+            "alarm": _opt("alarm_entity"),
+            "alarm_switch": _opt("alarm_switch_entity"),
+            "light": _opt("light_entity"),
+        }
+        return {key: value for key, value in config.items() if value not in (None, "")}
+
+    def _climate_entity_id(self):
+        """Entity-ID des Zonen-Thermostats aus der Registry."""
+        hass = getattr(self, "hass", None)
+        if hass is None:
+            return None
+        try:
+            registry = er.async_get(hass)
+        except Exception:  # pragma: no cover — Registry fehlt nur im Testaufbau
+            return None
+        return registry.async_get_entity_id(
+            "climate",
+            DOMAIN,
+            f"{self.coordinator.config_entry.entry_id}_zone{self.zone_idx}_climate",
+        )
 
 
 class BedZonePowerSensor(RejuvenationBedZoneSensor):

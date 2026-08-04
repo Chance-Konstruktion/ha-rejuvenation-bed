@@ -167,7 +167,9 @@
           "sleep_temp": "Einschlaf-Temperatur",
           "deep_sleep_temp": "Tiefschlaf-Temperatur",
           "wake_temp": "Aufwach-Temperatur",
-          "sleep_stage_entity": "Schlafphasen-Sensor"
+          "sleep_stage_entity": "Schlafphasen-Sensor",
+          "alarm_switch_entity": "Wecker aktiv",
+          "light_entity": "Schlafzimmerlampe"
         },
         "data_description": {
           "warm_from": "Ab wann soll diese Seite warm sein? Das Vorheizen startet automatisch früher.",
@@ -178,7 +180,9 @@
           "sleep_temp": "Temperatur beim Einschlafen. Leer = saisonal automatisch (Sommer ~27°C, Winter ~29°C).",
           "deep_sleep_temp": "Kühlster Punkt im Tiefschlaf. Leer = saisonal automatisch (Sommer ~26°C, Winter ~27.5°C).",
           "wake_temp": "Temperatur beim Aufwachen. Leer = saisonal automatisch (Sommer ~28°C, Winter ~30°C).",
-          "sleep_stage_entity": "Schlafphasen von Fitbit, Withings oder Apple Watch. Überschreibt die Biorhythmus-Kurve."
+          "sleep_stage_entity": "Schlafphasen von Fitbit, Withings oder Apple Watch. Überschreibt die Biorhythmus-Kurve.",
+          "alarm_switch_entity": "Optionaler Helfer (Schalter), der der Nachttisch-Karte sagt, ob der Wecker scharf ist.",
+          "light_entity": "Lampe oder Schalter für die Nachttisch-Karte — dort die dritte Taste."
         }
       },
       "mode_settings": {

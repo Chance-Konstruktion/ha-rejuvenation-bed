@@ -14,7 +14,8 @@ Vier Bereiche, logisch getrennt:
      └── Komfort-Sensoren (Präsenz, Feuchtigkeit, Luft)
 
   🌡️ Schlaf-Profil (pro Zone)
-     ├── Wecker (Alarm-Entity, Wochenende)
+     ├── Wecker (Alarm-Entity, Wecker-Schalter, Wochenende)
+     ├── Nachttisch-Karte (Schlafzimmerlampe)
      ├── Temperaturen (Einschlaf, Tiefschlaf, Aufwach)
      └── Wearable (Schlafphasen-Sensor)
 
@@ -480,6 +481,18 @@ class RejuvenationBedOptionsFlow(config_entries.OptionsFlow):
         # ─── Wecker ───────────────────────────────────────────
         current_alarm = _get("alarm_entity")
         self._add_optional_entity(schema_dict, "alarm_entity", current_alarm, domain=["sensor", "input_datetime"])
+
+        # Wecker-Schalter und Schlafzimmerlampe: rein für die Nachttisch-Karte.
+        # Sie landen als Attribut am Status-Sensor der Zone, damit die Karte sie
+        # von selbst findet und niemand dieselben Entity-IDs in jedem Dashboard
+        # erneut einträgt.
+        self._add_optional_entity(
+            schema_dict,
+            "alarm_switch_entity",
+            _get("alarm_switch_entity"),
+            domain=["input_boolean", "switch"],
+        )
+        self._add_optional_entity(schema_dict, "light_entity", _get("light_entity"), domain=["light", "switch"])
 
         schema_dict[vol.Optional("weekend_offset_hours", default=_get("weekend_offset_hours", 1.5))] = (
             selector.NumberSelector(

@@ -5,6 +5,39 @@ Alle Änderungen am Rejuvenation Bed Projekt.
 ## [Unreleased]
 
 ### Dashboard
+- **Lampe: Regler statt Menü.** Ein Tipp auf die Lampe klappt den Dimmer direkt
+  unter der Taste auf, statt ein Vollbild-Overlay über die Karte zu ziehen.
+  »An / Aus« und »Nachtlicht« stehen daneben. Nachts will man dimmen, nicht
+  navigieren — und der Daumen soll dabei die Uhr nicht verdecken.
+- **Uhr: Helligkeit auf Gedrückthalten.** Wer die Uhr gut eine halbe Sekunde
+  hält, bekommt ihre beiden Helligkeitsregler (*Aktiv* und *Ruhe*); ein Tipp tut
+  weiterhin nichts, und Wischen gilt nicht als Halten. Die Regler schreiben
+  dieselbe Einstellung wie die in den Anzeige-Einstellungen und halten sich
+  gegenseitig auf Stand. Das Zifferblatt wechselt weiterhin nur über die
+  Einstellungen. Offene Regler schließen sich, sobald die Karte in die Nachtruhe
+  geht.
+- **Karte findet ihre Entitäten selbst.** Thermostat, Weckzeit, Wecker-Schalter
+  und Lampe stehen jetzt als Attribut am Status-Sensor jeder Zone. Fehlt in der
+  Karte ein Eintrag, holt sie ihn von dort — bei zwei Zonen entstehen so von
+  selbst zwei Bett-Einträge, und eine Karte ganz ohne Konfiguration läuft
+  sofort. Was in der Karte steht, hat weiterhin Vorrang.
+- **Wecker-Schalter und Lampe im Options-Flow.** Unter *🌡️ Schlaf-Profil* stehen
+  neben der Weckzeit jetzt auch »Wecker aktiv« und »Schlafzimmerlampe« — einmal
+  je Bettseite gewählt, statt in jedem Dashboard dieselben Entity-IDs erneut
+  einzutragen.
+- **Karten-Editor öffnet sich zuverlässig.** Wird der Editor als Erstes
+  geöffnet, ist `ha-form` im Frontend noch gar nicht geladen und die Felder
+  blieben leer; die Karte lädt es jetzt selbst nach und zeigt notfalls einfache
+  Eingabefelder mit Vorschlagsliste. Außerdem verschwand die Vorgabe für die
+  Ruhe-Helligkeit beim ersten Tippen aus der Konfiguration, weil sie im
+  Formular gar nicht mit übergeben wurde.
+- **Einstellungen zeigen die Entitäten.** Das Zahnrad listet unter *Entitäten*,
+  was gerade an welcher Taste hängt und ob es aus der Karte oder aus der
+  Integration kommt. Die Statuszeile nennt fehlende Ziele beim Namen statt
+  »Nicht konfiguriert: climate«.
+- **Temperaturgrenzen vom Thermostat.** Ohne `temp_min`/`temp_max` in der Karte
+  gelten jetzt die Grenzen, die das Thermostat selbst meldet, statt fester
+  20–40 °C.
 - **Overlays auf Kleinstschirmen bedienbar:** Auf dem Außendisplay eines
   Falters verdeckt die Kamera den unteren Rand — genau dort standen
   »Speichern«, »Fertig« und »Zurück«. Die Knöpfe sitzen jetzt in einer Leiste
