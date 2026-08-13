@@ -1,0 +1,9 @@
+{
+  "name": "Rejuvenation Bed",
+  "content_in_root": false,
+  "render_readme": false,
+  "homeassistant": "2024.7.0",
+  "zip_release": true,
+  "filename": "rejuvenation_bed.zip",
+  "hide_default_branch": false
+}

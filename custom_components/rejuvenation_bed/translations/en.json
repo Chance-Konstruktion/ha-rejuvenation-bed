@@ -1,0 +1,297 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Bed Setup",
+        "description": "Welcome! How many heating zones does your bed have?",
+        "data": {
+          "zones": "Number of zones"
+        }
+      },
+      "bed_type": {
+        "title": "Bed Type",
+        "description": "What type of bed do you want to control?\n\n**Waterbed:** High thermal mass (300-700L water). Slow heating (~0.7°C/h), stores heat like a battery. Min. 24°C (condensation protection!), gentle ramps (1°C/h max).\n\n**Heating Pad:** Low thermal mass. Fast heating (minutes!), no heat storage. Can be completely OFF, no ramp limits needed.",
+        "data": {
+          "bed_type": "Bed type"
+        }
+      },
+      "safety_info": {
+        "title": "⚠️ Safety Notice",
+        "description": "**IMPORTANT:** Make sure your bed heater's physical thermostat is set to **MAXIMUM (38°C)**!\n\nOnly this way Home Assistant can precisely control the temperature.\n\n**For waterbeds:** The minimum temperature of 24°C prevents condensation and mold. Never turn off the heater completely!\n\n**The hardware thermostat remains as a safety backup!**"
+      },
+      "zone_config": {
+        "title": "Zone Configuration",
+        "description": "Configuration for: {zone_info}",
+        "data": {
+          "heater": "Heater switch / relay",
+          "temp_sensor": "Temperature sensor (optional)",
+          "hardware_max": "Max. safety temperature (°C)",
+          "boost_target_temp": "Boost target temperature (°C)",
+          "power_rating": "Heating power (Watts)",
+          "power_sensor": "Power sensor (optional)",
+          "presence_sensor": "Presence sensor (optional)",
+          "moisture_sensor": "Moisture sensor (optional)",
+          "air_temp_sensor": "Surface temperature (top)"
+        }
+      },
+      "hardware_summary": {
+        "title": "🎯 Your Hardware Setup",
+        "description": "Based on your sensors, the following features are available:\n\n{features}\n\nReady to continue?"
+      },
+      "energy_config": {
+        "title": "⚡ Energy Tracking",
+        "description": "Configure how power consumption is tracked.",
+        "data": {
+          "enable_tracking": "Enable energy tracking",
+          "total_power_rating": "Total heating power (Watts)",
+          "energy_sensor": "Energy meter sensor",
+          "compare_to_legacy": "Compare with classic waterbed",
+          "electricity_price": "Electricity price (€/kWh)"
+        }
+      },
+      "global_config": {
+        "title": "Global Settings",
+        "description": "Configure when your bed should be warm and ready.",
+        "data": {
+          "warm_from": "Warm from (Evening)",
+          "warm_until": "Warm until (Morning)",
+          "alarm_entity": "Alarm sensor (optional)",
+          "chronotype": "Your chronotype",
+          "solar_sensor": "Solar production sensor (Watts)",
+          "price_sensor": "Electricity price sensor",
+          "outdoor_sensor": "Outdoor temperature sensor",
+          "co2_sensor": "CO2 sensor (for sleep score)",
+          "summer_threshold": "Summer shutoff threshold (°C)"
+        }
+      }
+    },
+    "abort": {
+      "already_configured": "This bed is already configured."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Settings",
+        "description": "What would you like to configure?",
+        "menu_options": {
+          "global_settings": "🌐 Global Settings",
+          "zone_sensors": "📡 Zone Sensors",
+          "zone_settings": "🌡️ Sleep Profile",
+          "mode_settings": "🎛️ Special Modes",
+          "save": "💾 Save & Close"
+        }
+      },
+      "global_settings": {
+        "title": "🌐 Global Settings",
+        "description": "What would you like to configure?",
+        "menu_options": {
+          "global_times": "🌡️ Temperature & Bed",
+          "global_sensors": "📊 Sensors & Electricity Price",
+          "global_solar": "☀️ Solar & Battery",
+          "init": "⬅️ Back"
+        }
+      },
+      "zone_sensors": {
+        "title": "📡 Select Zone",
+        "description": "Which zone would you like to edit?"
+      },
+      "edit_zone_sensors": {
+        "title": "📡 Sensors – {zone_name}",
+        "description": "Hardware assignment for this zone. Only the heater switch is required, all other fields are optional.",
+        "data": {
+          "heater": "Heater switch",
+          "temp_sensor": "Temperature sensor (water)",
+          "power_sensor": "Power sensor",
+          "presence_sensor": "Presence sensor",
+          "moisture_sensor": "Humidity sensor",
+          "air_temp_sensor": "Surface temperature (top)"
+        },
+        "data_description": {
+          "heater": "The switch or relay that controls the heater — e.g. a smart plug, Zigbee switch or input_boolean.",
+          "temp_sensor": "Temperature sensor in the water or on the mattress. Without this sensor only basic mode (timer) is available. With sensor: full biorhythm curve, presence detection and calibration.",
+          "power_sensor": "Power sensor from the smart plug in watts. Enables energy statistics, savings calculation and improves presence detection.",
+          "presence_sensor": "Dedicated presence sensor such as a pressure mat or mmWave radar. Without this sensor the system detects occupancy via temperature analysis.",
+          "moisture_sensor": "Humidity sensor for sweat detection and leak alarm. Can be an SHT41 or a separate humidity sensor.",
+          "air_temp_sensor": "Second temperature sensor on top of the mattress core, e.g. an SHT41. Measures the surface between mattress and blanket. Enables blanket check, sweat detection 2.0 and better presence detection through body heat."
+        }
+      },
+      "zone_settings": {
+        "title": "🌡️ Select Zone",
+        "description": "Which zone's sleep profile would you like to adjust?"
+      },
+      "edit_zone_settings": {
+        "title": "🌡️ Sleep Profile – {zone_name}",
+        "description": "Sleep times, chronotype, temperatures and wearable for this bed side. In a dual bed, both sides can have different times and settings.",
+        "data": {
+          "warm_from": "Warm from (Evening)",
+          "warm_until": "Warm until / Wake-up time",
+          "chronotype": "Chronotype",
+          "alarm_entity": "Alarm entity",
+          "weekend_offset_hours": "Weekend sleep-in",
+          "sleep_temp": "Sleep onset temperature",
+          "deep_sleep_temp": "Deep sleep temperature",
+          "wake_temp": "Wake-up temperature",
+          "sleep_stage_entity": "Sleep stage sensor",
+          "alarm_switch_entity": "Alarm active switch",
+          "light_entity": "Bedroom light"
+        },
+        "data_description": {
+          "warm_from": "When should this side start being warm? Preheating starts automatically earlier.",
+          "warm_until": "Until when should it stay warm? Also serves as wake-up time for the biorhythm curve.",
+          "chronotype": "Determines the lowest point of the temperature curve. Early birds reach it sooner, night owls later.",
+          "alarm_entity": "Sensor with next alarm time, e.g. sensor.next_alarm.",
+          "weekend_offset_hours": "How many hours to shift the wake-up time on weekends.",
+          "sleep_temp": "Temperature at sleep onset. Empty = seasonal automatic (summer ~27°C, winter ~29°C).",
+          "deep_sleep_temp": "Coolest point during deep sleep. Empty = seasonal automatic (summer ~26°C, winter ~27.5°C).",
+          "wake_temp": "Temperature at wake-up. Empty = seasonal automatic (summer ~28°C, winter ~30°C).",
+          "sleep_stage_entity": "Sleep stages from Fitbit, Withings or Apple Watch. Overrides the biorhythm curve.",
+          "alarm_switch_entity": "Optional helper (toggle/switch) that tells the nightstand card whether the alarm is armed.",
+          "light_entity": "Light or switch for the nightstand card — it appears there as the third key."
+        }
+      },
+      "mode_settings": {
+        "title": "🎛️ Special Modes",
+        "description": "Temperature settings for sick, boost and away modes.",
+        "data": {
+          "sick_mode_temp": "Sick mode temperature",
+          "sick_mode_days": "Sick mode duration",
+          "boost_target_temp": "Boost target temperature",
+          "away_temp": "Away temperature"
+        },
+        "data_description": {
+          "sick_mode_temp": "Constant temperature during sick mode. Recommended: 30–32°C for muscle relaxation and recovery.",
+          "sick_mode_days": "How many days sick mode stays active before automatically deactivating.",
+          "boost_target_temp": "Fixed target temperature during quick heating (boost). Recommended: 32–34°C.",
+          "away_temp": "Holding temperature during away mode. For waterbeds never below 24°C due to condensation and vinyl protection. Recommended: 24–25°C."
+        }
+      },
+      "global_times": {
+        "title": "🌡️ Temperature & Bed",
+        "description": "System-wide temperature limits and bed properties.",
+        "data": {
+          "summer_cutoff_enabled": "Summer shutoff",
+          "summer_threshold": "Summer threshold (outdoor)",
+          "summer_temp": "Summer bed temperature",
+          "temperature_offset": "Temperature offset",
+          "bed_volume_liters": "Bed volume"
+        },
+        "data_description": {
+          "summer_cutoff_enabled": "When enabled, the bed is held at the summer temperature once the outdoor threshold is exceeded — instead of running the sleep curve. Also pauses Solar Boost (a warm bed in summer is pointless; the thermal battery is mainly a transitional-season / winter feature). Turn off to run the normal sleep profile all year.",
+          "summer_threshold": "OUTDOOR temperature at which summer mode kicks in. Above this the bed switches to the summer bed temperature below. Recommended: 25°C.",
+          "summer_temp": "BED temperature held during summer mode (not the outdoor threshold). The bed is kept cool at this value instead of following the sleep curve. Waterbeds are clamped to at least 24°C (condensation protection). Recommended: 24–25°C.",
+          "temperature_offset": "Fine-tune all temperatures. +1.0 = everything 1°C warmer, -1.0 = cooler.",
+          "bed_volume_liters": "Water volume in liters. Guidelines: 250 L single, 400 L double, 700 L king-size. Used for thermal battery and heating time."
+        }
+      },
+      "global_sensors": {
+        "title": "📊 Sensors & Electricity Price",
+        "description": "Electricity price and room sensors. Solar & battery have their own section.\n\n**Electricity price** — Your current tariff in ct/kWh. Used for savings calculation and as fallback without a price sensor.\n\n**Price sensor** — Dynamic electricity price from Tibber, Octopus or ENTSO-E. Overrides the fixed tariff and enables Eco mode.\n\n**CO₂ sensor** — CO₂ in the bedroom for the sleep score (25% weight).",
+        "data": {
+          "electricity_price": "Electricity price (fixed tariff)",
+          "price_sensor": "Dynamic price sensor",
+          "co2_sensor": "CO₂ sensor"
+        },
+        "data_description": {
+          "electricity_price": "Your current electricity tariff. Used for savings calculation and as fallback without a price sensor.",
+          "price_sensor": "Overrides the fixed price with real-time data and enables Eco mode.",
+          "co2_sensor": "CO₂ in the bedroom for the sleep score."
+        }
+      },
+      "global_solar": {
+        "title": "☀️ Solar & Battery",
+        "description": "Solar Boost charges the bed (thermal mass) from PV surplus. Three independent triggers — any one fires the boost, and only the sensors you configure count.\n\n**Solar sensor** — PV power in watts (e.g. Fronius, SMA, Huawei).\n\n**Solar threshold** — Minimum surplus in watts to activate boost. Set at least as high as the bed's heater power (e.g. 300 W single, 600 W double).\n\n**Battery SoC (optional)** — Independent trigger: the boost also fires once SoC reaches the threshold (battery full → use the surplus). Works on its own and alongside the solar threshold.\n\n**PV forecast (optional)** — Another independent trigger: the boost also fires when the remaining-day forecast is generous. Leave empty and nothing changes.\n\n**Home battery priority (optional)** — Off by default. Turn it on to give the battery/boiler priority: the solar threshold then only fires when the battery is (nearly) full *or* the forecast is generous (the classic gating behaviour).",
+        "data": {
+          "solar_sensor": "Solar sensor",
+          "solar_boost_threshold": "Solar threshold",
+          "battery_soc_sensor": "Home battery SoC sensor",
+          "bed_boost_soc_threshold": "Battery SoC threshold for bed boost",
+          "forecast_sensor": "PV forecast sensor (remaining today, kWh)",
+          "bed_boost_min_forecast_kwh": "Forecast threshold for bed boost",
+          "battery_priority": "Home battery priority"
+        },
+        "data_description": {
+          "solar_sensor": "PV power in watts. Solar Boost activates above the solar threshold.",
+          "solar_boost_threshold": "PV surplus in watts needed to activate Solar Boost. For a double bed with 600 W heater, set to 600 W or higher.",
+          "battery_soc_sensor": "State of charge of your home battery in percent. Independent trigger: the boost also fires once SoC reaches the threshold — works on its own and alongside the solar threshold.",
+          "bed_boost_soc_threshold": "Battery SoC at which the SoC trigger fires the boost. Default 90%. 5% hysteresis (releases below 85%).",
+          "forecast_sensor": "Optional. PV forecast in kWh remaining for the rest of the day (e.g. sensor.solcast_pv_forecast_forecast_remaining_today).",
+          "bed_boost_min_forecast_kwh": "Remaining PV forecast at which the forecast trigger fires the boost. Default 3 kWh. Hysteresis 1 kWh.",
+          "battery_priority": "Off (default): solar threshold, SoC and forecast are independent OR-triggers — any one fires the boost. On: the home battery/boiler get priority — the solar threshold only fires when the battery is (nearly) full or the forecast is generous. Without a battery/forecast sensor this has no effect."
+        }
+      }
+    },
+    "abort": {
+      "no_zones": "No zones configured. Please set up the integration first.",
+      "invalid_zone": "Invalid zone."
+    }
+  },
+  "services": {
+    "set_boost": {
+      "name": "Activate Boost",
+      "description": "Activates quick heating mode",
+      "fields": {
+        "duration_minutes": {
+          "name": "Duration (minutes)",
+          "description": "How long the boost should stay active"
+        }
+      }
+    },
+    "set_sick_mode": {
+      "name": "Activate Sick Mode",
+      "description": "Activates constant warmth for recovery",
+      "fields": {
+        "temperature": {
+          "name": "Temperature (°C)",
+          "description": "Constant target temperature"
+        },
+        "days": {
+          "name": "Duration (days)",
+          "description": "How many days the mode stays active"
+        }
+      }
+    },
+    "set_vacation_mode": {
+      "name": "Activate Vacation Mode",
+      "description": "Activates frost protection mode for absence",
+      "fields": {
+        "temperature": {
+          "name": "Temperature (°C)",
+          "description": "Minimum holding temperature"
+        },
+        "end_date": {
+          "name": "Return date",
+          "description": "When the vacation ends (optional)"
+        }
+      }
+    },
+    "cancel_special_mode": {
+      "name": "Cancel Special Mode",
+      "description": "Cancels boost, sick or vacation mode"
+    },
+    "reset_energy_budget": {
+      "name": "Reset Energy Budget",
+      "description": "Resets energy statistics to zero",
+      "fields": {
+        "confirm": {
+          "name": "Confirmation",
+          "description": "Confirm the reset"
+        }
+      }
+    },
+    "preheat_bed": {
+      "name": "Preheat Bed",
+      "description": "Preheats the bed to comfort temperature",
+      "fields": {
+        "target_temperature": {
+          "name": "Target temperature (°C)",
+          "description": "Desired preheat temperature"
+        },
+        "duration_minutes": {
+          "name": "Duration (minutes)",
+          "description": "How long to preheat"
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,72 @@
+# Rejuvenation Bed — Nachttischwecker
+#
+# Die Karte bringt die Integration selbst mit. Es muss nichts nach
+# /config/www kopiert und keine Ressource von Hand eingetragen werden.
+#
+# Am bequemsten geht es ohne diese Datei: Dashboard anlegen, "Karte
+# hinzufügen" → "Rejuvenation Nachttischwecker" und die Entitäten im
+# grafischen Editor aus den Auswahlfeldern klicken.
+#
+# Ganz ohne Eintrag geht es auch. Stehen Wecker-Schalter und Lampe in den
+# Optionen der Integration (Einstellungen → Geräte & Dienste →
+# Rejuvenation Bed → Konfigurieren → 🌡️ Schlaf-Profil), findet die Karte
+# sie samt Thermostat und Weckzeit von selbst — eine Zeile genügt:
+#
+#   - type: custom:rejuvenation-nightstand
+#
+# Was unten in der Karte steht, hat Vorrang; leer gelassene Felder kommen
+# aus der Integration.
+#
+# Einrichtung von Hand:
+#   1. Einstellungen → Dashboards → Dashboard hinzufügen → Neues Dashboard
+#   2. Im Dashboard: Stift → drei Punkte → "Raw-Konfigurationseditor"
+#   3. Diesen Inhalt einfügen und die Entity-IDs anpassen
+#
+# Wichtig ist "type: panel": die Ansicht besteht dann aus genau einer
+# Karte, die den ganzen Bildschirm füllt. Für echtes Vollbild ohne
+# Browserleisten gibt es oben rechts in der Karte den Vollbild-Knopf.
+
+title: Nachttisch
+views:
+  - title: Nachttisch
+    type: panel # eine Karte, volle Breite und Höhe
+    cards:
+      - type: custom:rejuvenation-nightstand
+
+        # Vorgaben. Jedes Gerät darf sie hinter dem Zahnrad in der Ecke
+        # der Karte überstimmen — dort sitzt auch die Wahl zwischen
+        # Automatisch, Hochkant und Breitbild.
+        face: outline # outline (Standard) · segment · matrix · flip
+        dim: 85 # Helligkeit der Uhr in Prozent
+
+        # Ein Eintrag je Bett bzw. je Bettseite. Jedes Telefon merkt
+        # sich, welcher seiner ist — so bedient jeder seine Seite vom
+        # eigenen Gerät aus. Bei nur einem Eintrag verschwindet die
+        # Umschaltung.
+        beds:
+          - name: Schlafzimmer · links
+            climate: climate.thermostat_bett_links
+            alarm: input_datetime.wecker_links
+            alarm_switch: input_boolean.wecker_links_aktiv
+            light: light.schlafzimmer
+            temp_min: 20
+            temp_max: 40
+
+          - name: Schlafzimmer · rechts
+            climate: climate.thermostat_bett_rechts
+            alarm: input_datetime.wecker_rechts
+            alarm_switch: input_boolean.wecker_rechts_aktiv
+            light: light.schlafzimmer
+# Kurzform für ein einzelnes Bett — statt der beds-Liste:
+#
+#   - type: custom:rejuvenation-nightstand
+#     climate: climate.thermostat_bett
+#     alarm: input_datetime.wecker
+#     alarm_switch: input_boolean.wecker_aktiv
+#     light: light.schlafzimmer
+#
+# Wecker und Wecker-Schalter sind gewöhnliche Helfer, die in Home
+# Assistant unter Einstellungen → Geräte & Dienste → Helfer angelegt
+# werden (Datum/Zeit mit "nur Zeit", sowie ein Schalter). Sie gehören
+# nicht zur Integration, damit du deine bestehende Weck-Automation
+# weiterverwenden kannst.

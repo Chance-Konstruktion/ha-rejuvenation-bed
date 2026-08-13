@@ -1,0 +1,185 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1280 420" width="1280" height="420" role="img" aria-label="Rejuvenation Bed">
+  <defs>
+    
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#1a1410"></stop>
+      <stop offset="50%" stop-color="#13100c"></stop>
+      <stop offset="100%" stop-color="#0c0907"></stop>
+    </linearGradient>
+
+    
+    <radialGradient id="glowSun" cx="0.85" cy="0.65" r="0.5">
+      <stop offset="0%" stop-color="#E8A33D" stop-opacity="0.22"></stop>
+      <stop offset="60%" stop-color="#B47326" stop-opacity="0.06"></stop>
+      <stop offset="100%" stop-color="#000000" stop-opacity="0"></stop>
+    </radialGradient>
+
+    
+    <radialGradient id="glowMoon" cx="0.12" cy="0.3" r="0.4">
+      <stop offset="0%" stop-color="#7a6b58" stop-opacity="0.16"></stop>
+      <stop offset="100%" stop-color="#000000" stop-opacity="0"></stop>
+    </radialGradient>
+
+    
+    <linearGradient id="titleGrad" x1="0" y1="0" x2="1" y2="0.3">
+      <stop offset="0%" stop-color="#B47326"></stop>
+      <stop offset="45%" stop-color="#F5C56B"></stop>
+      <stop offset="75%" stop-color="#E8A33D"></stop>
+      <stop offset="100%" stop-color="#B47326"></stop>
+    </linearGradient>
+
+    <linearGradient id="curveStroke" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#5a4a38" stop-opacity="0.4"></stop>
+      <stop offset="35%" stop-color="#8b6b3a" stop-opacity="0.9"></stop>
+      <stop offset="65%" stop-color="#E8A33D" stop-opacity="0.95"></stop>
+      <stop offset="100%" stop-color="#F5C56B" stop-opacity="0.6"></stop>
+    </linearGradient>
+
+    <linearGradient id="curveFill" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#E8A33D" stop-opacity="0.18"></stop>
+      <stop offset="100%" stop-color="#E8A33D" stop-opacity="0"></stop>
+    </linearGradient>
+
+    
+    <pattern id="dots" x="0" y="0" width="32" height="32" patternUnits="userSpaceOnUse">
+      <circle cx="1" cy="1" r="0.6" fill="#3a2e22" opacity="0.55"></circle>
+    </pattern>
+
+    <filter id="softBlur" x="-10%" y="-10%" width="120%" height="120%">
+      <feGaussianBlur stdDeviation="14"></feGaussianBlur>
+    </filter>
+
+    <filter id="curveBlur" x="-5%" y="-5%" width="110%" height="110%">
+      <feGaussianBlur stdDeviation="6"></feGaussianBlur>
+    </filter>
+  </defs>
+
+  
+  <rect width="1280" height="420" fill="url(#bg)"></rect>
+  <rect width="1280" height="420" fill="url(#dots)"></rect>
+  <rect width="1280" height="420" fill="url(#glowSun)"></rect>
+  <rect width="1280" height="420" fill="url(#glowMoon)"></rect>
+
+  
+  <rect x="0.5" y="0.5" width="1279" height="419" fill="none" stroke="#2a2218" stroke-width="1"></rect>
+
+  
+  <g opacity="0.85">
+    
+    <path d="M 0 240 C 120 240, 180 130, 320 130 S 540 320, 720 320 S 1000 100, 1280 100" fill="none" stroke="#E8A33D" stroke-width="2" opacity="0.35" filter="url(#curveBlur)"></path>
+    
+    <path d="M 0 240 C 120 240, 180 130, 320 130 S 540 320, 720 320 S 1000 100, 1280 100" fill="none" stroke="url(#curveStroke)" stroke-width="1.4"></path>
+    
+    <path d="M 0 240 C 120 240, 180 130, 320 130 S 540 320, 720 320 S 1000 100, 1280 100 L 1280 420 L 0 420 Z" fill="url(#curveFill)" opacity="0.5"></path>
+
+    
+    <g transform="translate(78, 132)">
+      <circle r="9" fill="#F5E6C8" opacity="0.85"></circle>
+      <circle r="9" cx="3" cy="-1" fill="#13100c"></circle>
+    </g>
+
+    
+    <g transform="translate(1208, 102)">
+      <circle r="10" fill="#F5C56B"></circle>
+      <circle r="10" fill="#F5C56B" opacity="0.35" filter="url(#curveBlur)"></circle>
+    </g>
+  </g>
+
+  
+  <g transform="translate(72, 64)" font-family="ui-monospace, &#39;SF Mono&#39;, &#39;Roboto Mono&#39;, Menlo, monospace" font-size="11" fill="#8b7355" letter-spacing="2.2">
+    <text y="0">HACS · v0.7.2 · BIORHYTHM · LOCAL-FIRST · OPEN SOURCE</text>
+  </g>
+
+  
+  <g transform="translate(72, 200)">
+    
+    <text font-family="Georgia, &#39;Cormorant Garamond&#39;, &#39;Times New Roman&#39;, serif" font-size="92" font-weight="700" fill="#E8A33D" opacity="0.18" letter-spacing="-2" filter="url(#softBlur)">Rejuvenation</text>
+    <text y="0" font-family="Georgia, &#39;Cormorant Garamond&#39;, &#39;Times New Roman&#39;, serif" font-size="92" font-weight="700" fill="url(#titleGrad)" letter-spacing="-2">Rejuvenation</text>
+    <text y="78" font-family="Georgia, &#39;Cormorant Garamond&#39;, &#39;Times New Roman&#39;, serif" font-size="92" font-weight="700" fill="url(#titleGrad)" letter-spacing="-2">Bed</text>
+    
+    <line x1="0" y1="100" x2="120" y2="100" stroke="#E8A33D" stroke-width="2"></line>
+    <text y="130" font-family="Georgia, &#39;Cormorant Garamond&#39;, serif" font-size="22" fill="#C4B393" font-style="italic">Sleep, measured in degrees.</text>
+  </g>
+
+  
+  <g transform="translate(1010, 130)">
+    
+    <g stroke="#8b6b3a" stroke-width="1.4" fill="none" opacity="0.7">
+      <path d="M 0 0 L 0 14 M 0 0 L 14 0"></path>
+      <path d="M 180 0 L 180 14 M 180 0 L 166 0"></path>
+      <path d="M 0 160 L 0 146 M 0 160 L 14 160"></path>
+      <path d="M 180 160 L 180 146 M 180 160 L 166 160"></path>
+    </g>
+    
+    <g transform="translate(34, 50)" fill="none" stroke="#E8A33D" stroke-width="1.6" stroke-linecap="round">
+      
+      <path d="M 4 14 L 4 50"></path>
+      
+      <path d="M 4 50 L 112 50 L 112 60"></path>
+      
+      <rect x="10" y="28" width="96" height="22" rx="4" fill="#E8A33D" fill-opacity="0.08"></rect>
+      
+      <rect x="14" y="22" width="22" height="10" rx="2" fill="#F5C56B" fill-opacity="0.45" stroke="none"></rect>
+      
+      <path d="M 40 12 q 4 -6 8 0 t 8 0 t 8 0 t 8 0" opacity="0.55"></path>
+      <path d="M 36 6  q 4 -6 8 0 t 8 0 t 8 0 t 8 0 t 8 0" opacity="0.35"></path>
+    </g>
+    
+    <text x="90" y="142" text-anchor="middle" font-family="ui-monospace, &#39;SF Mono&#39;, Menlo, monospace" font-size="10" fill="#8b7355" letter-spacing="1.6">29.4 °C · ZONE A</text>
+  </g>
+
+  
+  <g transform="translate(72, 348)" font-family="ui-monospace, &#39;SF Mono&#39;, &#39;Roboto Mono&#39;, Menlo, monospace" font-size="11" letter-spacing="1.4" fill="#E0CFA6">
+    
+    <g>
+      <rect x="0" y="0" width="148" height="28" rx="14" fill="none" stroke="#5a4a38"></rect>
+      <path d="M 14 14 q 6 -8 12 0 t 12 0" fill="none" stroke="#E8A33D" stroke-width="1.4"></path>
+      <text x="46" y="18">BIORHYTHM</text>
+    </g>
+    
+    <g transform="translate(160, 0)">
+      <rect x="0" y="0" width="120" height="28" rx="14" fill="none" stroke="#5a4a38"></rect>
+      <circle cx="18" cy="14" r="4" fill="none" stroke="#E8A33D" stroke-width="1.4"></circle>
+      <g stroke="#E8A33D" stroke-width="1.2" stroke-linecap="round">
+        <line x1="18" y1="6" x2="18" y2="3"></line>
+        <line x1="18" y1="22" x2="18" y2="25"></line>
+        <line x1="10" y1="14" x2="7" y2="14"></line>
+        <line x1="26" y1="14" x2="29" y2="14"></line>
+      </g>
+      <text x="40" y="18">SOLAR</text>
+    </g>
+    
+    <g transform="translate(292, 0)">
+      <rect x="0" y="0" width="150" height="28" rx="14" fill="none" stroke="#5a4a38"></rect>
+      <path d="M 14 16 q 3 -4 6 0 t 6 0 t 6 0" fill="none" stroke="#E8A33D" stroke-width="1.4"></path>
+      <text x="46" y="18">WATERBED</text>
+    </g>
+    
+    <g transform="translate(454, 0)">
+      <rect x="0" y="0" width="160" height="28" rx="14" fill="none" stroke="#5a4a38"></rect>
+      <g transform="translate(14, 8)" fill="none" stroke="#E8A33D" stroke-width="1.4">
+        <circle cx="6" cy="6" r="5.5"></circle>
+        <path d="M 6 0.5 A 5.5 5.5 0 0 1 11.5 6" stroke="#F5C56B"></path>
+      </g>
+      <text x="40" y="18">SLEEP SCORE</text>
+    </g>
+    
+    <g transform="translate(626, 0)">
+      <rect x="0" y="0" width="148" height="28" rx="14" fill="none" stroke="#5a4a38"></rect>
+      <path d="M 14 8 l 6 -3 l 6 3 v 5 q 0 5 -6 7 q -6 -2 -6 -7 z" fill="none" stroke="#E8A33D" stroke-width="1.4"></path>
+      <text x="40" y="18">FAIL-SAFE</text>
+    </g>
+  </g>
+
+  
+  <g transform="translate(0, 396)">
+    <rect x="0" y="0" width="1280" height="24" fill="#0a0806"></rect>
+    <line x1="0" y1="0" x2="1280" y2="0" stroke="#2a2218" stroke-width="1"></line>
+    <text x="72" y="16" font-family="ui-monospace, &#39;SF Mono&#39;, Menlo, monospace" font-size="11" fill="#8b7355" letter-spacing="1.4">› sense → predict → warm → wake</text>
+    <g transform="translate(1180, 12)">
+      <circle r="3.5" fill="#7BA968"></circle>
+      <circle r="3.5" fill="#7BA968" opacity="0.5" filter="url(#curveBlur)"></circle>
+      <text x="10" y="4" font-family="ui-monospace, &#39;SF Mono&#39;, Menlo, monospace" font-size="11" fill="#8b7355" letter-spacing="1.4">LIVE</text>
+    </g>
+  </g>
+</svg>
