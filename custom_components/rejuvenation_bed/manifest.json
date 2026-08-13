@@ -1,0 +1,15 @@
+{
+  "domain": "rejuvenation_bed",
+  "name": "Rejuvenation Bed",
+  "after_dependencies": ["lovelace"],
+  "codeowners": ["@Chance-Konstruktion"],
+  "config_flow": true,
+  "dependencies": ["http", "frontend"],
+  "documentation": "https://github.com/Chance-Konstruktion/ha-rejuvenation-bed",
+  "integration_type": "device",
+  "iot_class": "local_polling",
+  "issue_tracker": "https://github.com/Chance-Konstruktion/ha-rejuvenation-bed/issues",
+  "requirements": [],
+  "single_config_entry": true,
+  "version": "260804"
+}

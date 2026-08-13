@@ -1,0 +1,623 @@
+"""
+Options Flow für das Rejuvenation Bed.
+
+Vier Bereiche, logisch getrennt:
+
+  🌐 Globale Einstellungen
+     ├── Zeitfenster (warm_from, warm_until)
+     ├── Temperatur (summer_threshold, temperature_offset)
+     └── Sensoren (solar, preis, CO₂)
+
+  📡 Zonen-Sensoren (Hardware pro Zone)
+     ├── Heizungsschalter (Pflicht)
+     ├── Kern-Sensoren (Temperatur, Leistung)
+     └── Komfort-Sensoren (Präsenz, Feuchtigkeit, Luft)
+
+  🌡️ Schlaf-Profil (pro Zone)
+     ├── Wecker (Alarm-Entity, Wecker-Schalter, Wochenende)
+     ├── Nachttisch-Karte (Schlafzimmerlampe)
+     ├── Temperaturen (Einschlaf, Tiefschlaf, Aufwach)
+     └── Wearable (Schlafphasen-Sensor)
+
+  🎛️ Sondermodi
+     ├── Krank (Temperatur, Dauer)
+     ├── Boost (Offset)
+     ├── Urlaub (Haltetemperatur)
+     └── Komfort (Ausschlafen-Offset)
+
+Navigation
+──────────
+Der Flow bleibt durchgehend offen. Jede Eingabemaske kehrt nach dem
+Speichern zu ihrem übergeordneten Menü zurück (statt den Flow zu beenden),
+sodass jederzeit eine Seite zurück navigiert werden kann, ohne den
+kompletten Options-Flow neu starten zu müssen. Änderungen werden in einer
+Arbeitskopie gesammelt und erst über »💾 Speichern & Beenden« im Hauptmenü
+endgültig übernommen (genau ein Reload statt einem pro Maske).
+"""
+
+import voluptuous as vol
+import logging
+from homeassistant import config_entries
+from homeassistant.helpers import selector
+from .const import (
+    DEFAULT_SICK_MODE_TEMP,
+    DEFAULT_SICK_MODE_DAYS,
+    DEFAULT_SUMMER_TEMP,
+    DEFAULT_SUMMER_HOLD_TEMP,
+    DEFAULT_BED_BOOST_SOC_THRESHOLD,
+    DEFAULT_BED_BOOST_MIN_FORECAST_KWH,
+)
+from .device_info import detect_hardware_level
+
+_LOGGER = logging.getLogger(__name__)
+
+
+class RejuvenationBedOptionsFlow(config_entries.OptionsFlow):
+    """Options Flow Handler."""
+
+    def __init__(self, config_entry):
+        self._config_entry = config_entry
+        self._editing_zone_index = 0
+        # Arbeitskopien: Änderungen werden hier gesammelt und erst beim
+        # finalen »Speichern & Beenden« in den Config-Entry übernommen.
+        # So bleibt der Flow offen und es ist jederzeit »zurück« möglich.
+        self._options = dict(config_entry.options)
+        self._zones = [dict(z) for z in config_entry.data.get("zones", [])]
+
+    # ═══════════════════════════════════════════════════════════════════════
+    # HAUPTMENÜ
+    # ═══════════════════════════════════════════════════════════════════════
+
+    async def async_step_init(self, user_input=None):
+        """Hauptmenü: Was soll konfiguriert werden?"""
+        return self.async_show_menu(
+            step_id="init",
+            menu_options={
+                "global_settings": "🌐 Globale Einstellungen",
+                "zone_sensors": "📡 Zonen-Sensoren",
+                "zone_settings": "🌡️ Schlaf-Profil",
+                "mode_settings": "🎛️ Sondermodi",
+                "save": "💾 Speichern & Beenden",
+            },
+        )
+
+    async def async_step_save(self, user_input=None):
+        """Alle gesammelten Änderungen übernehmen und Flow beenden."""
+        # Zonen-Hardware (liegt in entry.data) nur schreiben, wenn geändert —
+        # vermeidet einen überflüssigen Reload, wenn nur Options angepasst wurden.
+        if self._zones != self._config_entry.data.get("zones", []):
+            new_data = {**self._config_entry.data, "zones": self._zones}
+            self.hass.config_entries.async_update_entry(self._config_entry, data=new_data)
+        # Options übernehmen → schließt den Flow und löst den Reload aus.
+        return self.async_create_entry(title="", data=self._options)
+
+    # ═══════════════════════════════════════════════════════════════════════
+    # 🌐 GLOBALE EINSTELLUNGEN (Sub-Menü)
+    # ═══════════════════════════════════════════════════════════════════════
+
+    async def async_step_global_settings(self, user_input=None):
+        """Globale Einstellungen: Sub-Menü."""
+        return self.async_show_menu(
+            step_id="global_settings",
+            menu_options={
+                "global_times": "🌡️ Temperatur & Bett",
+                "global_sensors": "📊 Sensoren & Strompreis",
+                "global_solar": "☀️ Solar & Akku",
+                "init": "⬅️ Zurück",
+            },
+        )
+
+    async def async_step_global_times(self, user_input=None):
+        """Temperatur-Grenzen und Bett-Eigenschaften."""
+        if user_input is not None:
+            self._options.update(user_input)
+            return await self.async_step_global_settings()
+
+        global_data = self._config_entry.data.get("global", {})
+
+        def _val(key, fallback=None):
+            return self._options.get(key, global_data.get(key, fallback))
+
+        return self.async_show_form(
+            step_id="global_times",
+            data_schema=vol.Schema(
+                {
+                    vol.Optional(
+                        "summer_cutoff_enabled", default=_val("summer_cutoff_enabled", True)
+                    ): selector.BooleanSelector(),
+                    vol.Optional(
+                        "summer_threshold", default=_val("summer_threshold", DEFAULT_SUMMER_TEMP)
+                    ): selector.NumberSelector(
+                        selector.NumberSelectorConfig(
+                            min=15, max=35, step=1, unit_of_measurement="°C", mode=selector.NumberSelectorMode.SLIDER
+                        )
+                    ),
+                    vol.Optional(
+                        "summer_temp", default=_val("summer_temp", DEFAULT_SUMMER_HOLD_TEMP)
+                    ): selector.NumberSelector(
+                        selector.NumberSelectorConfig(
+                            min=22, max=30, step=0.5, unit_of_measurement="°C", mode=selector.NumberSelectorMode.SLIDER
+                        )
+                    ),
+                    vol.Optional(
+                        "temperature_offset", default=_val("temperature_offset", 0.0)
+                    ): selector.NumberSelector(
+                        selector.NumberSelectorConfig(
+                            min=-3.0,
+                            max=3.0,
+                            step=0.5,
+                            unit_of_measurement="°C",
+                            mode=selector.NumberSelectorMode.SLIDER,
+                        )
+                    ),
+                    vol.Optional("bed_volume_liters", default=_val("bed_volume_liters", 250)): selector.NumberSelector(
+                        selector.NumberSelectorConfig(
+                            min=100, max=1200, step=50, unit_of_measurement="L", mode=selector.NumberSelectorMode.SLIDER
+                        )
+                    ),
+                }
+            ),
+        )
+
+    async def async_step_global_sensors(self, user_input=None):
+        """Sensoren und Strompreis (Solar & Akku siehe eigener Bereich)."""
+        if user_input is not None:
+            optional_sensors = {
+                "price_sensor",
+                "co2_sensor",
+            }
+            for key, value in user_input.items():
+                if key in optional_sensors and (value is None or value == ""):
+                    self._options.pop(key, None)
+                else:
+                    self._options[key] = value
+            return await self.async_step_global_settings()
+
+        global_data = self._config_entry.data.get("global", {})
+
+        def _val(key, fallback=None):
+            return self._options.get(key, global_data.get(key, fallback))
+
+        return self.async_show_form(
+            step_id="global_sensors",
+            data_schema=vol.Schema(
+                {
+                    # ─── Strompreis ───────────────────────────────────
+                    vol.Optional("electricity_price", default=_val("electricity_price", 30.0)): selector.NumberSelector(
+                        selector.NumberSelectorConfig(
+                            min=5.0,
+                            max=80.0,
+                            step=0.5,
+                            unit_of_measurement="ct/kWh",
+                            mode=selector.NumberSelectorMode.SLIDER,
+                        )
+                    ),
+                    # ─── Dynamischer Preis-Sensor ─────────────────────
+                    vol.Optional(
+                        "price_sensor", description={"suggested_value": _val("price_sensor")}
+                    ): selector.EntitySelector(selector.EntitySelectorConfig(domain="sensor")),
+                    # ─── CO₂ ──────────────────────────────────────────
+                    vol.Optional(
+                        "co2_sensor", description={"suggested_value": _val("co2_sensor")}
+                    ): selector.EntitySelector(
+                        selector.EntitySelectorConfig(domain="sensor", device_class="carbon_dioxide")
+                    ),
+                }
+            ),
+        )
+
+    async def async_step_global_solar(self, user_input=None):
+        """Solar & Akku: Solar-Boost-Trigger (Solar-Schwelle, SoC, Forecast)."""
+        if user_input is not None:
+            optional_sensors = {
+                "solar_sensor",
+                "battery_soc_sensor",
+                "forecast_sensor",
+            }
+            for key, value in user_input.items():
+                if key in optional_sensors and (value is None or value == ""):
+                    self._options.pop(key, None)
+                else:
+                    self._options[key] = value
+            return await self.async_step_global_settings()
+
+        global_data = self._config_entry.data.get("global", {})
+
+        def _val(key, fallback=None):
+            return self._options.get(key, global_data.get(key, fallback))
+
+        return self.async_show_form(
+            step_id="global_solar",
+            data_schema=vol.Schema(
+                {
+                    # ─── Solar ────────────────────────────────────────
+                    vol.Optional(
+                        "solar_sensor", description={"suggested_value": _val("solar_sensor")}
+                    ): selector.EntitySelector(selector.EntitySelectorConfig(domain="sensor", device_class="power")),
+                    vol.Optional(
+                        "solar_boost_threshold", default=_val("solar_boost_threshold", 500)
+                    ): selector.NumberSelector(
+                        selector.NumberSelectorConfig(
+                            min=100, max=2000, step=50, unit_of_measurement="W", mode=selector.NumberSelectorMode.SLIDER
+                        )
+                    ),
+                    # ─── Akku-SoC (unabhängiger Trigger) ──────────────
+                    vol.Optional(
+                        "battery_soc_sensor", description={"suggested_value": _val("battery_soc_sensor")}
+                    ): selector.EntitySelector(selector.EntitySelectorConfig(domain="sensor", device_class="battery")),
+                    vol.Optional(
+                        "bed_boost_soc_threshold",
+                        default=_val(
+                            "bed_boost_soc_threshold",
+                            DEFAULT_BED_BOOST_SOC_THRESHOLD,
+                        ),
+                    ): selector.NumberSelector(
+                        selector.NumberSelectorConfig(
+                            min=50, max=100, step=1, unit_of_measurement="%", mode=selector.NumberSelectorMode.SLIDER
+                        )
+                    ),
+                    # ─── PV-Forecast (optionaler Trigger) ─────────────
+                    vol.Optional(
+                        "forecast_sensor", description={"suggested_value": _val("forecast_sensor")}
+                    ): selector.EntitySelector(selector.EntitySelectorConfig(domain="sensor")),
+                    vol.Optional(
+                        "bed_boost_min_forecast_kwh",
+                        default=_val(
+                            "bed_boost_min_forecast_kwh",
+                            DEFAULT_BED_BOOST_MIN_FORECAST_KWH,
+                        ),
+                    ): selector.NumberSelector(
+                        selector.NumberSelectorConfig(
+                            min=0.5,
+                            max=20.0,
+                            step=0.5,
+                            unit_of_measurement="kWh",
+                            mode=selector.NumberSelectorMode.SLIDER,
+                        )
+                    ),
+                    # ─── Akku-Vorrang (optional) ──────────────────────
+                    # AUS (Default): Solar-Schwelle, SoC und Forecast sind
+                    # unabhängige ODER-Trigger. AN: Akku/Boiler haben Vorrang,
+                    # die Solar-Schwelle löst nur mit (fast) vollem Akku /
+                    # üppiger Forecast aus.
+                    vol.Optional(
+                        "battery_priority", default=_val("battery_priority", False)
+                    ): selector.BooleanSelector(),
+                }
+            ),
+        )
+
+    # ═══════════════════════════════════════════════════════════════════════
+    # 📡 ZONEN-SENSOREN (Hardware)
+    # ═══════════════════════════════════════════════════════════════════════
+
+    async def async_step_zone_sensors(self, user_input=None):
+        """Zonen-Sensoren: Bei Dual-Zone erst per Menü auswählen (mit Zurück)."""
+        zones = self._zones
+        if not zones:
+            return self.async_abort(reason="no_zones")
+
+        if len(zones) > 1:
+            return self.async_show_menu(
+                step_id="zone_sensors",
+                menu_options={
+                    "zone_sensors_left": "📡 Zone 1 (Links)",
+                    "zone_sensors_right": "📡 Zone 2 (Rechts)",
+                    "init": "⬅️ Zurück",
+                },
+            )
+
+        self._editing_zone_index = 0
+        return await self.async_step_edit_zone_sensors()
+
+    async def async_step_zone_sensors_left(self, user_input=None):
+        """Zone 1 (Links) Hardware bearbeiten."""
+        self._editing_zone_index = 0
+        return await self.async_step_edit_zone_sensors()
+
+    async def async_step_zone_sensors_right(self, user_input=None):
+        """Zone 2 (Rechts) Hardware bearbeiten."""
+        self._editing_zone_index = 1
+        return await self.async_step_edit_zone_sensors()
+
+    async def async_step_edit_zone_sensors(self, user_input=None):
+        """Hardware-Sensoren einer Zone bearbeiten."""
+        zone_index = self._editing_zone_index
+        zones = self._zones
+        if zone_index >= len(zones):
+            return self.async_abort(reason="invalid_zone")
+
+        current_zone = zones[zone_index]
+
+        if user_input is not None:
+            cleaned = {k: v for k, v in user_input.items() if v not in ("", None)}
+
+            sensor_keys = {
+                "heater",
+                "temp_sensor",
+                "power_sensor",
+                "presence_sensor",
+                "moisture_sensor",
+                "air_temp_sensor",
+            }
+            new_zone = {k: v for k, v in current_zone.items() if k not in sensor_keys}
+            new_zone.update(cleaned)
+            new_zone["hardware_level"] = detect_hardware_level(new_zone)
+
+            # In Arbeitskopie schreiben (persistiert beim finalen Speichern).
+            self._zones[zone_index] = new_zone
+            _LOGGER.debug(f"Zone {zone_index} Sensoren vorgemerkt: {cleaned}")
+            # Zurück zur Zonen-Auswahl bzw. zum Hauptmenü (Single-Zone).
+            return await self.async_step_zone_sensors_done()
+
+        zone_name = self._zone_display_name(zone_index, zones)
+        schema_dict = {}
+
+        # Pflicht: Heizungsschalter
+        schema_dict[vol.Required("heater", default=current_zone.get("heater", ""))] = selector.EntitySelector(
+            selector.EntitySelectorConfig(domain=["switch", "light", "number", "input_boolean"])
+        )
+
+        # Optional: Kern-Sensoren
+        self._add_optional_entity(
+            schema_dict, "temp_sensor", current_zone.get("temp_sensor"), domain="sensor", device_class="temperature"
+        )
+        self._add_optional_entity(
+            schema_dict, "power_sensor", current_zone.get("power_sensor"), domain="sensor", device_class="power"
+        )
+
+        # Optional: Komfort-Sensoren
+        self._add_optional_entity(
+            schema_dict,
+            "presence_sensor",
+            current_zone.get("presence_sensor"),
+            domain="binary_sensor",
+            device_class="occupancy",
+        )
+        self._add_optional_entity(
+            schema_dict,
+            "moisture_sensor",
+            current_zone.get("moisture_sensor"),
+            domain="sensor",
+            device_class="humidity",
+        )
+        self._add_optional_entity(
+            schema_dict,
+            "air_temp_sensor",
+            current_zone.get("air_temp_sensor"),
+            domain="sensor",
+            device_class="temperature",
+        )
+
+        return self.async_show_form(
+            step_id="edit_zone_sensors",
+            data_schema=vol.Schema(schema_dict),
+            description_placeholders={"zone_name": zone_name},
+        )
+
+    async def async_step_zone_sensors_done(self, user_input=None):
+        """Nach dem Speichern: zurück zur Zonen-Auswahl bzw. Hauptmenü."""
+        if len(self._zones) > 1:
+            return await self.async_step_zone_sensors()
+        return await self.async_step_init()
+
+    # ═══════════════════════════════════════════════════════════════════════
+    # 🌡️ SCHLAF-PROFIL (pro Zone)
+    # ═══════════════════════════════════════════════════════════════════════
+
+    async def async_step_zone_settings(self, user_input=None):
+        """Schlaf-Profil: Bei Dual-Zone erst per Menü auswählen (mit Zurück)."""
+        zones = self._zones
+        if not zones:
+            return self.async_abort(reason="no_zones")
+
+        if len(zones) > 1:
+            return self.async_show_menu(
+                step_id="zone_settings",
+                menu_options={
+                    "zone_settings_left": "🌡️ Zone 1 (Links)",
+                    "zone_settings_right": "🌡️ Zone 2 (Rechts)",
+                    "init": "⬅️ Zurück",
+                },
+            )
+
+        self._editing_zone_index = 0
+        return await self.async_step_edit_zone_settings()
+
+    async def async_step_zone_settings_left(self, user_input=None):
+        """Zone 1 (Links) Schlaf-Profil bearbeiten."""
+        self._editing_zone_index = 0
+        return await self.async_step_edit_zone_settings()
+
+    async def async_step_zone_settings_right(self, user_input=None):
+        """Zone 2 (Rechts) Schlaf-Profil bearbeiten."""
+        self._editing_zone_index = 1
+        return await self.async_step_edit_zone_settings()
+
+    async def async_step_edit_zone_settings(self, user_input=None):
+        """Schlaf-Profil einer Zone bearbeiten."""
+        zone_index = self._editing_zone_index
+        zones = self._zones
+        if zone_index >= len(zones):
+            return self.async_abort(reason="invalid_zone")
+
+        opts = self._options
+        global_data = self._config_entry.data.get("global", {})
+        prefix = f"zone_{zone_index}_"
+
+        if user_input is not None:
+            for key, value in user_input.items():
+                if value not in (None, ""):
+                    self._options[f"{prefix}{key}"] = value
+                else:
+                    self._options.pop(f"{prefix}{key}", None)
+            return await self.async_step_zone_settings_done()
+
+        zone_name = self._zone_display_name(zone_index, zones)
+
+        def _get(key, default=None):
+            """Zone-Option lesen, Fallback auf Global."""
+            return opts.get(f"{prefix}{key}", opts.get(key, global_data.get(key, default)))
+
+        schema_dict = {}
+
+        # ─── Zeitfenster (pro Zone!) ──────────────────────────
+        schema_dict[vol.Required("warm_from", default=_get("warm_from", "22:00"))] = selector.TimeSelector()
+
+        schema_dict[vol.Required("warm_until", default=_get("warm_until", "07:00"))] = selector.TimeSelector()
+
+        # ─── Chronotyp (pro Zone!) ────────────────────────────
+        schema_dict[vol.Required("chronotype", default=_get("chronotype", "normal"))] = selector.SelectSelector(
+            selector.SelectSelectorConfig(
+                options=[
+                    {"value": "lerche", "label": "🌅 Lerche (Frühaufsteher)"},
+                    {"value": "normal", "label": "😊 Normal"},
+                    {"value": "eule", "label": "🦉 Eule (Nachteule)"},
+                ],
+                mode=selector.SelectSelectorMode.LIST,
+            )
+        )
+
+        # ─── Wecker ───────────────────────────────────────────
+        current_alarm = _get("alarm_entity")
+        self._add_optional_entity(schema_dict, "alarm_entity", current_alarm, domain=["sensor", "input_datetime"])
+
+        # Wecker-Schalter und Schlafzimmerlampe: rein für die Nachttisch-Karte.
+        # Sie landen als Attribut am Status-Sensor der Zone, damit die Karte sie
+        # von selbst findet und niemand dieselben Entity-IDs in jedem Dashboard
+        # erneut einträgt.
+        self._add_optional_entity(
+            schema_dict,
+            "alarm_switch_entity",
+            _get("alarm_switch_entity"),
+            domain=["input_boolean", "switch"],
+        )
+        self._add_optional_entity(schema_dict, "light_entity", _get("light_entity"), domain=["light", "switch"])
+
+        schema_dict[vol.Optional("weekend_offset_hours", default=_get("weekend_offset_hours", 1.5))] = (
+            selector.NumberSelector(
+                selector.NumberSelectorConfig(
+                    min=0.0, max=4.0, step=0.5, unit_of_measurement="h", mode=selector.NumberSelectorMode.SLIDER
+                )
+            )
+        )
+
+        # ─── Schlaf-Temperaturen ──────────────────────────────
+        for temp_key in ("sleep_temp", "deep_sleep_temp", "wake_temp"):
+            current_val = opts.get(f"{prefix}{temp_key}")
+            kwargs = {}
+            if current_val is not None:
+                kwargs["description"] = {"suggested_value": current_val}
+            schema_dict[vol.Optional(temp_key, **kwargs)] = selector.NumberSelector(
+                selector.NumberSelectorConfig(
+                    min=24.0, max=36.0, step=0.5, unit_of_measurement="°C", mode=selector.NumberSelectorMode.SLIDER
+                )
+            )
+
+        # ─── Wearable ────────────────────────────────────────
+        self._add_optional_entity(
+            schema_dict, "sleep_stage_entity", opts.get(f"{prefix}sleep_stage_entity"), domain="sensor"
+        )
+
+        return self.async_show_form(
+            step_id="edit_zone_settings",
+            data_schema=vol.Schema(schema_dict),
+            description_placeholders={"zone_name": zone_name},
+        )
+
+    async def async_step_zone_settings_done(self, user_input=None):
+        """Nach dem Speichern: zurück zur Zonen-Auswahl bzw. Hauptmenü."""
+        if len(self._zones) > 1:
+            return await self.async_step_zone_settings()
+        return await self.async_step_init()
+
+    # ═══════════════════════════════════════════════════════════════════════
+    # 🎛️ SONDERMODI
+    # ═══════════════════════════════════════════════════════════════════════
+
+    async def async_step_mode_settings(self, user_input=None):
+        """Sondermodi: Krank, Boost, Urlaub, Komfort."""
+        if user_input is not None:
+            self._options.update(user_input)
+            return await self.async_step_init()
+
+        current = self._options
+
+        return self.async_show_form(
+            step_id="mode_settings",
+            data_schema=vol.Schema(
+                {
+                    # ─── Krank ────────────────────────────────────────
+                    vol.Required(
+                        "sick_mode_temp", default=current.get("sick_mode_temp", DEFAULT_SICK_MODE_TEMP)
+                    ): selector.NumberSelector(
+                        selector.NumberSelectorConfig(
+                            min=28.0,
+                            max=35.0,
+                            step=0.5,
+                            unit_of_measurement="°C",
+                            mode=selector.NumberSelectorMode.SLIDER,
+                        )
+                    ),
+                    vol.Required(
+                        "sick_mode_days", default=current.get("sick_mode_days", DEFAULT_SICK_MODE_DAYS)
+                    ): selector.NumberSelector(
+                        selector.NumberSelectorConfig(
+                            min=1, max=14, step=1, unit_of_measurement="Tage", mode=selector.NumberSelectorMode.SLIDER
+                        )
+                    ),
+                    # ─── Boost (#11: feste Zieltemperatur, absolut) ───
+                    vol.Required(
+                        "boost_target_temp", default=current.get("boost_target_temp", 34.0)
+                    ): selector.NumberSelector(
+                        selector.NumberSelectorConfig(
+                            min=28.0,
+                            max=34.0,
+                            step=0.5,
+                            unit_of_measurement="°C",
+                            mode=selector.NumberSelectorMode.SLIDER,
+                        )
+                    ),
+                    # ─── Urlaub ───────────────────────────────────────
+                    vol.Required("away_temp", default=current.get("away_temp", 24.0)): selector.NumberSelector(
+                        selector.NumberSelectorConfig(
+                            min=22.0,
+                            max=26.0,
+                            step=0.5,
+                            unit_of_measurement="°C",
+                            mode=selector.NumberSelectorMode.SLIDER,
+                        )
+                    ),
+                    # O9: comfort_offset entfernt — war nie verdrahtet (COMFORT-Preset
+                    # wurde in #8 entfernt). Kein toter Konfig-Regler mehr.
+                }
+            ),
+        )
+
+    # ═══════════════════════════════════════════════════════════════════════
+    # HILFSFUNKTIONEN
+    # ═══════════════════════════════════════════════════════════════════════
+
+    @staticmethod
+    def _add_optional_entity(schema_dict, key, current_value, domain=None, device_class=None):
+        """Optionalen Entity-Selector hinzufügen."""
+        kwargs = {}
+        if current_value:
+            kwargs["description"] = {"suggested_value": current_value}
+
+        entity_config = {}
+        if domain:
+            entity_config["domain"] = domain
+        if device_class:
+            entity_config["device_class"] = device_class
+
+        schema_dict[vol.Optional(key, **kwargs)] = selector.EntitySelector(
+            selector.EntitySelectorConfig(**entity_config)
+        )
+
+    @staticmethod
+    def _zone_display_name(zone_index: int, zones: list) -> str:
+        """Anzeigename für eine Zone."""
+        if len(zones) == 1:
+            return "Hauptzone"
+        return "Links" if zone_index == 0 else "Rechts"

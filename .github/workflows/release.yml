@@ -1,0 +1,35 @@
+name: Release
+
+# Baut beim Pushen eines Tags `v*` (z.B. v260619) ein ZIP der Integration
+# und hängt es als Asset an das zugehörige GitHub-Release. HACS lädt dieses
+# ZIP dann direkt (siehe hacs.json: zip_release + filename).
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  release-zip:
+    name: Build & attach integration zip
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Create integration zip
+        # Inhalt des Integrations-Ordners landet im ZIP-Root, d.h.
+        # manifest.json liegt oben — so erwartet HACS das ZIP.
+        run: |
+          cd custom_components/rejuvenation_bed
+          zip -r "${GITHUB_WORKSPACE}/rejuvenation_bed.zip" . \
+            -x "*.pyc" -x "__pycache__/*" -x "*/__pycache__/*"
+
+      - name: Attach zip to release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: rejuvenation_bed.zip
+          generate_release_notes: true

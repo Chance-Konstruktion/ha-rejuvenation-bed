@@ -1,0 +1,42 @@
+name: Lint & Test
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  ruff:
+    name: Ruff Linter
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install ruff
+      - name: Ruff (errors & warnings)
+        run: ruff check custom_components/rejuvenation_bed/ tests/ --select E,F --ignore E501,E302,E303,E261,E262,E265,E266,E741
+
+  black:
+    name: Black Formatter Check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install black
+      - name: Black (integration + tests)
+        run: black --check --diff --line-length 120 custom_components/ tests/
+
+  pytest:
+    name: Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install pytest pytest-cov pytest-asyncio
+      - run: pytest tests/ -v --cov=custom_components/rejuvenation_bed --cov-report=term-missing
