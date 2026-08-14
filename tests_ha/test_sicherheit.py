@@ -54,6 +54,19 @@ async def test_ueberhitzung_schaltet_die_heizung_wirklich_ab(
     assert hass.states.get(HEIZUNG).state == "off", "die Heizung lief bei 37 °C weiter"
 
 
+@pytest.mark.xfail(
+    strict=True,
+    reason=(
+        "Die Verriegelung greift bei der Standardeinstellung nie. "
+        "hardware_max ist 36, ABSOLUTE_MAX_TEMP ist 38, also liegt das "
+        "harte Limit bei 36 -- genau auf OVERHEAT_EMERGENCY_TEMP. "
+        "async_check_all schlaegt deshalb zuerst zu und kehrt aus "
+        "_async_update_data zurueck; async_check_zone_safety, das als "
+        "einziges _emergency_shutdown setzt, wird nie erreicht. Damit "
+        "sind die Verriegelung, der Text 'NOT-AUS aktiv ... dann Reset!' "
+        "und clear_emergency unerreichbar. Siehe Issue #1."
+    ),
+)
 async def test_notaus_haelt_auch_wenn_es_wieder_kuehl_wird(
     hass: HomeAssistant, bett
 ) -> None:
@@ -64,6 +77,11 @@ async def test_notaus_haelt_auch_wenn_es_wieder_kuehl_wird(
     misst er wieder plausibel -- und wuerde die Verriegelung von selbst
     fallen, liefe die Anlage in dieselbe Ueberhitzung zurueck, diesmal
     ohne dass jemand hinsieht.
+
+    Der Test ist bewusst als erwarteter Fehlschlag markiert und nicht
+    abgeschwaecht: er beschreibt, was gelten soll. ``strict=True`` heisst,
+    dass er meckert, sobald das Verhalten repariert ist -- dann gehoert
+    die Markierung weg, nicht der Test.
     """
     koordinator = _koordinator(hass, bett)
     await _heizung_an(hass)
