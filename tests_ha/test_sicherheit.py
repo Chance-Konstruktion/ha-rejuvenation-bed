@@ -126,8 +126,43 @@ async def test_notaus_meldet_sich_beim_nutzer(hass: HomeAssistant, bett) -> None
     await koordinator.async_refresh()
     await hass.async_block_till_done()
 
-    meldung = hass.states.get("persistent_notification.rejuvenation_bed_emergency_0")
-    assert meldung is not None, "keine Meldung in der Oberflaeche"
+    # Persistente Meldungen sind seit 2022 keine Entitaeten mehr -- sie
+    # stehen nicht im Zustandsspeicher, sondern in einer eigenen Ablage.
+    # Home Assistants eigene Tests greifen genauso darauf zu.
+    from homeassistant.components import persistent_notification as pn
+
+    meldungen = pn._async_get_or_create_notifications(hass)
+    assert "rejuvenation_bed_emergency_0" in meldungen, (
+        f"keine Meldung fuer die verriegelte Zone; vorhanden: {sorted(meldungen)}"
+    )
+    text = meldungen["rejuvenation_bed_emergency_0"]["message"]
+    # Der Nutzer muss zwei Dinge erfahren: dass es aus bleibt, und wie er
+    # es wieder anbekommt.
+    assert "bleibt aus" in text
+    assert "clear_emergency" in text
+
+
+async def test_freigabe_raeumt_die_meldung_weg(hass: HomeAssistant, bett) -> None:
+    """Eine Warnung, die nach der Freigabe stehen bleibt, erzieht zum Wegklicken.
+
+    Wer sich daran gewoehnt, Meldungen dieser Integration ungelesen
+    wegzuwischen, uebersieht die naechste echte.
+    """
+    from homeassistant.components import persistent_notification as pn
+
+    koordinator = _koordinator(hass, bett)
+    await _heizung_an(hass)
+
+    await temperatur_melden(hass, OVERHEAT_EMERGENCY_TEMP + 1)
+    await koordinator.async_refresh()
+    await hass.async_block_till_done()
+    assert "rejuvenation_bed_emergency_0" in pn._async_get_or_create_notifications(hass)
+
+    await temperatur_melden(hass, 26.0)
+    await hass.services.async_call(DOMAIN, "clear_emergency", {}, blocking=True)
+    await hass.async_block_till_done()
+
+    assert "rejuvenation_bed_emergency_0" not in pn._async_get_or_create_notifications(hass)
 
 
 async def test_ausgefallener_fuehler_schaltet_das_wasserbett_nicht_hart_ab(
