@@ -18,6 +18,7 @@ from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, Upda
 from homeassistant.components.persistent_notification import async_create as notify_create
 
 from .const import (
+    DOMAIN,
     UPDATE_INTERVAL,
     get_bed_config,
     BED_TYPE_WATERBED,
@@ -516,7 +517,9 @@ class RejuvenationBedCoordinator(DataUpdateCoordinator):
 
             # KRITISCH: Emergency Shutdown (nur bei Überhitzung!)
             if not safety_check["is_safe"]:
-                await self._async_emergency_shutdown(safety_check["reason"])
+                await self._async_emergency_shutdown(
+                    safety_check["reason"], safety_check.get("zone")
+                )
                 decision["global_state"]["status"] = "EMERGENCY_SHUTDOWN"
                 decision["reason"] = safety_check["reason"]
                 return decision
@@ -1323,11 +1326,60 @@ class RejuvenationBedCoordinator(DataUpdateCoordinator):
 
         return HVACMode.HEAT, PRESET_NONE
 
-    async def _async_emergency_shutdown(self, reason):
-        """Sicherheitsabschaltung aller Zonen."""
+    async def _async_emergency_shutdown(self, reason, zone_index=None):
+        """Sicherheitsabschaltung aller Zonen -- und Verriegelung.
+
+        Abgeschaltet wird alles: welche Zone den Fühler überhitzt hat, sagt
+        wenig darüber, ob die Nachbarzone am selben Relais hängt.
+
+        Verriegelt wird dagegen nur die auffällige Zone. Sonst bliebe nach
+        einem Defekt auf der linken Bettseite auch die rechte kalt, bis
+        jemand zurücksetzt -- und beim Wasserbett ist Auskühlen kein
+        harmloser Zustand.
+
+        Ohne die Verriegelung war dieser Not-Aus wirkungslos: er schaltete
+        ab, solange der Fühler zu heiß meldete, und die normale Regelung
+        heizte beim nächsten plausiblen Messwert wieder an. Bei einem
+        klebenden Relais ist genau das der Verlauf, vor dem die ganze
+        Sicherheitskette schützen soll.
+        """
         _LOGGER.critical(f"EMERGENCY SHUTDOWN ausgelöst: {reason}")
         for zone in self.config_entry.data.get("zones", []):
             await self._async_control_heater(zone.get("heater"), False)
+
+        zonen = (
+            [zone_index]
+            if zone_index is not None
+            else list(range(len(self.config_entry.data.get("zones", []))))
+        )
+        neu = [z for z in zonen if self.safety_manager.trigger_emergency(z, reason)]
+        if not neu:
+            # Schon verriegelt -- die Meldung steht bereits in der
+            # Oberfläche. Sie im Sekundentakt neu zu schreiben, macht sie
+            # nur unlesbar.
+            return
+
+        for z in neu:
+            await self._async_send_notification(
+                title=f"🚨 NOT-AUS Zone {z + 1}",
+                message=(
+                    f"{reason}\n\n"
+                    f"Die Heizung ist abgeschaltet und **bleibt aus**, bis du "
+                    f"sie von Hand freigibst. Das ist Absicht: würde sie sich "
+                    f"selbst wieder einschalten, liefe ein klebendes Relais "
+                    f"unbemerkt in dieselbe Überhitzung zurück.\n\n"
+                    f"So gehst du vor:\n"
+                    f"1. Stecker ziehen und das Relais prüfen.\n"
+                    f"2. Hardware-Thermostat kontrollieren (max. 34 °C).\n"
+                    f"3. Sitzt der Temperaturfühler noch richtig?\n\n"
+                    f"Danach freigeben mit dem Dienst "
+                    f"`{DOMAIN}.clear_emergency`.\n\n"
+                    f"⚠️ Wasserbett: Es bleibt jetzt kalt. Länger als ein "
+                    f"paar Tage unter 24 °C schlägt Kondenswasser an — kümmere "
+                    f"dich also zeitnah darum oder gib bewusst wieder frei."
+                ),
+                notification_id=f"rejuvenation_bed_emergency_{z}",
+            )
 
     @callback
     def get_last_decision(self) -> Optional[Dict]:

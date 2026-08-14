@@ -356,9 +356,45 @@ class SafetyManager:
         _LOGGER.warning(f"SAFETY WARNING Zone {zone_index}: {message}")
         return message
 
+    def trigger_emergency(self, zone_index: int, reason: str) -> bool:
+        """Verriegelt eine Zone von außen. Gibt True zurück, wenn neu.
+
+        Bis hierher konnte die Verriegelung nur in
+        :meth:`async_check_zone_safety` gesetzt werden -- und die wurde bei
+        einer Überhitzung nie erreicht. Der Grund: ``_check_overheating``
+        greift bei ``min(hardware_max, ABSOLUTE_MAX_TEMP)``, und
+        ``hardware_max`` ist per Voreinstellung 36, also genau
+        :data:`OVERHEAT_EMERGENCY_TEMP`. Der Coordinator kehrte deshalb
+        immer schon in der globalen Prüfung zurück, und die Zonen-Prüfung
+        lief erst gar nicht.
+
+        Ergebnis war ein Not-Aus, der keiner war: Heizung aus, solange der
+        Fühler zu heiß meldet, und selbsttätig wieder an, sobald er einen
+        plausiblen Wert liefert. Genau der Verlauf, den ein klebendes
+        Relais erzeugt.
+
+        Die Schwellen bleiben unangetastet -- sie zu verschieben hieße, die
+        Abschaltung nach oben zu rücken. Stattdessen darf die globale
+        Prüfung die Verriegelung jetzt selbst setzen.
+
+        Der Rückgabewert unterscheidet die erste Verriegelung von jedem
+        weiteren Durchlauf, damit die Benachrichtigung nicht im
+        Sekundentakt neu geschrieben wird.
+        """
+        if self._emergency_shutdown.get(zone_index):
+            return False
+        self._emergency_shutdown[zone_index] = True
+        self._emergency_reason[zone_index] = reason
+        _LOGGER.critical(f"Zone {zone_index}: NOT-AUS verriegelt -- {reason}")
+        return True
+
     def is_emergency_shutdown(self, zone_index: int) -> bool:
         """Prüft ob ein Emergency-Shutdown aktiv ist."""
         return self._emergency_shutdown.get(zone_index, False)
+
+    def emergency_zones(self) -> list:
+        """Alle derzeit verriegelten Zonen."""
+        return sorted(z for z, aktiv in self._emergency_shutdown.items() if aktiv)
 
     def get_emergency_reason(self, zone_index: int) -> Optional[str]:
         """Gibt den Grund für einen Emergency-Shutdown zurück."""
