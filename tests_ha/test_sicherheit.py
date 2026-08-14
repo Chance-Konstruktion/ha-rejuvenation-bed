@@ -54,19 +54,6 @@ async def test_ueberhitzung_schaltet_die_heizung_wirklich_ab(
     assert hass.states.get(HEIZUNG).state == "off", "die Heizung lief bei 37 °C weiter"
 
 
-@pytest.mark.xfail(
-    strict=True,
-    reason=(
-        "Die Verriegelung greift bei der Standardeinstellung nie. "
-        "hardware_max ist 36, ABSOLUTE_MAX_TEMP ist 38, also liegt das "
-        "harte Limit bei 36 -- genau auf OVERHEAT_EMERGENCY_TEMP. "
-        "async_check_all schlaegt deshalb zuerst zu und kehrt aus "
-        "_async_update_data zurueck; async_check_zone_safety, das als "
-        "einziges _emergency_shutdown setzt, wird nie erreicht. Damit "
-        "sind die Verriegelung, der Text 'NOT-AUS aktiv ... dann Reset!' "
-        "und clear_emergency unerreichbar. Siehe Issue #1."
-    ),
-)
 async def test_notaus_haelt_auch_wenn_es_wieder_kuehl_wird(
     hass: HomeAssistant, bett
 ) -> None:
@@ -78,10 +65,10 @@ async def test_notaus_haelt_auch_wenn_es_wieder_kuehl_wird(
     fallen, liefe die Anlage in dieselbe Ueberhitzung zurueck, diesmal
     ohne dass jemand hinsieht.
 
-    Der Test ist bewusst als erwarteter Fehlschlag markiert und nicht
-    abgeschwaecht: er beschreibt, was gelten soll. ``strict=True`` heisst,
-    dass er meckert, sobald das Verhalten repariert ist -- dann gehoert
-    die Markierung weg, nicht der Test.
+    Dieser Test hat den Fehler gefunden (Issue #1): die Verriegelung war
+    unerreichbar, weil ``hardware_max`` und ``OVERHEAT_EMERGENCY_TEMP``
+    beide auf 36 stehen und die globale Pruefung deshalb immer zuerst
+    zurueckkehrte.
     """
     koordinator = _koordinator(hass, bett)
     await _heizung_an(hass)
@@ -97,6 +84,50 @@ async def test_notaus_haelt_auch_wenn_es_wieder_kuehl_wird(
     await hass.async_block_till_done()
 
     assert hass.states.get(HEIZUNG).state == "off", "der Not-Aus hat sich selbst aufgehoben"
+
+
+async def test_freigabe_hebt_den_notaus_auf(hass: HomeAssistant, bett) -> None:
+    """Die Gegenseite: nach der Pruefung muss das Bett wieder anlaufen.
+
+    Eine Verriegelung ohne Freigabe waere kein Schutz, sondern ein
+    Totalausfall bis zum naechsten Neustart -- und beim Wasserbett heisst
+    das Auskuehlen und Kondenswasser. Genau diese Luecke bestand, bevor es
+    den Dienst gab: ``SafetyManager.clear_emergency()`` existierte, hatte
+    aber im ganzen Projekt keinen Aufrufer.
+    """
+    koordinator = _koordinator(hass, bett)
+    await _heizung_an(hass)
+
+    await temperatur_melden(hass, OVERHEAT_EMERGENCY_TEMP + 1)
+    await koordinator.async_refresh()
+    await hass.async_block_till_done()
+    assert koordinator.safety_manager.emergency_zones() == [0]
+
+    await temperatur_melden(hass, 26.0)
+    await hass.services.async_call(DOMAIN, "clear_emergency", {}, blocking=True)
+    await hass.async_block_till_done()
+
+    assert koordinator.safety_manager.emergency_zones() == []
+    assert koordinator.safety_manager.is_emergency_shutdown(0) is False
+
+
+async def test_notaus_meldet_sich_beim_nutzer(hass: HomeAssistant, bett) -> None:
+    """Stufe 3 der Sicherheitshierarchie: der Mensch muss es erfahren.
+
+    Der Kopf von safety_manager.py nennt die Nutzer-Benachrichtigung
+    ausdruecklich. Bis Issue #1 schrieb die eigentliche Abschaltung nur
+    eine Protokollzeile -- gesehen haette das niemand, der nicht ohnehin
+    schon gesucht hat.
+    """
+    koordinator = _koordinator(hass, bett)
+    await _heizung_an(hass)
+
+    await temperatur_melden(hass, OVERHEAT_EMERGENCY_TEMP + 1)
+    await koordinator.async_refresh()
+    await hass.async_block_till_done()
+
+    meldung = hass.states.get("persistent_notification.rejuvenation_bed_emergency_0")
+    assert meldung is not None, "keine Meldung in der Oberflaeche"
 
 
 async def test_ausgefallener_fuehler_schaltet_das_wasserbett_nicht_hart_ab(

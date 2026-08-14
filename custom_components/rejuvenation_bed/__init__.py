@@ -49,6 +49,15 @@ SERVICE_SET_VACATION_SCHEMA = vol.Schema(
     }
 )
 
+SERVICE_CLEAR_EMERGENCY_SCHEMA = vol.Schema(
+    {
+        # Ohne Angabe werden alle verriegelten Zonen freigegeben. Die
+        # Nummer ist die, die der Nutzer in der Meldung gelesen hat --
+        # also 1-basiert, nicht der interne Index.
+        vol.Optional("zone"): vol.All(vol.Coerce(int), vol.Range(min=1, max=3)),
+    }
+)
+
 SERVICE_PREHEAT_SCHEMA = vol.Schema(
     {
         vol.Optional("target_temperature", default=29): vol.All(vol.Coerce(float), vol.Range(min=26, max=34)),
@@ -362,8 +371,52 @@ async def _async_setup_services(hass: HomeAssistant, entry: ConfigEntry):
         _LOGGER.info(f"Vorheizen auf {target_temp}°C für {duration} Minuten")
         await coordinator.async_request_refresh()
 
+    async def handle_clear_emergency(call: ServiceCall):
+        """Handle clear_emergency service.
+
+        Die Gegenseite zum Not-Aus. Bis hierher gab es keine: der
+        SafetyManager hatte zwar ein ``clear_emergency()``, aber im ganzen
+        Projekt keinen einzigen Aufrufer -- die Meldung forderte den Nutzer
+        zu einem Reset auf, den es nicht gab.
+
+        Bewusst ein Dienst und kein Knopf in der Karte: eine Freigabe
+        gehört hinter eine Handlung, die man nicht im Vorbeiwischen
+        auslöst. Wer hier landet, hat gerade den Stecker in der Hand.
+        """
+        coordinator = _get_coordinator(hass)
+        if coordinator is None:
+            _LOGGER.warning("clear_emergency: kein aktiver Coordinator")
+            return
+
+        gewuenscht = call.data.get("zone")
+        verriegelt = coordinator.safety_manager.emergency_zones()
+        if not verriegelt:
+            _LOGGER.info("clear_emergency: keine Zone ist verriegelt")
+            return
+
+        # Ohne Angabe alle -- wer nach einem Not-Aus zurücksetzt, will das
+        # Bett wieder benutzen, nicht die Hälfte davon.
+        zonen = [gewuenscht - 1] if gewuenscht else verriegelt
+
+        from homeassistant.components.persistent_notification import (
+            async_dismiss as notify_dismiss,
+        )
+
+        for zone_idx in zonen:
+            coordinator.safety_manager.clear_emergency(zone_idx)
+            # Die Meldung mitnehmen: eine Warnung, die nach der Freigabe
+            # stehen bleibt, erzieht den Nutzer dazu, sie wegzuklicken
+            # ohne sie zu lesen.
+            notify_dismiss(hass, f"rejuvenation_bed_emergency_{zone_idx}")
+            _LOGGER.warning(f"Zone {zone_idx + 1}: Not-Aus manuell freigegeben")
+
+        await coordinator.async_request_refresh()
+
     # Services registrieren
     hass.services.async_register(DOMAIN, "set_boost", handle_set_boost, schema=SERVICE_SET_BOOST_SCHEMA)
+    hass.services.async_register(
+        DOMAIN, "clear_emergency", handle_clear_emergency, schema=SERVICE_CLEAR_EMERGENCY_SCHEMA
+    )
     hass.services.async_register(DOMAIN, "set_sick_mode", handle_set_sick_mode, schema=SERVICE_SET_SICK_MODE_SCHEMA)
     hass.services.async_register(DOMAIN, "set_vacation_mode", handle_set_vacation, schema=SERVICE_SET_VACATION_SCHEMA)
     hass.services.async_register(DOMAIN, "cancel_special_mode", handle_cancel_special_mode)
@@ -393,6 +446,7 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     # #6: Globale Services nur entfernen, wenn kein Coordinator mehr übrig ist
     if not any(isinstance(v, RejuvenationBedCoordinator) for v in hass.data.get(DOMAIN, {}).values()):
         for service in [
+            "clear_emergency",
             "set_boost",
             "set_sick_mode",
             "set_vacation_mode",
