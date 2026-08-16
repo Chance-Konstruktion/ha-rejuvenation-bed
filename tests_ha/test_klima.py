@@ -127,75 +127,36 @@ async def test_der_wunsch_kommt_am_regler_an(hass: HomeAssistant, bett) -> None:
     )
 
 
-async def test_die_anzeige_ist_die_rampe_und_nicht_der_wunsch(
+async def test_das_thermostat_zeigt_den_wunsch_und_nicht_die_rampe(
     hass: HomeAssistant, bett
 ) -> None:
-    """Was das Thermostat zeigt, ist der GERAMPTE Sollwert.
+    """Eingestellt ist eingestellt.
 
-    Das ist Absicht: Ein Wasserbett vertraegt keine Temperatursprunge, der
-    RampController faehrt den Sollwert deshalb mit begrenzter Rate von der
-    Ist-Temperatur zum Wunsch. Solange die Rampe laeuft, steht am
-    Thermostat also weniger, als der Nutzer eingestellt hat.
+    Home Assistant erwartet unter ``target_temperature`` das, was der
+    Nutzer will -- daran haengen die Karte, die Sprachassistenz und jede
+    Automatisierung. Hier stand frueher der GERAMPTE Sollwert: Wer 30
+    einstellte, las 28 und hielt das Thermostat fuer kaputt.
 
-    Dieser Test haelt genau das fest -- und zwar als Zusage, nicht als
-    Entschuldigung: Die Anzeige darf zwischen Ist und Wunsch liegen, aber
-    NIE darueber. Ein Sollwert oberhalb des Wunsches waere ein Ueberschwinger,
-    und der liegt bei einer Bettheizung an einem Koerper an.
-
-    (Fuer den Nutzer bleibt das trotzdem verwirrend: Er stellt 30 ein und
-    liest 28. Ob die Integration den Wunsch als `target_temperature` zeigen
-    und die Rampe intern fahren sollte, ist eine Entscheidung fuer Chris --
-    dieser Test schreibt sie nicht fest, er beschreibt nur, was heute gilt.)
+    Die Rampe ist deshalb nicht weg, sie steht nur an ihrem Platz --
+    als Attribut ``ramp_setpoint``. Auf sie schaltet die Heizung
+    weiterhin, denn ein Wasserbett vertraegt keine Spruenge.
     """
     entitaet = _thermostat(hass, bett)
-    ist = hass.states.get(entitaet).attributes.get("current_temperature")
     await hass.services.async_call(
         CLIMATE_DOMAIN, SERVICE_SET_TEMPERATURE,
         {ATTR_ENTITY_ID: entitaet, ATTR_TEMPERATURE: 30.0}, blocking=True)
     await regelkreis_drehen(hass, bett)
 
-    gezeigt = hass.states.get(entitaet).attributes.get("temperature")
-    assert gezeigt is not None
-    assert gezeigt <= 30.0, (
-        f"Der Sollwert {gezeigt} liegt UEBER dem Wunsch 30.0 -- ein "
-        "Ueberschwinger, der an einem Koerper anliegt"
+    zustand = hass.states.get(entitaet)
+    assert zustand.attributes.get("temperature") == 30.0, (
+        "Das Thermostat zeigt nicht, was eingestellt wurde"
     )
-    if ist is not None:
-        assert gezeigt >= min(ist, 30.0) - 0.1, (
-            f"Der Sollwert {gezeigt} liegt unter der Ist-Temperatur {ist} "
-            "und unter dem Wunsch -- die Rampe faehrt in die falsche Richtung"
-        )
 
-
-async def test_ueber_der_grenze_kommt_nichts_an(hass: HomeAssistant, bett) -> None:
-    """Der Fall, auf den es bei einer Bettheizung ankommt.
-
-    Ein Wert oberhalb von ``max_temp`` darf nicht als Ziel stehenbleiben --
-    egal ob Home Assistant ihn abweist oder unser Code ihn deckelt. Beides
-    ist in Ordnung; nur durchreichen ist es nicht. Deshalb prueft dieser
-    Test das ERGEBNIS und nicht den Weg dorthin: Er bleibt richtig, auch
-    wenn eine kuenftige Home-Assistant-Version die Pruefung verschiebt.
-    """
-    entitaet = _thermostat(hass, bett)
-    grenze = hass.states.get(entitaet).attributes["max_temp"]
-    zu_heiss = grenze + 10
-
-    try:
-        await hass.services.async_call(
-            CLIMATE_DOMAIN,
-            SERVICE_SET_TEMPERATURE,
-            {ATTR_ENTITY_ID: entitaet, ATTR_TEMPERATURE: zu_heiss},
-            blocking=True,
-        )
-        await regelkreis_drehen(hass, bett)
-    except (ServiceValidationError, ValueError):
-        # Home Assistant hat abgewiesen. Das ist der saubere Ausgang.
-        pass
-
-    ziel = hass.states.get(entitaet).attributes.get("temperature")
-    assert ziel is None or ziel <= grenze, (
-        f"{zu_heiss} °C stehen als Ziel am Thermostat, obwohl die Grenze "
-        f"bei {grenze} °C liegt. Das liegt danach am Koerper an."
+    rampe = zustand.attributes.get("ramp_setpoint")
+    assert rampe is not None, "Der echte Schalt-Sollwert ist nirgends sichtbar"
+    assert rampe <= 30.0, (
+        f"Der Schalt-Sollwert {rampe} liegt UEBER dem Ziel 30.0 -- ein "
+        "Ueberschwinger, der an einem Koerper anliegt"
     )
 
 

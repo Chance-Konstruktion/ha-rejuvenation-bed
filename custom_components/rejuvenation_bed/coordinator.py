@@ -1061,7 +1061,20 @@ class RejuvenationBedCoordinator(DataUpdateCoordinator):
             hvac_mode, preset_mode = self._determine_hvac_mode(zone_index, is_present, zone_config)
 
             decision["zones"][zone_name] = {
-                "target": round(target_temp, 1),
+                # "target" ist der WUNSCH -- das, worauf geregelt wird und was
+                # der Nutzer eingestellt hat (oder die Kurve vorgibt). Genau
+                # das erwartet Home Assistant unter target_temperature, und
+                # genau das liest jede Karte, jede Automatisierung und jede
+                # Sprachassistenz.
+                #
+                # Hier stand frueher der GERAMPTE Sollwert. Der ist die
+                # Stellgroesse des RampControllers und faengt bei der
+                # Ist-Temperatur an: Wer 30 einstellte, las 28 und hielt das
+                # Thermostat fuer kaputt. Der Wert ist nicht verloren, er
+                # steht jetzt daneben als "ramp_setpoint" -- und darauf
+                # schaltet die Heizung auch weiterhin.
+                "target": round(desired_temp, 1),
+                "ramp_setpoint": round(target_temp, 1),
                 "current": round(current_temp, 1),
                 "active": should_heat,
                 "watt": round(current_watt, 1),
