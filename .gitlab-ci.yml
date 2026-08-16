@@ -82,6 +82,54 @@ pytest-ha:
         echo "Frontend-Paket fuer diesen Kern: $paket"
         pip install -q "$paket"
       fi
+    # Integrationen, die ein Test wirklich importieren muss.
+    #
+    # Der Adapter holt sie zur Laufzeit und faengt ImportError ab, damit
+    # er auch ohne sie laeuft. Ein Test, der den Weg MIT ihnen prueft,
+    # braucht ihre Python-Pakete aber tatsaechlich -- und die bringt
+    # pytest-homeassistant-custom-component nicht mit.
+    #
+    # In requirements_test_ha_components.txt stehen nur die Namen der
+    # Integrationen. Die Pakete kommen aus Home Assistants eigenen
+    # Manifesten, samt denen ihrer Abhaengigkeiten (bluetooth zieht usb
+    # nach, thread zieht zeroconf). Eingetragene Versionen waeren beim
+    # naechsten Update still falsch: pip nimmt sie klaglos.
+    - |
+      if [ -f requirements_test_ha_components.txt ]; then
+        pakete=$(python - <<'PY'
+      import json, pathlib
+      import homeassistant.components as komponenten
+
+      wurzel = pathlib.Path(komponenten.__file__).parent
+      offen = [
+          zeile.strip()
+          for zeile in pathlib.Path(
+              "requirements_test_ha_components.txt"
+          ).read_text(encoding="utf-8").splitlines()
+          if zeile.strip() and not zeile.lstrip().startswith("#")
+      ]
+
+      gesehen, pakete = set(), []
+      while offen:
+          name = offen.pop()
+          if name in gesehen:
+              continue
+          gesehen.add(name)
+          manifest = wurzel / name / "manifest.json"
+          if not manifest.is_file():
+              continue
+          daten = json.loads(manifest.read_text(encoding="utf-8"))
+          pakete.extend(daten.get("requirements") or [])
+          offen.extend(daten.get("dependencies") or [])
+
+      print(" ".join(sorted(set(pakete))))
+      PY
+      )
+        if [ -n "$pakete" ]; then
+          echo "Pakete fuer die genannten Integrationen: $pakete"
+          pip install -q $pakete
+        fi
+      fi
   script:
     - python -m pytest -c pytest-ha.ini -q -rs --junitxml=report-ha.xml
   artifacts:
@@ -175,3 +223,98 @@ release:
     description: "Automatisch erzeugt aus Tag $CI_COMMIT_TAG."
   rules:
     - if: $CI_COMMIT_TAG
+
+# ── Tests gegen echte Hardware ────────────────────────────────────────
+# Laeuft nur, wo es tests/test_hardware_integration.py gibt (heute: nur
+# ha-powerline). Die Adapter haengen im selben Netz wie der Runner, also
+# soll dagegen wirklich geprueft werden statt uebersprungen zu werden.
+#
+# ABER: HomePlug arbeitet auf Schicht 2. Ein Docker-Container sieht das
+# LAN dort nur mit host-Netzwerk und CAP_NET_RAW -- beides steht in der
+# config.toml des Runners, nicht hier. Solange das fehlt, ueberspringt
+# sich der Test mit dem Grund "Raw HomePlug sockets are not available",
+# und genau der steht dann dank -rs im Log. Kein stilles Gruen: Der Job
+# ist sichtbar da und sagt, was ihm fehlt.
+pytest-hardware:
+  stage: test
+  image: python:3.13
+  variables:
+    POWERLINE_HARDWARE_TESTS: "1"
+  before_script:
+    - |
+      if [ -f requirements_test.txt ]; then
+        pip install -q -r requirements_test.txt
+      else
+        pip install -q pytest pytest-asyncio voluptuous pyyaml jsonschema
+      fi
+    - |
+      python - <<'PY'
+      # Was der Job vorfindet, gehoert ins Log -- sonst raetselt man beim
+      # naechsten Uebersprungen wieder, ob es an der Konfiguration liegt.
+      import socket
+      try:
+          s = socket.socket(socket.AF_PACKET, socket.SOCK_RAW)
+          s.close()
+          print("Rohe Sockets: verfuegbar")
+      except Exception as fehler:
+          print(f"Rohe Sockets: NICHT verfuegbar ({fehler})")
+          print("  -> config.toml des Runners: network_mode = \"host\" und")
+          print("     cap_add = [\"NET_RAW\", \"NET_ADMIN\"]")
+      PY
+  script:
+    - python -m pytest tests/test_hardware_integration.py -q -rs
+  rules:
+    - exists:
+        - tests/test_hardware_integration.py
+
+# ── Die Vorlage gegen ihre Quelle ─────────────────────────────────────
+# Oben steht "dieselbe Datei liegt in allen Repositories". Das stimmte
+# nicht: ha-powerline und espeasy-p2p trugen eine aeltere Fassung -- ohne
+# den Job pytest-ha. Beide Pipelines waren gruen, und niemand konnte
+# sehen, dass der halbe Testlauf schlicht fehlte. Eine Behauptung, die
+# nichts prueft, haelt genau bis zum ersten Mal, wo es darauf ankommt.
+#
+# Der Vergleich laeuft nur auf dem Hauptzweig: Auf einem Feature-Zweig
+# soll man die Vorlage aendern koennen, ohne dass die eigene Pipeline
+# darueber rot wird. Und nicht im Hub selbst -- dort IST die Quelle, und
+# genau der Commit, der sie aendert, wuerde sich sonst selbst umbringen.
+ci-vorlage:
+  stage: validate
+  image: python:3.13
+  script:
+    - |
+      python - <<'PY'
+      import pathlib, sys, urllib.request
+
+      QUELLE = ("https://gitlab.schanz.ipv64.net/chance-konstruktion/"
+                "ha-spatial-hub/-/raw/main/.gitlab-ci.yml")
+      try:
+          quelle = urllib.request.urlopen(QUELLE, timeout=20).read().decode()
+      except Exception as fehler:
+          # Kein Netz ist kein Grund fuer Rot. Ein Job, der bei einer
+          # Stoerung rot wird, wird nach dem zweiten Mal ignoriert.
+          print(f"Quelle nicht erreichbar ({fehler}) - uebersprungen.")
+          sys.exit(0)
+
+      hier = pathlib.Path(".gitlab-ci.yml").read_text(encoding="utf-8")
+      if hier.replace("\r\n", "\n") == quelle.replace("\r\n", "\n"):
+          print("Die CI-Vorlage ist auf dem Stand des Hubs.")
+          sys.exit(0)
+
+      print(
+          "Diese .gitlab-ci.yml weicht von der Quelle im Hub ab.\n"
+          "Das ist der Fall, in dem Jobs still verschwinden - genau so hat\n"
+          "hier zweimal der Job pytest-ha gefehlt, ohne dass etwas rot war.\n"
+          "\n"
+          "Uebernehmen:\n"
+          "  curl -s " + QUELLE + " -o .gitlab-ci.yml\n"
+          "\n"
+          "Soll die Aenderung fuer ALLE gelten, gehoert sie in den Hub -\n"
+          "und von dort in jedes Repository."
+      )
+      sys.exit(1)
+      PY
+  rules:
+    - if: $CI_PROJECT_NAME == "ha-spatial-hub"
+      when: never
+    - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
