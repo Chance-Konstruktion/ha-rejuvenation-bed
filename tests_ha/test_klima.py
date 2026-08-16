@@ -105,12 +105,12 @@ async def test_das_thermostat_hat_eine_eigene_kennung(
 # ── Was ankommt, wenn jemand am Rad dreht ─────────────────────────────
 
 
-async def test_eine_zieltemperatur_kommt_wirklich_an(
-    hass: HomeAssistant, bett
-) -> None:
-    """Der ganze Weg: Dienstaufruf, Home Assistants Pruefung, unser Code,
-    zurueck in den Zustandsspeicher. In der Attrappen-Suite endet er nach
-    dem zweiten Schritt."""
+async def test_der_wunsch_kommt_am_regler_an(hass: HomeAssistant, bett) -> None:
+    """Der ganze Weg: Dienstaufruf, Home Assistants Pruefung, unser Code.
+
+    Geprueft wird der WUNSCH, nicht die Anzeige -- die beiden sind bei
+    diesem Bett absichtlich verschieden, siehe den naechsten Test.
+    """
     entitaet = _thermostat(hass, bett)
     await hass.services.async_call(
         CLIMATE_DOMAIN,
@@ -120,11 +120,51 @@ async def test_eine_zieltemperatur_kommt_wirklich_an(
     )
     await regelkreis_drehen(hass, bett)
 
-    zustand = hass.states.get(entitaet)
-    assert zustand.attributes.get("temperature") == 30.0, (
-        "Die gesetzte Zieltemperatur steht nicht am Thermostat -- der "
-        "Nutzer dreht am Rad und nichts passiert"
+    koordinator = hass.data[DOMAIN][bett.entry_id]
+    assert koordinator.get_active_manual_target(0) == 30.0, (
+        "Der Wunsch des Nutzers ist am Koordinator nicht angekommen -- "
+        "dann dreht er am Rad und es passiert wirklich nichts"
     )
+
+
+async def test_die_anzeige_ist_die_rampe_und_nicht_der_wunsch(
+    hass: HomeAssistant, bett
+) -> None:
+    """Was das Thermostat zeigt, ist der GERAMPTE Sollwert.
+
+    Das ist Absicht: Ein Wasserbett vertraegt keine Temperatursprunge, der
+    RampController faehrt den Sollwert deshalb mit begrenzter Rate von der
+    Ist-Temperatur zum Wunsch. Solange die Rampe laeuft, steht am
+    Thermostat also weniger, als der Nutzer eingestellt hat.
+
+    Dieser Test haelt genau das fest -- und zwar als Zusage, nicht als
+    Entschuldigung: Die Anzeige darf zwischen Ist und Wunsch liegen, aber
+    NIE darueber. Ein Sollwert oberhalb des Wunsches waere ein Ueberschwinger,
+    und der liegt bei einer Bettheizung an einem Koerper an.
+
+    (Fuer den Nutzer bleibt das trotzdem verwirrend: Er stellt 30 ein und
+    liest 28. Ob die Integration den Wunsch als `target_temperature` zeigen
+    und die Rampe intern fahren sollte, ist eine Entscheidung fuer Chris --
+    dieser Test schreibt sie nicht fest, er beschreibt nur, was heute gilt.)
+    """
+    entitaet = _thermostat(hass, bett)
+    ist = hass.states.get(entitaet).attributes.get("current_temperature")
+    await hass.services.async_call(
+        CLIMATE_DOMAIN, SERVICE_SET_TEMPERATURE,
+        {ATTR_ENTITY_ID: entitaet, ATTR_TEMPERATURE: 30.0}, blocking=True)
+    await regelkreis_drehen(hass, bett)
+
+    gezeigt = hass.states.get(entitaet).attributes.get("temperature")
+    assert gezeigt is not None
+    assert gezeigt <= 30.0, (
+        f"Der Sollwert {gezeigt} liegt UEBER dem Wunsch 30.0 -- ein "
+        "Ueberschwinger, der an einem Koerper anliegt"
+    )
+    if ist is not None:
+        assert gezeigt >= min(ist, 30.0) - 0.1, (
+            f"Der Sollwert {gezeigt} liegt unter der Ist-Temperatur {ist} "
+            "und unter dem Wunsch -- die Rampe faehrt in die falsche Richtung"
+        )
 
 
 async def test_ueber_der_grenze_kommt_nichts_an(hass: HomeAssistant, bett) -> None:
@@ -168,7 +208,7 @@ async def test_ausschalten_schaltet_die_heizung_wirklich_ab(
     Geprueft wird deshalb der echte ``input_boolean`` und nicht das
     Attribut, das die Integration ueber sich selbst behauptet.
     """
-    from .conftest import HEIZUNG, temperatur_melden
+    from conftest import HEIZUNG, temperatur_melden
 
     entitaet = _thermostat(hass, bett)
 
@@ -193,13 +233,16 @@ async def test_ausschalten_schaltet_die_heizung_wirklich_ab(
 
 
 async def test_wiederholtes_setzen_bleibt_ruhig(hass: HomeAssistant, bett) -> None:
-    """Dreimal dieselbe Temperatur darf nicht dreimal etwas anderes
-    ergeben. Ein Zustand, der beim zweiten Aufruf anders gelesen als
-    geschrieben wird, faellt im Betrieb erst nach Stunden auf."""
+    """Dreimal derselbe Wunsch darf nicht dreimal etwas anderes ergeben.
+
+    Ein Zustand, der beim zweiten Aufruf anders gelesen als geschrieben
+    wird, faellt im Betrieb erst nach Stunden auf -- und dann nachts.
+    """
     entitaet = _thermostat(hass, bett)
+    koordinator = hass.data[DOMAIN][bett.entry_id]
     for _ in range(3):
         await hass.services.async_call(
             CLIMATE_DOMAIN, SERVICE_SET_TEMPERATURE,
             {ATTR_ENTITY_ID: entitaet, ATTR_TEMPERATURE: 29.0}, blocking=True)
         await regelkreis_drehen(hass, bett)
-    assert hass.states.get(entitaet).attributes.get("temperature") == 29.0
+        assert koordinator.get_active_manual_target(0) == 29.0
