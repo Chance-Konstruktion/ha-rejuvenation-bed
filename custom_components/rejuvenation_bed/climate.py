@@ -251,6 +251,21 @@ class RejuvenationBedClimate(CoordinatorEntity, ClimateEntity):
             "reason": zone_data.get("reason", ""),
         }
 
+        # Der Sollwert, auf den die Heizung TATSAECHLICH schaltet.
+        #
+        # Er ist nicht dasselbe wie die Zieltemperatur: Beim Wasserbett
+        # faehrt der RampController ihn mit begrenzter Rate von der
+        # Ist-Temperatur zum Ziel, damit das Material keine Spruenge
+        # bekommt. Solange die Rampe laeuft, liegt er darunter.
+        #
+        # Frueher stand dieser Wert als target_temperature am Thermostat.
+        # Wer 30 einstellte, las 28 -- und hielt die Integration fuer
+        # kaputt. Jetzt steht oben das Ziel und hier die Stellgroesse, wo
+        # sie hingehoert: sichtbar fuer den, der es wissen will, aber
+        # nicht dort, wo Home Assistant den Wunsch des Nutzers erwartet.
+        if (rampe := zone_data.get("ramp_setpoint")) is not None:
+            attrs["ramp_setpoint"] = rampe
+
         if self._hardware_level in ["C", "B+", "D", "E"]:
             attrs["presence_detected"] = zone_data.get("is_present", False)
             attrs["presence_confidence"] = zone_data.get("presence_confidence", 0.0)
