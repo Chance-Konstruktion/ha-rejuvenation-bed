@@ -15,8 +15,6 @@ danach am Koerper eines schlafenden Menschen an.
 
 from __future__ import annotations
 
-from datetime import timedelta
-
 import pytest
 from homeassistant.components.climate import (
     ATTR_HVAC_MODE,
@@ -29,26 +27,30 @@ from homeassistant.const import ATTR_ENTITY_ID, ATTR_TEMPERATURE
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ServiceValidationError
 from homeassistant.helpers import entity_registry as er
-from homeassistant.util import dt as dt_util
-from pytest_homeassistant_custom_component.common import async_fire_time_changed
-
-from custom_components.rejuvenation_bed.const import ABSOLUTE_MAX_TEMP
+from custom_components.rejuvenation_bed.const import ABSOLUTE_MAX_TEMP, DOMAIN
 
 
-async def regelkreis_drehen(hass: HomeAssistant) -> None:
-    """Warten, bis der Koordinator wirklich neu gerechnet hat.
+async def regelkreis_drehen(hass: HomeAssistant, bett) -> None:
+    """Den Koordinator wirklich einmal rechnen lassen.
 
     ``async_set_temperature`` legt den Wunsch am Koordinator ab und ruft
     ``async_request_refresh``. Das ist ENTPRELLT: Home Assistant sammelt
-    Anfragen und dreht den Regelkreis erst nach einer Ruhezeit -- sonst
-    rechnete eine Integration bei jedem Schieberegler-Zucken neu.
+    Anfragen und rechnet erst nach einer Ruhezeit neu -- sonst rechnete
+    eine Integration bei jedem Zucken des Schiebereglers.
 
-    ``async_block_till_done`` bewegt die Uhr nicht, wartet also auf etwas,
-    das erst spaeter faellig wird. Genau daran sind meine ersten drei
-    Tests gescheitert -- am Test, nicht an der Integration. Die Uhr muss
-    weitergestellt werden, und danach ist das Ergebnis echt.
+    Zwei Anlaeufe habe ich hier gebraucht, und der erste war lehrreich:
+    ``async_block_till_done`` bewegt die Uhr nicht, also wartete der Test
+    auf etwas, das noch nicht faellig war. Die Uhr vorzustellen
+    (``async_fire_time_changed``) half aber auch nicht -- der Debouncer
+    haengt an der Laufzeit-Uhr der Ereignisschleife, und die stellt kein
+    Test um. Ein Test, der auf zehn echte Sekunden wartet, ist keine
+    Loesung, sondern eine Wette.
+
+    Also direkt: den Koordinator holen und rechnen lassen. Was danach am
+    Thermostat steht, ist echt gerechnet und nicht abgewartet.
     """
-    async_fire_time_changed(hass, dt_util.utcnow() + timedelta(seconds=30))
+    koordinator = hass.data[DOMAIN][bett.entry_id]
+    await koordinator.async_refresh()
     await hass.async_block_till_done()
 
 
@@ -116,7 +118,7 @@ async def test_eine_zieltemperatur_kommt_wirklich_an(
         {ATTR_ENTITY_ID: entitaet, ATTR_TEMPERATURE: 30.0},
         blocking=True,
     )
-    await regelkreis_drehen(hass)
+    await regelkreis_drehen(hass, bett)
 
     zustand = hass.states.get(entitaet)
     assert zustand.attributes.get("temperature") == 30.0, (
@@ -145,7 +147,7 @@ async def test_ueber_der_grenze_kommt_nichts_an(hass: HomeAssistant, bett) -> No
             {ATTR_ENTITY_ID: entitaet, ATTR_TEMPERATURE: zu_heiss},
             blocking=True,
         )
-        await regelkreis_drehen(hass)
+        await regelkreis_drehen(hass, bett)
     except (ServiceValidationError, ValueError):
         # Home Assistant hat abgewiesen. Das ist der saubere Ausgang.
         pass
@@ -175,14 +177,14 @@ async def test_ausschalten_schaltet_die_heizung_wirklich_ab(
         CLIMATE_DOMAIN, SERVICE_SET_HVAC_MODE,
         {ATTR_ENTITY_ID: entitaet, ATTR_HVAC_MODE: HVACMode.HEAT}, blocking=True)
     await temperatur_melden(hass, 20.0)
-    await regelkreis_drehen(hass)
+    await regelkreis_drehen(hass, bett)
 
     await hass.services.async_call(
         CLIMATE_DOMAIN, SERVICE_SET_HVAC_MODE,
         {ATTR_ENTITY_ID: entitaet, ATTR_HVAC_MODE: HVACMode.OFF}, blocking=True)
-    await regelkreis_drehen(hass)
+    await regelkreis_drehen(hass, bett)
     await temperatur_melden(hass, 20.0)
-    await regelkreis_drehen(hass)
+    await regelkreis_drehen(hass, bett)
 
     assert hass.states.get(HEIZUNG).state == "off", (
         "Das Thermostat steht auf Aus, der Schaltaktor aber auf An"
@@ -199,5 +201,5 @@ async def test_wiederholtes_setzen_bleibt_ruhig(hass: HomeAssistant, bett) -> No
         await hass.services.async_call(
             CLIMATE_DOMAIN, SERVICE_SET_TEMPERATURE,
             {ATTR_ENTITY_ID: entitaet, ATTR_TEMPERATURE: 29.0}, blocking=True)
-        await regelkreis_drehen(hass)
+        await regelkreis_drehen(hass, bett)
     assert hass.states.get(entitaet).attributes.get("temperature") == 29.0
