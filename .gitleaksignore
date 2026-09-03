@@ -1,0 +1,25 @@
+# Ausnahmen fuer die Geheimnis-Suche.
+#
+# Jede Zeile ist EIN Fund, festgenagelt auf Commit, Datei, Regel und
+# Zeile. Wird die Datei geaendert, greift die Ausnahme nicht mehr --
+# sie kann also nichts Neues durchlassen.
+#
+# Alle vier Eintraege stammen aus der GitHub-Historie, die am 03.09.2026
+# in dieses Repo uebernommen wurde. Die Regel `generic-api-key` schlaegt
+# dort auf derselben Zeile an:
+#
+#     const CFG_KEY = "rejuvenation…"
+#
+# Das ist der Name des Schluessels, unter dem das Dashboard seine
+# Einstellungen im Browser ablegt (localStorage) -- ein Bezeichner, kein
+# Zugangsdatum. Nachgeprueft am 03.09.2026: In der gesamten Historie
+# dieses Repos steht kein Token, kein privater Schluessel und kein JWT.
+#
+# Wichtig: Das ist eine Ausnahme fuer vier bekannte Fundstellen, keine
+# Abschwaechung der Regel. Ein echtes Token in einer dieser Dateien
+# wuerde weiterhin gemeldet, weil es auf einer anderen Zeile stuende.
+
+44dac12e4ff1a84be51f7dcbff7c3e7d22e17f7d:dashboards/nightstand.html:generic-api-key:880
+44dac12e4ff1a84be51f7dcbff7c3e7d22e17f7d:dashboards/nightstand.html:generic-api-key:881
+d7096adcb654c152376140120a550ba0ee2b5c54:dashboards/nightstand.html:generic-api-key:616
+06794397b5ba2777b3c1574db66d1ba9bdbcb3cb:dashboards/premium_nightstand_dashboard.html:generic-api-key:751
