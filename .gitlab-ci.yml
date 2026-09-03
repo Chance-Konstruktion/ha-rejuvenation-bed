@@ -358,20 +358,27 @@ pages:
   stage: release
   image: python:3.13
   script:
-    - pip install -q markdown
-    - python tools/seite.py public
-    # Der Job ist erst fertig, wenn die Verweise auch stimmen. Ein
-    # Verzeichnis voller Seiten, die aufeinander ins Leere zeigen, waere
-    # sonst ein gruener Haken -- und die Seite existiert ja, sie fuehrt
-    # nur nirgendwohin.
-    - pip install -q pytest
-    - python -m pytest -q tests/test_seite.py
     - |
-      anzahl=$(ls public/*.html 2>/dev/null | wc -l)
-      echo "$anzahl Seiten"
-      if [ "$anzahl" -lt 8 ]; then
-        echo "Zu wenige -- die Seitenliste in tools/seite.py ist geschrumpft."
-        exit 1
+      if [ -f tools/seite.py ]; then
+        # Fall 1: Das Repo erzeugt seine Seite selbst.
+        pip install -q markdown
+        python tools/seite.py public
+        pip install -q pytest
+        python -m pytest -q tests/test_seite.py
+        anzahl=$(ls public/*.html 2>/dev/null | wc -l)
+        echo "$anzahl Seiten erzeugt"
+        if [ "$anzahl" -lt 8 ]; then
+          echo "Zu wenige -- die Seitenliste in tools/seite.py ist geschrumpft."
+          exit 1
+        fi
+      else
+        # Fall 2: Eine fertige Seite liegt in docs/. So war es auf GitHub
+        # eingestellt (Quelle: main, Pfad /docs). Ohne diesen Zweig lief der
+        # Job nie und die Pages-Adresse zeigte ins Leere.
+        rm -rf public
+        cp -r docs public
+        test -f public/index.html || { echo "docs/index.html fehlt."; exit 1; }
+        echo "$(ls public/*.html 2>/dev/null | wc -l) Seiten aus docs/ uebernommen"
       fi
   artifacts:
     paths:
@@ -380,3 +387,4 @@ pages:
     - if: $CI_COMMIT_BRANCH == $CI_DEFAULT_BRANCH
       exists:
         - tools/seite.py
+        - docs/index.html
