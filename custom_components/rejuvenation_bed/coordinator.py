@@ -517,9 +517,7 @@ class RejuvenationBedCoordinator(DataUpdateCoordinator):
 
             # KRITISCH: Emergency Shutdown (nur bei Überhitzung!)
             if not safety_check["is_safe"]:
-                await self._async_emergency_shutdown(
-                    safety_check["reason"], safety_check.get("zone")
-                )
+                await self._async_emergency_shutdown(safety_check["reason"], safety_check.get("zone"))
                 decision["global_state"]["status"] = "EMERGENCY_SHUTDOWN"
                 decision["reason"] = safety_check["reason"]
                 return decision
@@ -1360,11 +1358,7 @@ class RejuvenationBedCoordinator(DataUpdateCoordinator):
         for zone in self.config_entry.data.get("zones", []):
             await self._async_control_heater(zone.get("heater"), False)
 
-        zonen = (
-            [zone_index]
-            if zone_index is not None
-            else list(range(len(self.config_entry.data.get("zones", []))))
-        )
+        zonen = [zone_index] if zone_index is not None else list(range(len(self.config_entry.data.get("zones", []))))
         neu = [z for z in zonen if self.safety_manager.trigger_emergency(z, reason)]
         if not neu:
             # Schon verriegelt -- die Meldung steht bereits in der
