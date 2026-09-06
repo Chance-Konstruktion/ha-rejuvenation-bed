@@ -26,7 +26,8 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
-      - run: pip install black
+      # Festgenagelt, damit hier und im GitLab dieselbe Fassung prueft.
+      - run: pip install "black==26.5.1"
       - name: Black (integration + tests)
         run: black --check --diff --line-length 120 custom_components/ tests/
 
