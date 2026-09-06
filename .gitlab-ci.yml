@@ -18,3 +18,31 @@ include:
   - project: 'claude/ci-vorlagen'
     file: '/vorlagen/standard.yml'
     ref: 'standard-v1'
+
+# ── Black, wie drueben ────────────────────────────────────────────────
+# Der Lint-Workflow auf GitHub laesst black mit --line-length 120 laufen.
+# Bis eben war das die einzige Stelle, an der dieses Repo auf Formatierung
+# geprueft wurde -- also fiel ein Verstoss erst auf der Ladentheke auf,
+# lange nachdem er hier entstanden war. Genau so ist der Lauf vom
+# 05.09.2026 rot geworden.
+#
+# Dieser Job steht bewusst nur hier und nicht in der gemeinsamen Vorlage:
+# von den vierzehn gespiegelten Repositories hat einzig dieses einen
+# Black-Workflow drueben. Ein Job in der Vorlage haette die anderen
+# dreizehn sofort rot gemacht, ohne dass es dort jemanden interessiert --
+# zusammen ueber 250 Dateien.
+#
+# Die Fassung ist festgenagelt, hier wie drueben. Mit `pip install black`
+# ohne Angabe formatiert eine neue Fassung anders, und ein Repo, das
+# gestern gruen war, ist heute rot, ohne dass jemand eine Zeile
+# angefasst hat.
+black:
+  stage: test
+  image: python:3.12-slim
+  script:
+    - pip install --quiet "black==26.5.1"
+    - black --version
+    - black --check --diff --line-length 120 custom_components/ tests/
+  rules:
+    - exists:
+        - custom_components/**/*.py
