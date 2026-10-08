@@ -61,8 +61,17 @@ Minimum: Ein Smart-Plug der die Heizung schaltet.
 Rejuvenation Bed ist im HACS-Standard-Repository gelistet — ein
 benutzerdefiniertes Repository ist nicht mehr nötig.
 
+Mit einem Klick im eigenen Home Assistant öffnen:
+
+[![Öffne deine Home-Assistant-Instanz und dieses Repository in HACS.](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=Chance-Konstruktion&repository=ha-rejuvenation-bed&category=integration)
+
+oder von Hand:
+
 1. HACS → Integrationen → Suche "Rejuvenation Bed" → Installieren
 2. Home Assistant neu starten
+3. Integration hinzufügen:
+
+[![Öffne deine Home-Assistant-Instanz und starte die Einrichtung der Integration.](https://my.home-assistant.io/badges/config_flow_start.svg)](https://my.home-assistant.io/redirect/config_flow_start/?domain=rejuvenation_bed)
 
 ### Manuell
 
