@@ -215,6 +215,40 @@ def test_update_cycle_emergency_latch_forces_off():
     assert "NOT-AUS" in zone["reason"]
 
 
+def test_emergency_latch_precedes_sensor_failure_failsafe():
+    """A failed sensor must never let the waterbed failsafe undo a latched shutdown."""
+    coord, hass = _build_coordinator(current_temp="unavailable", heater_state="on")
+    coord._startup_time = local_now() - timedelta(hours=1)
+    coord.safety_manager._emergency_shutdown[0] = True
+    coord.safety_manager._emergency_reason[0] = "Test-Notfall"
+
+    result = asyncio.run(coord._async_update_data())
+
+    zone = result["zones"]["Zone 1"]
+    assert zone["status"] == "EMERGENCY_SHUTDOWN"
+    assert zone["active"] is False
+    calls = hass.services.async_call.await_args_list
+    assert any(call.args[1] == "turn_off" for call in calls)
+    assert all(call.args[1] != "turn_on" for call in calls)
+
+
+def test_emergency_latch_survives_later_zone_processing_error():
+    """A later error after an overheat latch must not turn the waterbed back on."""
+    coord, hass = _build_coordinator(current_temp="37.0", heater_state="off")
+    # The global check uses this limit; the zone safety check still latches at 36°C.
+    coord.config_entry.data["zones"][0]["hardware_max"] = 38
+    coord._async_send_notification = AsyncMock()
+    coord._async_update_sleep_tracking = AsyncMock(side_effect=RuntimeError("test tracking failure"))
+
+    result = asyncio.run(coord._async_update_data())
+
+    zone = result["zones"]["Zone 1"]
+    assert coord.safety_manager.is_emergency_shutdown(0) is True
+    assert zone["status"] == "EMERGENCY_SHUTDOWN"
+    assert zone["heater_state"] is False
+    assert all(call.args[1] != "turn_on" for call in hass.services.async_call.await_args_list)
+
+
 def test_update_cycle_sensor_failure_failsafe_on():
     # Temp-Sensor unavailable + Startup-Grace abgelaufen → Wasserbett heizt blind
     coord, hass = _build_coordinator(current_temp="unavailable", heater_state="off")
