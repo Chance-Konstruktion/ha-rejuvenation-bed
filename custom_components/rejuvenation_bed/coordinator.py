@@ -604,6 +604,30 @@ class RejuvenationBedCoordinator(DataUpdateCoordinator):
             current_temp = self._safe_get_sensor_value(temp_sensor, default=None)
             current_watt = self._get_zone_power(zone_config)
 
+            # NOT-AUS hat Vorrang vor jedem Sensor-Fallback. Andernfalls könnte
+            # ein ausgefallener Temperaturfühler die Wasserbett-Fail-Safe-Logik
+            # erreichen, bevor die Verriegelung geprüft wird, und die Heizung
+            # nach einem Not-Aus wieder einschalten.
+            if self.safety_manager.is_emergency_shutdown(zone_index):
+                from homeassistant.components.climate.const import HVACMode as _HVACMode
+
+                heater_entity = zone_config.get("heater")
+                await self._async_control_heater(heater_entity, False)
+                self._heater_states[heater_entity] = False
+                emergency_reason = self.safety_manager.get_emergency_reason(zone_index)
+                display_temp = round(current_temp, 1) if current_temp is not None else "unknown"
+                decision["zones"][zone_name] = {
+                    "target": display_temp,
+                    "current": display_temp,
+                    "active": False,
+                    "watt": 0.0,
+                    "mode": "emergency",
+                    "status": "EMERGENCY_SHUTDOWN",
+                    "hvac_mode": _HVACMode.OFF,
+                    "reason": f"🚨 NOT-AUS aktiv: {emergency_reason} — Stecker prüfen, dann Reset!",
+                }
+                return 0.0
+
             # FAIL-SAFE: Kein Temperatur-Sensor oder -Wert?
             if current_temp is None:
                 if temp_sensor:
@@ -654,28 +678,6 @@ class RejuvenationBedCoordinator(DataUpdateCoordinator):
                         ),
                         notification_id=f"rejuvenation_bed_sensor_failure_{zone_index}",
                     )
-
-            # ═══════════════════════════════════════════════════════════
-            # #1 EMERGENCY-LATCH: Hält Not-Aus bis manuell zurückgesetzt
-            # (SafetyManager setzt das Flag bei >36°C = Relais-Verdacht)
-            # ═══════════════════════════════════════════════════════════
-            if self.safety_manager.is_emergency_shutdown(zone_index):
-                from homeassistant.components.climate.const import HVACMode as _HVACMode
-
-                heater_entity = zone_config.get("heater")
-                await self._async_control_heater(heater_entity, False)
-                self._heater_states[heater_entity] = False
-                emergency_reason = self.safety_manager.get_emergency_reason(zone_index)
-                decision["zones"][zone_name] = {
-                    "target": round(current_temp, 1) if current_temp else "unknown",
-                    "current": round(current_temp, 1) if current_temp else "unknown",
-                    "active": False,
-                    "watt": 0.0,
-                    "mode": "emergency",
-                    "hvac_mode": _HVACMode.OFF,
-                    "reason": f"🚨 NOT-AUS aktiv: {emergency_reason} — Stecker prüfen, dann Reset!",
-                }
-                return current_watt
 
             # NEU: Degraded Mode Override
             if is_degraded_mode and zone_index in degraded_zones:
@@ -1120,19 +1122,29 @@ class RejuvenationBedCoordinator(DataUpdateCoordinator):
             # ═══════════════════════════════════════════════════════════
             _LOGGER.error(f"Fehler in Zone {zone_index}: {zone_error}", exc_info=True)
 
-            # #2 Fail-Safe-Richtung je Bett-Typ: Wasserbett AN, Heizmatte AUS
-            fail_state = self.is_waterbed
+            # #2 Fail-Safe-Richtung je Bett-Typ: Wasserbett AN, Heizmatte AUS.
+            # Ein aktiver Not-Aus ist jedoch vorrangig und darf auch bei einem
+            # späteren Verarbeitungsfehler niemals durch Fail-Safe-AN aufgehoben werden.
+            emergency_latched = self.safety_manager.is_emergency_shutdown(zone_index)
+            fail_state = self.is_waterbed and not emergency_latched
             heater_entity = zone_config.get("heater")
             if heater_entity:
                 await self._async_control_heater(heater_entity, fail_state)
                 self._heater_states[heater_entity] = fail_state
 
             decision["zones"][zone_name] = {
-                "status": "ERROR",
+                "status": "EMERGENCY_SHUTDOWN" if emergency_latched else "ERROR",
                 "error": str(zone_error),
                 "heater_state": fail_state,
+                "active": fail_state,
                 "reason": (
-                    "⚠️ Fehler - Heizung AN (Sicherheit)" if fail_state else "⚠️ Fehler - Heizmatte AUS (Sicherheit)"
+                    f"🚨 NOT-AUS bleibt verriegelt: {self.safety_manager.get_emergency_reason(zone_index)}"
+                    if emergency_latched
+                    else (
+                        "⚠️ Fehler - Heizung AN (Sicherheit)"
+                        if fail_state
+                        else "⚠️ Fehler - Heizmatte AUS (Sicherheit)"
+                    )
                 ),
             }
         return current_watt
