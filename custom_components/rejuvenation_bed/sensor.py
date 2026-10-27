@@ -211,6 +211,10 @@ class BedStatusSensor(RejuvenationBedZoneSensor):
         zone_data = data["zones"].get(self.internal_zone_name, {})
         reason = zone_data.get("reason", "")
 
+        # Ein Zonen-Not-Aus kann aktiv bleiben, nachdem der globale
+        # Überhitzungsstatus abgeklungen ist.
+        if zone_data.get("mode") == "emergency" or zone_data.get("status") == "EMERGENCY_SHUTDOWN":
+            return "NOT-AUS"
         if data.get("global_state", {}).get("status") == "EMERGENCY_SHUTDOWN":
             return "NOT-AUS"
         if "is_leaking" in zone_data and zone_data["is_leaking"]:
