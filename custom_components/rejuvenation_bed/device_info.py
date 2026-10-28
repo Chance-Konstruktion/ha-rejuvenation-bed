@@ -20,11 +20,7 @@ def _via_device_fields(coordinator) -> dict[str, object]:
     device_id_lookup = getattr(dr, "async_get_device_id_by_identifier", None)
     if device_id_lookup is not None:
         try:
-            return {
-                "via_device_id": device_id_lookup(
-                    coordinator.hass, identifier, config_entry_id=entry.entry_id
-                )
-            }
+            return {"via_device_id": device_id_lookup(coordinator.hass, identifier, config_entry_id=entry.entry_id)}
         except ValueError:
             # The parent should already exist, but setup must survive an
             # incomplete device registry without leaving a stale link.
