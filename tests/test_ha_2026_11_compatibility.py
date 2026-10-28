@@ -34,10 +34,7 @@ def test_config_flow_results_pass_step_id() -> None:
                 continue
             if any(keyword.arg == "step_id" for keyword in node.keywords):
                 continue
-            failures.append(
-                f"{path.relative_to(INTEGRATION)}:{node.lineno} "
-                f"{node.func.attr}() without step_id"
-            )
+            failures.append(f"{path.relative_to(INTEGRATION)}:{node.lineno} " f"{node.func.attr}() without step_id")
 
     assert not failures, "\n".join(failures)
 
@@ -53,10 +50,7 @@ def test_device_info_does_not_pass_deprecated_via_device_keyword() -> None:
             if not isinstance(node.func, ast.Name) or node.func.id != "DeviceInfo":
                 continue
             if any(keyword.arg == "via_device" for keyword in node.keywords):
-                failures.append(
-                    f"{path.relative_to(INTEGRATION)}:{node.lineno} "
-                    "DeviceInfo(via_device=...)"
-                )
+                failures.append(f"{path.relative_to(INTEGRATION)}:{node.lineno} " "DeviceInfo(via_device=...)")
 
     assert not failures, "\n".join(failures)
 
@@ -75,9 +69,7 @@ def test_climate_temperature_api_is_version_gated() -> None:
 
 def test_manifest_declares_a_home_assistant_category() -> None:
     """Keep the custom integration discoverable in the HACS catalog."""
-    manifest = json.loads(
-        (INTEGRATION / "manifest.json").read_text(encoding="utf-8")
-    )
+    manifest = json.loads((INTEGRATION / "manifest.json").read_text(encoding="utf-8"))
     categories = manifest.get("categories", [])
     assert 1 <= len(categories) <= 3
     assert "climate.thermostats_heating" in categories
