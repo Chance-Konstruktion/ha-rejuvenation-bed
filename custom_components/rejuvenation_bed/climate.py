@@ -61,7 +61,14 @@ class RejuvenationBedClimate(CoordinatorEntity, ClimateEntity):
     """Thermostat-Interface für eine Bett-Zone."""
 
     _attr_has_entity_name = True
-    _attr_temperature_unit = UnitOfTemperature.CELSIUS
+
+    # Home Assistant 2026.11 renamed the climate temperature properties.
+    # Define only the supported API for the running Core version so the old
+    # compatibility aliases do not emit deprecation warnings.
+    if hasattr(ClimateEntity, "native_current_temperature"):
+        _attr_native_temperature_unit = UnitOfTemperature.CELSIUS
+    else:
+        _attr_temperature_unit = UnitOfTemperature.CELSIUS
 
     # Tatsächlich unterstützte HVAC-Modi (Krank läuft über Service, nicht DRY)
     _attr_hvac_modes = [
@@ -147,9 +154,8 @@ class RejuvenationBedClimate(CoordinatorEntity, ClimateEntity):
         else:
             return HVACAction.IDLE
 
-    @property
-    def current_temperature(self) -> float | None:
-        """Aktuelle Temperatur."""
+    def _get_current_temperature(self) -> float | None:
+        """Aktuelle Temperatur der Bett-Zone."""
         data = self.coordinator.data
         if not data or "zones" not in data:
             return None
@@ -162,17 +168,39 @@ class RejuvenationBedClimate(CoordinatorEntity, ClimateEntity):
             return None
         return current
 
-    @property
-    def target_temperature(self) -> float | None:
-        """Zieltemperatur."""
+    def _get_target_temperature(self) -> float | None:
+        """Zieltemperatur der Bett-Zone."""
         data = self.coordinator.data
         if not data or "zones" not in data:
             return None
 
         zone_name = f"Zone {self._zone_idx + 1}"
         zone_data = data["zones"].get(zone_name, {})
-
         return zone_data.get("target")
+
+    if hasattr(ClimateEntity, "native_current_temperature"):
+
+        @property
+        def native_current_temperature(self) -> float | None:
+            """Aktuelle Temperatur (Home Assistant 2026.11+)."""
+            return self._get_current_temperature()
+
+        @property
+        def native_target_temperature(self) -> float | None:
+            """Zieltemperatur (Home Assistant 2026.11+)."""
+            return self._get_target_temperature()
+
+    else:
+
+        @property
+        def current_temperature(self) -> float | None:
+            """Aktuelle Temperatur (ältere Home-Assistant-Versionen)."""
+            return self._get_current_temperature()
+
+        @property
+        def target_temperature(self) -> float | None:
+            """Zieltemperatur (ältere Home-Assistant-Versionen)."""
+            return self._get_target_temperature()
 
     @property
     def preset_mode(self) -> str:
