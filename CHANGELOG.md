@@ -8,7 +8,6 @@ Alle Änderungen am Rejuvenation Bed Projekt.
 - Use the native climate temperature properties when provided by Core, while keeping the older property names only for older supported versions.
 - Use the modern DeviceInfo parent-device ID on Core versions that support it, with a feature-detected fallback for older versions.
 - Add regression tests for flow step IDs and deprecated DeviceInfo parent references.
-- Declare the `climate.thermostats_heating` category for HACS catalog discovery.
 
 ## [v260804] - 2026-08-04
 
