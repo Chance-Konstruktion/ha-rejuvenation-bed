@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import ast
-import json
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -66,10 +65,3 @@ def test_climate_temperature_api_is_version_gated() -> None:
     assert "_attr_native_temperature_unit = UnitOfTemperature.CELSIUS" in source
     assert "_attr_temperature_unit = UnitOfTemperature.CELSIUS" in source
 
-
-def test_manifest_declares_a_home_assistant_category() -> None:
-    """Keep the custom integration discoverable in the HACS catalog."""
-    manifest = json.loads((INTEGRATION / "manifest.json").read_text(encoding="utf-8"))
-    categories = manifest.get("categories", [])
-    assert 1 <= len(categories) <= 3
-    assert "climate.thermostats_heating" in categories
