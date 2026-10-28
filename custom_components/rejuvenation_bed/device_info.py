@@ -6,7 +6,7 @@ from homeassistant.helpers.device_registry import DeviceInfo
 from .const import DOMAIN, MANUFACTURER, SW_VERSION
 
 
-def _via_device_fields(coordinator) -> dict[str, str]:
+def _via_device_fields(coordinator) -> dict[str, object]:
     """Return the parent-device link using the API available in this Core."""
     entry = coordinator.config_entry
     identifier = (DOMAIN, entry.entry_id)
