@@ -188,7 +188,7 @@ The setup wizard asks for your heater switch first. Everything else is optional 
 
 ## ✦ Configuration
 
-The options flow is split into four panes — each one a single page, no nesting.
+The options flow groups settings into four areas, with focused subpages for global settings, each zone's hardware and sleep profile, and special modes. Changes are staged in a working copy and only applied when you choose **Save & Exit**.
 
 <details>
 <summary><b>🌐 Global Settings</b> — times, temperatures, sensors, electricity price</summary>
@@ -320,6 +320,7 @@ Per zone (one zone for single beds, two for dual-core waterbeds):
 | `rejuvenation_bed.cancel_special_mode` | Cancel all special modes |
 | `rejuvenation_bed.preheat_bed`         | Preheat bed (temperature + duration) |
 | `rejuvenation_bed.reset_energy_budget` | Reset energy statistics |
+| `rejuvenation_bed.clear_emergency` | Clear a zone's emergency lockout after checking the relay, hardware thermostat, and temperature-sensor placement |
 
 </details>
 
