@@ -64,4 +64,3 @@ def test_climate_temperature_api_is_version_gated() -> None:
     assert "def target_temperature(" in source
     assert "_attr_native_temperature_unit = UnitOfTemperature.CELSIUS" in source
     assert "_attr_temperature_unit = UnitOfTemperature.CELSIUS" in source
-
