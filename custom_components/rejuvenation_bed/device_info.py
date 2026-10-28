@@ -11,24 +11,37 @@ def _via_device_fields(coordinator) -> dict[str, object]:
     entry = coordinator.config_entry
     identifier = (DOMAIN, entry.entry_id)
 
-    # DeviceInfo became a dataclass in Home Assistant 2026.11. Older supported
-    # versions use the TypedDict field "via_device"; newer versions require
-    # the parent registry device ID in "via_device_id".
+    # Core 2026.8 introduced via_device_id and dropped via_device from the
+    # DeviceInfo type; 2026.11 then made DeviceInfo a dataclass. Detect the
+    # field so the integration still works with earlier supported Core builds.
     if "via_device_id" not in getattr(DeviceInfo, "__annotations__", {}):
         return {"via_device": identifier}
 
+    device_id_lookup = getattr(dr, "async_get_device_id_by_identifier", None)
+    if device_id_lookup is not None:
+        try:
+            return {
+                "via_device_id": device_id_lookup(
+                    coordinator.hass, identifier, config_entry_id=entry.entry_id
+                )
+            }
+        except ValueError:
+            # The parent should already exist, but setup must survive an
+            # incomplete device registry without leaving a stale link.
+            return {}
+
+    # Defensive fallback for a Core build that exposes the field but not the
+    # module helper. Prefer entry-scoped lookup when available.
     registry = dr.async_get(coordinator.hass)
     lookup = getattr(registry, "async_get_device_by_identifier", None)
-    if lookup is None:
-        parent = registry.async_get_device(identifiers={identifier})
-    else:
+    if lookup is not None:
         parent = lookup(identifier, entry.entry_id)
-
+    else:
+        parent = registry.async_get_device(identifiers={identifier})
     if parent is None:
-        # Parent registration happens before platform setup, but omit the link
-        # rather than failing setup if an incomplete registry is encountered.
         return {}
     return {"via_device_id": parent.id}
+
 
 def detect_hardware_level(zone_config: dict) -> str:
     """
