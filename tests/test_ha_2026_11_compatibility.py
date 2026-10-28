@@ -72,6 +72,7 @@ def test_climate_temperature_api_is_version_gated() -> None:
     assert "_attr_native_temperature_unit = UnitOfTemperature.CELSIUS" in source
     assert "_attr_temperature_unit = UnitOfTemperature.CELSIUS" in source
 
+
 def test_manifest_declares_a_home_assistant_category() -> None:
     """Keep the custom integration discoverable in the HACS catalog."""
     manifest = json.loads(
