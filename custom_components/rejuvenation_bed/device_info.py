@@ -1,8 +1,42 @@
 """Gemeinsame DeviceInfo-Factories für alle Plattform-Module."""
 
-from homeassistant.helpers.entity import DeviceInfo
+from homeassistant.helpers import device_registry as dr
+from homeassistant.helpers.device_registry import DeviceInfo
 
 from .const import DOMAIN, MANUFACTURER, SW_VERSION
+
+
+def _via_device_fields(coordinator) -> dict[str, object]:
+    """Return the parent-device link using the API available in this Core."""
+    entry = coordinator.config_entry
+    identifier = (DOMAIN, entry.entry_id)
+
+    # Core 2026.8 introduced via_device_id and dropped via_device from the
+    # DeviceInfo type; 2026.11 then made DeviceInfo a dataclass. Detect the
+    # field so the integration still works with earlier supported Core builds.
+    if "via_device_id" not in getattr(DeviceInfo, "__annotations__", {}):
+        return {"via_device": identifier}
+
+    device_id_lookup = getattr(dr, "async_get_device_id_by_identifier", None)
+    if device_id_lookup is not None:
+        try:
+            return {"via_device_id": device_id_lookup(coordinator.hass, identifier, config_entry_id=entry.entry_id)}
+        except ValueError:
+            # The parent should already exist, but setup must survive an
+            # incomplete device registry without leaving a stale link.
+            return {}
+
+    # Defensive fallback for a Core build that exposes the field but not the
+    # module helper. Prefer entry-scoped lookup when available.
+    registry = dr.async_get(coordinator.hass)
+    lookup = getattr(registry, "async_get_device_by_identifier", None)
+    if lookup is not None:
+        parent = lookup(identifier, entry.entry_id)
+    else:
+        parent = registry.async_get_device(identifiers={identifier})
+    if parent is None:
+        return {}
+    return {"via_device_id": parent.id}
 
 
 def detect_hardware_level(zone_config: dict) -> str:
@@ -68,7 +102,7 @@ def get_zone_device_info(coordinator, zone_index: int) -> DeviceInfo:
         model=f"Bett-Zone {zone_name}",
         name=f"Bett {zone_name}",
         sw_version=SW_VERSION,
-        via_device=(DOMAIN, coordinator.config_entry.entry_id),
+        **_via_device_fields(coordinator),
     )
 
 
@@ -80,7 +114,7 @@ def get_energy_device_info(coordinator) -> DeviceInfo:
         model="Energie & Ersparnis",
         name="Bett Energie",
         sw_version=SW_VERSION,
-        via_device=(DOMAIN, coordinator.config_entry.entry_id),
+        **_via_device_fields(coordinator),
     )
 
 
@@ -92,5 +126,5 @@ def get_sleep_device_info(coordinator) -> DeviceInfo:
         model="Schlaf, Analyse & Intelligenz",
         name="Bett Schlaf/Analyse",
         sw_version=SW_VERSION,
-        via_device=(DOMAIN, coordinator.config_entry.entry_id),
+        **_via_device_fields(coordinator),
     )
