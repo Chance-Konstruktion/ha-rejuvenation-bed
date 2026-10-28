@@ -4,6 +4,11 @@ Alle Änderungen am Rejuvenation Bed Projekt.
 
 ## [Unreleased]
 
+### Home Assistant 2026.11
+- Use the native climate temperature properties when provided by Core, while keeping the older property names only for older supported versions.
+- Use the modern DeviceInfo parent-device ID on Core versions that support it, with a feature-detected fallback for older versions.
+- Add regression tests for flow step IDs and deprecated DeviceInfo parent references.
+
 ## [v260804] - 2026-08-04
 
 ### Dashboard
