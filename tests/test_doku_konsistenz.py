@@ -45,3 +45,20 @@ class TestK6StrompreisLabel:
         data = json.load(io.open(DE, encoding="utf-8"))
         texte = list(_iter_strings(data))
         assert any("30-35 ct/kWh" in s for s in texte)
+
+
+class TestK1ClearEmergencyUebersetzt:
+    """K1: clear_emergency ist in strings.json und beiden Übersetzungen
+    vertreten (englische Nutzer sahen sonst den deutschen Text aus
+    services.yaml) und steht in der Services-Tabelle der README_DE."""
+
+    @pytest.mark.parametrize("path", [STRINGS, EN, DE])
+    def test_dienst_uebersetzt(self, path):
+        data = json.load(io.open(path, encoding="utf-8"))
+        entry = data["services"]["clear_emergency"]
+        assert entry["name"] and entry["description"]
+        assert "zone" in entry["fields"]
+
+    def test_readme_de_listet_dienst(self):
+        text = io.open("README_DE.md", encoding="utf-8").read()
+        assert "rejuvenation_bed.clear_emergency" in text

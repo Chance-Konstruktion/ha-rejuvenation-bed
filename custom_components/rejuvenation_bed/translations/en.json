@@ -227,6 +227,16 @@
     }
   },
   "services": {
+    "clear_emergency": {
+      "name": "Clear emergency shutdown",
+      "description": "Releases a zone from an emergency shutdown — only after you have checked the relay, the hardware thermostat and the temperature-sensor placement. The lockout is intentional: it keeps a sticking relay from silently running back into the same overheat.",
+      "fields": {
+        "zone": {
+          "name": "Zone",
+          "description": "Which zone to release — the number from the notification. Leave out to release all locked zones."
+        }
+      }
+    },
     "set_boost": {
       "name": "Activate Boost",
       "description": "Activates quick heating mode",

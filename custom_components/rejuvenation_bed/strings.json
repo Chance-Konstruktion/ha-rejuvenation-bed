@@ -232,6 +232,16 @@
     }
   },
   "services": {
+    "clear_emergency": {
+      "name": "Not-Aus freigeben",
+      "description": "Gibt eine Zone nach einem Not-Aus wieder frei — erst nachdem du Relais, Hardware-Thermostat und Sitz des Temperaturfühlers geprüft hast. Die Verriegelung ist Absicht: Sie verhindert, dass ein klebendes Relais unbemerkt in dieselbe Überhitzung zurückläuft.",
+      "fields": {
+        "zone": {
+          "name": "Zone",
+          "description": "Welche Zone freigegeben werden soll — die Nummer aus der Meldung. Ohne Angabe werden alle verriegelten Zonen freigegeben."
+        }
+      }
+    },
     "set_boost": {
       "name": "Boost aktivieren",
       "description": "Aktiviert den Schnellheizen-Modus",

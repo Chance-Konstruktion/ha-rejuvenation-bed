@@ -152,6 +152,7 @@ Die Integration erstellt drei Geräte in Home Assistant:
 | `rejuvenation_bed.cancel_special_mode` | Alle Sondermodi beenden |
 | `rejuvenation_bed.preheat_bed` | Bett vorheizen (Temperatur + Dauer) |
 | `rejuvenation_bed.reset_energy_budget` | Energiestatistiken zurücksetzen |
+| `rejuvenation_bed.clear_emergency` | Not-Aus einer Zone freigeben (nach Prüfung von Relais, Hardware-Thermostat und Fühler-Sitz) |
 
 ---
 
