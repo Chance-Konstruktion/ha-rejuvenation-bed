@@ -107,13 +107,16 @@ set_vacation_mode:
       description: >-
         Minimale Haltetemperatur während der Abwesenheit.
         Wasserbetten: Nie unter 24°C (Kondensation!).
-        Heizmatten: Kann 0°C sein (komplett aus).
+        Heizmatten: Der Wert ist ohne Wirkung — die Matte schaltet im
+        Urlaub komplett aus.
       required: false
       default: 20
       example: 24
       selector:
         number:
-          min: 0
+          # K5: wie das Service-Schema (vol.Range min=15, max=25) — der
+          # Selector bot 0 an, jeder Wert darunter flog in die Validierung.
+          min: 15
           max: 25
           step: 1
           unit_of_measurement: °C
