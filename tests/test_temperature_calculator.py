@@ -225,7 +225,9 @@ class TestWakeAndOutdoorRefresh:
             "custom_components.rejuvenation_bed.temperature_calculator.local_now",
             return_value=dt(2026, 11, 8, 21, 0, 0),
         ):
-            return asyncio.run(calc.async_calculate_target(0, {"temperature_offset": 0.0}, {}, has_presence_sensor=False))
+            return asyncio.run(
+                calc.async_calculate_target(0, {"temperature_offset": 0.0}, {}, has_presence_sensor=False)
+            )
 
     def test_wake_time_follows_later_alarm(self, monkeypatch):
         from datetime import datetime, time

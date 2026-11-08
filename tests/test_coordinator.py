@@ -421,15 +421,18 @@ class TestVacationPresetReporting:
         # in _determine_hvac_mode importiert
         climate_const = sys.modules["homeassistant.components.climate.const"]
 
-        return SimpleNamespace(
-            manual_hvac_mode={},
-            manual_preset={},
-            manual_boost={},
-            vacation_mode_enabled=True,
-            sick_mode_until={},
-            eco_mode_enabled=False,
-            _climate_const=climate_const,
-        ), climate_const
+        return (
+            SimpleNamespace(
+                manual_hvac_mode={},
+                manual_preset={},
+                manual_boost={},
+                vacation_mode_enabled=True,
+                sick_mode_until={},
+                eco_mode_enabled=False,
+                _climate_const=climate_const,
+            ),
+            climate_const,
+        )
 
     def test_level_a_reports_no_away(self):
         from datetime import datetime as _dt  # noqa: F401

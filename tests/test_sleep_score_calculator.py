@@ -229,6 +229,7 @@ class TestWeeklyAverage:
     def test_last_score(self, calculator):
         assert calculator.get_last_score(0) is None
 
+
 class TestHeatingCycleRecording:
     """M2: Die Heizzyklen-Datenfelder werden befüllt.
 

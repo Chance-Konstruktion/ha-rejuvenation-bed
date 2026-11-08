@@ -6,6 +6,7 @@ state_class, der vergleichbare BedThermalBatterySensor setzt MEASUREMENT.
 
 import sys
 
+
 # Echte Basisklassen statt Mock, bevor sensor.py importiert wird (Muster aus
 # test_nightstand_config.py: zwei MagicMocks als Basen werfen einen
 # Metaclass-Konflikt).

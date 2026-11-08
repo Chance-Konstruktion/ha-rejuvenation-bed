@@ -8,6 +8,7 @@ nie über ~42 % steigen.
 import sys
 from unittest.mock import MagicMock
 
+
 # Echte Basisklassen statt Mock, bevor sensor.py importiert wird (Muster aus
 # test_nightstand_config.py: zwei MagicMocks als Basen werfen einen
 # Metaclass-Konflikt).
