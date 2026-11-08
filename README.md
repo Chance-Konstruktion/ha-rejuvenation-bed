@@ -489,7 +489,7 @@ The integration degrades automatically. The SHT41 can fail without affecting hea
 
 <br>
 
-Waterbeds use variance analysis inside the water body. Heating pads use the **temperature trend**: if the heater is off and the surface keeps rising, a body is on it. This needs a pad-mounted thermistor. Without a sensor, presence detection is disabled and the system runs as a Level-A timer. After a ~3-minute settling time, detection is reliable, if a touch less precise than on a waterbed.
+Waterbeds use variance analysis inside the water body. Heating pads use the **temperature trend**: if the heater is off and the surface keeps rising, a body is on it. This needs a pad-mounted thermistor. Without a sensor, presence detection is disabled and the system runs as a Level-A timer. After a ~20-minute settling time (20 samples at the 60-second loop), detection is reliable, if a touch less precise than on a waterbed.
 
 </details>
 

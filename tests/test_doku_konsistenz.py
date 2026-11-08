@@ -84,3 +84,18 @@ class TestK2BoostDoku:
             "custom_components/rejuvenation_bed/const.py", encoding="utf-8"
         ).read()
         assert "DEFAULT_BOOST_OFFSET" not in code
+
+
+class TestK9Einliegezeit:
+    """K9: Die Praesenz-Erkennung braucht PRESENCE_MIN_SAMPLES = 20 Werte
+    im 60-Sekunden-Loop — rund 20 Minuten, nicht ~3 Minuten."""
+
+    def test_en_readme_nennt_zwanzig_minuten(self):
+        text = io.open("README.md", encoding="utf-8").read()
+        assert "~3-minute settling" not in text
+        assert "~20-minute settling" in text
+
+    def test_de_readme_nennt_zwanzig_minuten(self):
+        text = io.open("README_DE.md", encoding="utf-8").read()
+        assert "~3 Min" not in text
+        assert "~20 Min" in text
