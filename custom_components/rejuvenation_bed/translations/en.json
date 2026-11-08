@@ -46,7 +46,7 @@
           "total_power_rating": "Total heating power (Watts)",
           "energy_sensor": "Energy meter sensor",
           "compare_to_legacy": "Compare with classic waterbed",
-          "electricity_price": "Electricity price (€/kWh)"
+          "electricity_price": "Electricity price (ct/kWh)"
         }
       },
       "global_config": {
