@@ -165,6 +165,26 @@ class TemperatureCalculator:
         # Schritt 4: Initialisiere Resolver für diese Zone (falls noch nicht geschehen)
         await self._ensure_resolvers_initialized(zone_index)
 
+        # Schritt 4b (M1): Weckzeit und Außentemperatur aktuell halten.
+        # Ohne dieses Auffrischen fror die Kurve beim ersten Update nach dem
+        # Start ein: ein Handy-Wecker, der erst abends gestellt wird, der
+        # Wochenend-Offset und die Außentemperatur erreichten die laufende
+        # Kurve nie — bis zum nächsten Neustart oder Options-Reload.
+        curve = self._curves.get(zone_index)
+        if curve is not None:
+            wake_resolver = self._wake_resolvers.get(zone_index)
+            if wake_resolver is not None:
+                wake_time, wake_source = wake_resolver.resolve()
+                if wake_time != curve.wake_time:
+                    curve.wake_time = wake_time
+                    _LOGGER.info(
+                        f"Zone {zone_index}: Aufwachzeit aktualisiert auf {wake_time.strftime('%H:%M')} "
+                        f"(Quelle: {wake_source})"
+                    )
+            outdoor_temp = self._read_outdoor_temp()
+            if outdoor_temp is not None and outdoor_temp != curve.outdoor_temp:
+                curve.update_outdoor_temp(outdoor_temp)
+
         # Schritt 5: Präsenz-basierte Logik
         curve = self._curves.get(zone_index)
         if not curve:
@@ -431,29 +451,10 @@ class TemperatureCalculator:
         # ═══════════════════════════════════════════════════════════════════════
         # Außentemperatur für saisonale Anpassung
         # Unterstützt: Temperatur-Sensor ODER Wetter-Entity
+        # (M1: als Helfer ausgelagert — der Coordinator liest sie jetzt pro
+        # Update nach, nicht mehr nur beim ersten Initialisieren)
         # ═══════════════════════════════════════════════════════════════════════
-        outdoor_temp = None
-        outdoor_source = global_conf.get("outdoor_sensor")
-
-        if outdoor_source:
-            state = self.hass.states.get(outdoor_source)
-            if state and state.state not in ["unknown", "unavailable"]:
-                # Prüfe ob es ein Wetter-Entity ist (hat temperature Attribut)
-                if state.domain == "weather":
-                    # Wetter-Entity: Temperatur aus Attributen holen
-                    temp_attr = state.attributes.get("temperature")
-                    if temp_attr is not None:
-                        try:
-                            outdoor_temp = float(temp_attr)
-                            _LOGGER.debug(f"Außentemperatur von Wetter-Entity: {outdoor_temp}°C")
-                        except (ValueError, TypeError):
-                            pass
-                else:
-                    # Normaler Sensor: State ist die Temperatur
-                    try:
-                        outdoor_temp = float(state.state)
-                    except ValueError:
-                        pass
+        outdoor_temp = self._read_outdoor_temp()
 
         # Biorhythmus-Kurve initialisieren MIT Saisonaler Anpassung
         curve = BiorhythmusCurve(
@@ -491,6 +492,41 @@ class TemperatureCalculator:
         self._sleep_stage_resolvers[zone_index] = sleep_stage_resolver
 
         _LOGGER.info(f"Zone {zone_index}: Resolver erfolgreich initialisiert")
+
+    def _read_outdoor_temp(self) -> Optional[float]:
+        """
+        Liest die Außentemperatur für die saisonale Anpassung (M1).
+
+        Unterstützt: Temperatur-Sensor ODER Wetter-Entity. None, wenn kein
+        Sensor konfiguriert ist oder der Wert gerade nicht lesbar ist.
+        """
+        global_conf = self.config_entry.data.get("global", {})
+        outdoor_source = global_conf.get("outdoor_sensor")
+
+        if not outdoor_source:
+            return None
+
+        state = self.hass.states.get(outdoor_source)
+        if not state or state.state in ["unknown", "unavailable"]:
+            return None
+
+        # Wetter-Entity: Temperatur aus Attributen holen
+        if state.domain == "weather":
+            temp_attr = state.attributes.get("temperature")
+            if temp_attr is None:
+                return None
+            try:
+                outdoor_temp = float(temp_attr)
+                _LOGGER.debug(f"Außentemperatur von Wetter-Entity: {outdoor_temp}°C")
+                return outdoor_temp
+            except (ValueError, TypeError):
+                return None
+
+        # Normaler Sensor: State ist die Temperatur
+        try:
+            return float(state.state)
+        except ValueError:
+            return None
 
     @staticmethod
     def _parse_time(time_str: str) -> time:

@@ -99,6 +99,13 @@ class BiorhythmusCurve:
         self.outdoor_temp = outdoor_temp
         self.user_offset = user_offset
 
+        # M1: Nutzer-Vorgaben merken (None = saisonal automatisch).
+        # update_outdoor_temp darf die saisonalen Werte wandern lassen, aber
+        # explizit konfigurierte Temperaturen nicht überbügeln.
+        self._user_sleep_temp = sleep_temp
+        self._user_deep_sleep_temp = deep_sleep_temp
+        self._user_wake_temp = wake_temp
+
         # Berechne saisonale Temperaturen
         base_sleep, base_deep, base_wake = self._calculate_seasonal_temps(outdoor_temp)
 
@@ -159,14 +166,23 @@ class BiorhythmusCurve:
         Aktualisiert die Außentemperatur und passt die Kurve an.
 
         Sollte regelmäßig aufgerufen werden (z.B. alle 30 Min).
+
+        M1: Nur die saisonalen Werte wandern mit — wo der Nutzer explizit
+        eine Temperatur konfiguriert hat, bleibt sie stehen (bisher würde
+        ein Aufruf die nutzerkonfigurierten Schlaf-Temperaturen platt-
+        machen, deshalb durfte die Methode nirgends gerufen werden).
         """
         if self.outdoor_temp != outdoor_temp:
             old_deep = self.deep_sleep_temp
             base_sleep, base_deep, base_wake = self._calculate_seasonal_temps(outdoor_temp)
 
-            self.sleep_temp = base_sleep + self.user_offset
-            self.deep_sleep_temp = base_deep + self.user_offset
-            self.wake_temp = base_wake + self.user_offset
+            self.sleep_temp = (
+                self._user_sleep_temp if self._user_sleep_temp is not None else base_sleep
+            ) + self.user_offset
+            self.deep_sleep_temp = (
+                self._user_deep_sleep_temp if self._user_deep_sleep_temp is not None else base_deep
+            ) + self.user_offset
+            self.wake_temp = (self._user_wake_temp if self._user_wake_temp is not None else base_wake) + self.user_offset
             self.outdoor_temp = outdoor_temp
 
             if abs(old_deep - self.deep_sleep_temp) > 0.3:
