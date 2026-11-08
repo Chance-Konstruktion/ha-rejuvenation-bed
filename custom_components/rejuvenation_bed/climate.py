@@ -293,9 +293,14 @@ class RejuvenationBedClimate(CoordinatorEntity, ClimateEntity):
             # Fund (pc-ap): Dabei auch das Datum abräumen, wie der Switch
             # beim Abschalten — sonst bleibt ein altes Ablaufdatum liegen
             # und vergiftet den nächsten Urlaub.
+            # Fund (pc-au): und den Temperatur-Override mit abräumen —
+            # Switch, cancel_special_mode und der Auto-Ablauf löschen
+            # ihn ebenfalls; sonst hält der nächste Urlaub wieder die
+            # alte Override-Temperatur statt der konfigurierten.
             if getattr(self.coordinator, "vacation_mode_enabled", False):
                 self.coordinator.vacation_mode_enabled = False
             self.coordinator.vacation_until = None
+            self.coordinator.vacation_temp_override = None
 
         await self.coordinator.async_request_refresh()
 
