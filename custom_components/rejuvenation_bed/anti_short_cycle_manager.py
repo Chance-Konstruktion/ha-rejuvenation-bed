@@ -227,6 +227,21 @@ class AntiShortCycleManager:
         cutoff = now - timedelta(hours=24)
         self._state_history = {k: v for k, v in self._state_history.items() if v.get("last_change", now) > cutoff}
 
+        # Der eigene Eintrag kann von der Bereinigung gerade mit weggeräumt
+        # worden sein (letzter Schaltvorgang > 24 h her — Normalfall bei einem
+        # Wasserbett, das über 24 h am Stück heizt, oder einer Heizung im
+        # Urlaub). Dann wie "Erste Entscheidung" neu anlegen, statt mit einem
+        # KeyError durch den Fail-Safe-Pfad des Coordinators zu fallen.
+        if heater_id not in self._state_history:
+            self._state_history[heater_id] = {
+                "current_state": new_state,
+                "last_change": now,
+                "last_on_time": now if new_state else None,
+                "last_off_time": now if not new_state else None,
+            }
+            _LOGGER.debug(f"{heater_id}: History nach 24h-Bereinigung neu angelegt")
+            return
+
         self._state_history[heater_id]["current_state"] = new_state
         self._state_history[heater_id]["last_change"] = now
 
