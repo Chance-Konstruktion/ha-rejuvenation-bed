@@ -80,9 +80,7 @@ class TestK2BoostDoku:
         assert "feste Zieltemperatur" in text
 
     def test_toter_offset_const_ist_weg(self):
-        code = io.open(
-            "custom_components/rejuvenation_bed/const.py", encoding="utf-8"
-        ).read()
+        code = io.open("custom_components/rejuvenation_bed/const.py", encoding="utf-8").read()
         assert "DEFAULT_BOOST_OFFSET" not in code
 
 
@@ -120,9 +118,7 @@ class TestK14VersionsBadge:
 
     @pytest.mark.parametrize("path", ["README.md", "README_DE.md"])
     def test_badge_entspricht_manifest(self, path):
-        manifest = json.load(
-            io.open("custom_components/rejuvenation_bed/manifest.json", encoding="utf-8")
-        )
+        manifest = json.load(io.open("custom_components/rejuvenation_bed/manifest.json", encoding="utf-8"))
         text = io.open(path, encoding="utf-8").read()
         assert f"version-v{manifest['version']}" in text
         assert "version-v260728" not in text

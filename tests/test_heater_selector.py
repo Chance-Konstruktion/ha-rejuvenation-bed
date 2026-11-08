@@ -18,8 +18,9 @@ import pytest
 # Echte Basisklassen statt Mock, bevor die Flows importiert werden (Muster aus
 # test_options_flow.py: Subclassing über einen MagicMock würde die echten
 # async_step_*-Methoden verschlucken).
-sys.modules["homeassistant"].config_entries.ConfigFlow = type("ConfigFlow", (), {"__init_subclass__": classmethod(
-    lambda cls, **kwargs: None)})
+sys.modules["homeassistant"].config_entries.ConfigFlow = type(
+    "ConfigFlow", (), {"__init_subclass__": classmethod(lambda cls, **kwargs: None)}
+)
 sys.modules["homeassistant.config_entries"].ConfigFlow = sys.modules["homeassistant"].config_entries.ConfigFlow
 sys.modules["homeassistant"].config_entries.OptionsFlow = type("OptionsFlow", (), {})
 sys.modules["homeassistant.config_entries"].OptionsFlow = sys.modules["homeassistant"].config_entries.OptionsFlow

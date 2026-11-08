@@ -182,7 +182,9 @@ class BiorhythmusCurve:
             self.deep_sleep_temp = (
                 self._user_deep_sleep_temp if self._user_deep_sleep_temp is not None else base_deep
             ) + self.user_offset
-            self.wake_temp = (self._user_wake_temp if self._user_wake_temp is not None else base_wake) + self.user_offset
+            self.wake_temp = (
+                self._user_wake_temp if self._user_wake_temp is not None else base_wake
+            ) + self.user_offset
             self.outdoor_temp = outdoor_temp
 
             if abs(old_deep - self.deep_sleep_temp) > 0.3:
