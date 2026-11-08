@@ -275,14 +275,27 @@ class RejuvenationBedClimate(CoordinatorEntity, ClimateEntity):
             # während die Zieltemperatur ausschließlich vacation_mode_enabled
             # folgte. Der Preset aktiviert jetzt denselben Urlaub wie der
             # Vacation-Switch (Frostschutz-Haltetemperatur, global).
+            #
+            # Fund (pc-ap): Dabei das Ablaufdatum mitsetzen, wie der
+            # Vacation-Switch (14 Tage Standard). Wer vorher per Schalter
+            # oder Dienst im Urlaub war, hat ein alt-abgelaufenes
+            # vacation_until stehen (der Auto-Ablauf im Coordinator löscht
+            # nur die Flagge, nie das Datum) — und genau das schaltete den
+            # soeben aktivierten Urlaub beim nächsten Update sofort wieder
+            # ab.
             if not hasattr(self.coordinator, "vacation_mode_enabled"):
                 self.coordinator.vacation_mode_enabled = False
             self.coordinator.vacation_mode_enabled = True
+            self.coordinator.vacation_until = local_now() + timedelta(days=14)
         elif preset_mode == PRESET_NONE:
             # Zurück auf "zu Hause": Vacation wieder aus — symmetrisch zum
             # Vacation-Switch, der dieselbe Koordinator-Flagge schaltet.
+            # Fund (pc-ap): Dabei auch das Datum abräumen, wie der Switch
+            # beim Abschalten — sonst bleibt ein altes Ablaufdatum liegen
+            # und vergiftet den nächsten Urlaub.
             if getattr(self.coordinator, "vacation_mode_enabled", False):
                 self.coordinator.vacation_mode_enabled = False
+            self.coordinator.vacation_until = None
 
         await self.coordinator.async_request_refresh()
 
