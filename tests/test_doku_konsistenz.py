@@ -62,3 +62,25 @@ class TestK1ClearEmergencyUebersetzt:
     def test_readme_de_listet_dienst(self):
         text = io.open("README_DE.md", encoding="utf-8").read()
         assert "rejuvenation_bed.clear_emergency" in text
+
+
+class TestK2BoostDoku:
+    """K2: Boost ist seit #11 eine feste Zieltemperatur (boost_target_temp,
+    Standard 34), kein Offset mehr auf die Zieltemperatur. Der 60-Min-Wert
+    gilt fuer den Switch; der Dienst set_boost defaultet auf 30 Min."""
+
+    def test_en_readme_beschreibt_feste_zieltemperatur(self):
+        text = io.open("README.md", encoding="utf-8").read()
+        assert "target + offset" not in text
+        assert "fixed boost target" in text
+
+    def test_de_readme_beschreibt_feste_zieltemperatur(self):
+        text = io.open("README_DE.md", encoding="utf-8").read()
+        assert "Zieltemperatur + Offset" not in text
+        assert "feste Zieltemperatur" in text
+
+    def test_toter_offset_const_ist_weg(self):
+        code = io.open(
+            "custom_components/rejuvenation_bed/const.py", encoding="utf-8"
+        ).read()
+        assert "DEFAULT_BOOST_OFFSET" not in code

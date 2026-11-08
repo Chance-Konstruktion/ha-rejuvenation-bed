@@ -239,7 +239,7 @@ Per zone (one zone for single beds, two for dual-core waterbeds):
 <br>
 
 - **Sick** — constant temperature for N days
-- **Boost** — target + offset for 60 min
+- **Boost** — fixed boost target (default 34 °C) for 60 min
 - **Vacation** — minimal 24 °C holding (frost / condensation protection)
 - **Comfort** — sleep-in offset for weekends and off-days
 
@@ -331,7 +331,7 @@ Per zone (one zone for single beds, two for dual-core waterbeds):
 
 | Mode         | Activation                                      | Effect |
 | :----------- | :---------------------------------------------- | :--- |
-| **Boost**    | `switch.bett_boost`                             | Target + offset for 60 min |
+| **Boost**    | `switch.bett_boost`                             | Fixed boost target (default 34 °C) for 60 min |
 | **Sick**     | `switch.bett_krank_modus`                       | Constant temperature for N days |
 | **Vacation** | `switch.bett_urlaub_modus` or service           | Minimal 24 °C holding temperature |
 | **Solar**    | `switch.bett_solar_batterie`                    | Store PV surplus as heat |

@@ -119,7 +119,6 @@ def get_bed_config(bed_type: str) -> dict:
 
 DEFAULT_SICK_MODE_TEMP = 30.0  # Konstante Temp im Krank-Modus
 DEFAULT_SICK_MODE_DAYS = 3  # Dauer Krank-Modus in Tagen
-DEFAULT_BOOST_OFFSET = 2.0  # +2°C beim Schnellheizen
 DEFAULT_COMFORT_OFFSET = 0.5  # +0.5°C beim Ausschlafen
 BOOST_MAX_TEMP = 34.0  # Absolute Obergrenze Boost (Hardware-Thermostat = Backup)
 

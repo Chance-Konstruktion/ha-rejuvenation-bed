@@ -160,7 +160,7 @@ Die Integration erstellt drei Geräte in Home Assistant:
 
 | Modus | Aktivierung | Wirkung |
 |-------|------------|---------|
-| **Boost** | `switch.bett_boost` | Schnellheizen: Zieltemperatur + Offset für 60 Min |
+| **Boost** | `switch.bett_boost` | Schnellheizen: feste Zieltemperatur (Standard 34°C) für 60 Min |
 | **Krank** | `switch.bett_krank_modus` | Konstante Temperatur für konfigurierbare Tage |
 | **Urlaub** | `switch.bett_urlaub_modus` oder Service | Minimale 24°C Haltetemperatur (mit optionaler Temperatur) |
 | **Solar** | `switch.bett_solar_batterie` | PV-Überschuss als Wärme speichern |
