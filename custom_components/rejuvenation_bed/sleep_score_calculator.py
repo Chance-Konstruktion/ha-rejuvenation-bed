@@ -134,6 +134,10 @@ class SleepScoreCalculator:
         # Aktuelle Nacht-Daten (werden während der Nacht gesammelt)
         self._current_night: Dict[int, NightData] = {}
 
+        # Heizzyklen: aktueller Schaltzustand und Zyklusbeginn je Zone (M2)
+        self._night_heating: Dict[int, bool] = {}
+        self._night_heating_since: Dict[int, datetime] = {}
+
         # CO2 Sensor (optional)
         self.co2_sensor = config_entry.options.get("co2_sensor") or config_entry.data.get("global", {}).get(
             "co2_sensor"
@@ -155,7 +159,40 @@ class SleepScoreCalculator:
             bedtime_actual=local_now(),
         )
 
+        # Neue Nacht: keinen Heizzyklus aus der vorherigen erben
+        self._night_heating[zone_index] = False
+        self._night_heating_since.pop(zone_index, None)
+
         _LOGGER.info(f"Zone {zone_index}: Nacht-Tracking gestartet")
+
+    def record_heating_state(self, zone_index: int, heating: bool):
+        """Zeichnet Heiz-Zyklen auf (M2).
+
+        Der Coordinator meldet pro Update, ob die Heizung heizen soll. AN
+        beginnt einen Zyklus, AUS beendet ihn und bucht die Dauer in
+        ``heating_cycles``/``total_heating_minutes``. Ohne dieses
+        Aufzeichnen blieben die Felder leer und die Heizzyklen-Effizienz
+        (35 % des Scores) wäre pauschal 100.
+        """
+        if zone_index not in self._current_night:
+            return
+
+        was = self._night_heating.get(zone_index, False)
+        if heating and not was:
+            self._night_heating[zone_index] = True
+            self._night_heating_since[zone_index] = local_now()
+        elif not heating and was:
+            self._night_heating[zone_index] = False
+            self._book_heating_cycle(zone_index, local_now())
+
+    def _book_heating_cycle(self, zone_index: int, until: datetime):
+        """Bucht den laufenden Heizzyklus bis ``until`` in die Nacht-Daten."""
+        since = self._night_heating_since.pop(zone_index, None)
+        night = self._current_night.get(zone_index)
+        if since is None or night is None:
+            return
+        night.heating_cycles += 1
+        night.total_heating_minutes += max(0.0, (until - since).total_seconds() / 60.0)
 
     def record_temperature(self, zone_index: int, current_temp: float, target_temp: float):
         """Zeichnet einen Temperatur-Datenpunkt auf."""
@@ -211,6 +248,12 @@ class SleepScoreCalculator:
 
         night = self._current_night[zone_index]
         night.wake_time_actual = local_now()
+
+        # M2: Läuft beim Aufstehen noch ein Heizzyklus, wird er hier
+        # abgeschlossen — sonst bliebe die AN-Zeit der letzten Phase ungebucht.
+        if self._night_heating.get(zone_index, False):
+            self._night_heating[zone_index] = False
+            self._book_heating_cycle(zone_index, night.wake_time_actual)
 
         # Mindestens 2 Stunden Daten?
         if len(night.temp_readings) < 20:  # ~20 Datenpunkte bei 6min Intervall = 2h

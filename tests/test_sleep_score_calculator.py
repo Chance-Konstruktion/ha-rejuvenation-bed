@@ -228,3 +228,73 @@ class TestWeeklyAverage:
 
     def test_last_score(self, calculator):
         assert calculator.get_last_score(0) is None
+
+class TestHeatingCycleRecording:
+    """M2: Die Heizzyklen-Datenfelder werden befüllt.
+
+    Ohne Aufzeichnung blieben heating_cycles/total_heating_minutes leer,
+    _calc_heating_efficiency lief in heating_cycles == 0 und vergab den
+    35%-Anteil des Scores pauschal als 100.
+    """
+
+    BASE = datetime(2026, 11, 8, 23, 0, 0)
+
+    class _Clock:
+        def __init__(self, start):
+            self.t = start
+
+        def __call__(self):
+            return self.t
+
+    def _run_night(self, calculator, script):
+        """script: Liste (minutes_since_base, "an"/"aus"/"ende")."""
+        from datetime import timedelta
+
+        clock = self._Clock(self.BASE)
+        with patch("custom_components.rejuvenation_bed.sleep_score_calculator.local_now", clock):
+            calculator.start_night_tracking(
+                zone_index=0,
+                planned_bedtime=self.BASE,
+                planned_wake=self.BASE + timedelta(hours=8),
+            )
+            score = None
+            for minutes, action in script:
+                clock.t = self.BASE + timedelta(minutes=minutes)
+                if action == "an":
+                    calculator.record_heating_state(0, True)
+                elif action == "aus":
+                    calculator.record_heating_state(0, False)
+                    # genug Temperatur-Datenpunkte für den Score
+                    for _ in range(25):
+                        calculator.record_temperature(0, 28.0, 28.0)
+                else:  # ende
+                    for _ in range(25):
+                        calculator.record_temperature(0, 28.0, 28.0)
+                    score = calculator.end_night_tracking(0)
+        return score
+
+    def test_two_short_cycles_cost_points(self, calculator):
+        # Zyklus 1: 2 Min, Zyklus 2: 5 Min -> Ø 3,5 Min -> max(0, 35) = 35
+        score = self._run_night(
+            calculator,
+            [(0, "an"), (2, "aus"), (10, "an"), (15, "aus"), (30, "ende")],
+        )
+        assert score.heating_efficiency_score == 35
+        assert score.total_score < 100
+
+    def test_long_cycles_stay_perfect(self, calculator):
+        # Ein 20-Min-Zyklus -> Ø 20 Min -> 100
+        score = self._run_night(
+            calculator,
+            [(0, "an"), (20, "aus"), (25, "ende")],
+        )
+        assert score.heating_efficiency_score == 100
+
+    def test_open_cycle_is_closed_at_wake_up(self, calculator):
+        # Heizung läuft noch, wenn die Nacht endet -> 12 Min werden gebucht
+        score = self._run_night(
+            calculator,
+            [(0, "an"), (12, "ende")],
+        )
+        # Ø 12 Min -> 80 + 2*4 = 88 (nicht 100, nicht 0)
+        assert score.heating_efficiency_score == 88

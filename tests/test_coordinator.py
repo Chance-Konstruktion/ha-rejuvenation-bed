@@ -355,3 +355,57 @@ def test_sensor_warning_throttled(mock_now):
     mock_now.return_value = later
     RejuvenationBedCoordinator._warn_sensor_throttled(fake, "sensor.x", "weg")
     assert fake._sensor_warn_at["sensor.x"] == later
+
+
+class TestSleepTrackingRecordsHeatingCycles:
+    """M2: Der Coordinator meldet Heiz-Zyklen an den Schlaf-Score."""
+
+    def _fake_self(self, calculator):
+        return SimpleNamespace(
+            config_entry=SimpleNamespace(options={}, data={"global": {}, "zones": [{}]}),
+            sleep_score_calculator=calculator,
+            _night_tracking_active={},
+            _curve_active={0: True},
+            _actual_bedtime={0: BASE},
+        )
+
+    def test_heating_transitions_reach_night_data(self):
+        import asyncio
+
+        from custom_components.rejuvenation_bed.sleep_score_calculator import SleepScoreCalculator
+
+        calc = SleepScoreCalculator(MagicMock(), SimpleNamespace(options={}, data={"global": {}}))
+        fake = self._fake_self(calc)
+
+        # Erstes Hinlegen startet das Tracking und meldet "heizt"
+        asyncio.run(
+            RejuvenationBedCoordinator._async_update_sleep_tracking(
+                fake, zone_index=0, is_present=True, current_temp=28.0, target_temp=28.0, should_heat=True
+            )
+        )
+        assert fake._night_tracking_active[0] is True
+        assert calc._current_night[0].heating_cycles == 0  # Zyklus läuft
+
+        # Heizung aus -> Zyklus abgeschlossen
+        asyncio.run(
+            RejuvenationBedCoordinator._async_update_sleep_tracking(
+                fake, zone_index=0, is_present=False, current_temp=28.0, target_temp=28.0, should_heat=False
+            )
+        )
+        assert calc._current_night[0].heating_cycles == 1
+
+    def test_no_tracking_without_night(self):
+        import asyncio
+
+        from custom_components.rejuvenation_bed.sleep_score_calculator import SleepScoreCalculator
+
+        calc = SleepScoreCalculator(MagicMock(), SimpleNamespace(options={}, data={"global": {}}))
+        fake = self._fake_self(calc)
+        fake._actual_bedtime = {0: None}  # nicht im Bett -> kein Tracking
+
+        asyncio.run(
+            RejuvenationBedCoordinator._async_update_sleep_tracking(
+                fake, zone_index=0, is_present=False, current_temp=28.0, target_temp=28.0, should_heat=True
+            )
+        )
+        assert calc._current_night == {}
