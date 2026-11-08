@@ -8,7 +8,9 @@ weiterhin ABSOLUTE_MAX_TEMP.
 """
 
 import sys
+from datetime import timedelta
 from unittest.mock import AsyncMock, MagicMock
+
 
 # Echte Basisklassen statt Mock, bevor climate.py importiert wird (Muster aus
 # test_nightstand_config.py: zwei MagicMocks als Basen werfen einen
@@ -30,6 +32,7 @@ from custom_components.rejuvenation_bed.const import (  # noqa: E402
     ABSOLUTE_MAX_TEMP,
     HEATING_PAD_CONFIG,
     WATERBED_CONFIG,
+    local_now,
 )
 
 
@@ -88,3 +91,49 @@ class TestAwayPresetActivatesVacation:
         asyncio.run(entity.async_set_preset_mode(preset_none))
 
         assert coordinator.vacation_mode_enabled is False
+
+    def test_away_renews_expired_vacation_until(self):
+        """Fund (pc-ap): AWAY erneuert ein alt-abgelaufenes vacation_until.
+
+        Wer vorher per Schalter oder Dienst im Urlaub war, hat ein
+        abgelaufenes Datum stehen (der Auto-Ablauf im Coordinator löscht
+        nur die Flagge, nie das Datum). Ohne Erneuerung schaltet der
+        nächste Update-Lauf den soeben per Preset aktivierten Urlaub
+        sofort wieder ab — AWAY setzt das Datum deshalb wie der
+        Vacation-Switch (14 Tage).
+        """
+        import asyncio
+
+        coordinator = MagicMock()
+        coordinator.bed_config = WATERBED_CONFIG.copy()
+        coordinator.config_entry = MagicMock(data={"zones": [{}]})
+        coordinator.async_request_refresh = AsyncMock()
+        coordinator.vacation_mode_enabled = False
+        coordinator.vacation_until = local_now() - timedelta(days=1)
+        entity = RejuvenationBedClimate(coordinator, 0, "")
+
+        preset_away = sys.modules["homeassistant.components.climate"].PRESET_AWAY
+        asyncio.run(entity.async_set_preset_mode(preset_away))
+
+        assert coordinator.vacation_mode_enabled is True
+        assert coordinator.vacation_until > local_now()
+
+    def test_none_preset_clears_vacation_until(self):
+        """Fund (pc-ap): PRESET_NONE räumt auch das Datum ab, wie der
+        Vacation-Switch beim Abschalten — es bleibt kein altes
+        Ablaufdatum liegen."""
+        import asyncio
+
+        coordinator = MagicMock()
+        coordinator.bed_config = WATERBED_CONFIG.copy()
+        coordinator.config_entry = MagicMock(data={"zones": [{}]})
+        coordinator.async_request_refresh = AsyncMock()
+        coordinator.vacation_mode_enabled = True
+        coordinator.vacation_until = local_now() + timedelta(days=14)
+        entity = RejuvenationBedClimate(coordinator, 0, "")
+
+        preset_none = sys.modules["homeassistant.components.climate"].PRESET_NONE
+        asyncio.run(entity.async_set_preset_mode(preset_none))
+
+        assert coordinator.vacation_mode_enabled is False
+        assert coordinator.vacation_until is None
