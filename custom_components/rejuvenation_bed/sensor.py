@@ -559,6 +559,13 @@ class BedThermalBatterySensor(RejuvenationBedEnergySensor):
         super().__init__(coordinator)
         self._attr_name = "Bett Thermische Batterie"
         self._attr_unique_id = f"{coordinator.config_entry.entry_id}_thermal_battery"
+        # K7: Skala an die Bett-Konfiguration binden. 100 % war auf 32 °C
+        # gelegt, aber über Standby 26 °C ist das Wasserbett nur bis
+        # solar_boost_max (28,5 °C) ladbar — der Prozentwert konnte im
+        # Betrieb nie über ~42 % steigen. 0 % = Standby-Temperatur,
+        # 100 % = Solar-Boost-Maximum des Bett-Typs.
+        self.TEMP_MIN = float(coordinator.bed_config.get("standby_temp", self.TEMP_MIN))
+        self.TEMP_MAX = float(coordinator.bed_config.get("solar_boost_max", self.TEMP_MAX))
 
     def _get_volume(self) -> float:
         """Bett-Volumen in Litern aus Config."""
