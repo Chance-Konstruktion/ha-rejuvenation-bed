@@ -46,10 +46,13 @@ def _run(coro):
 def fresh_selector(monkeypatch):
     """Frische Selector-Mocks, damit die Aufruf-Argumente des Form-Schritts lesbar sind."""
     fresh = MagicMock()
-    monkeypatch.setattr(config_flow_module.selector, "EntitySelector", fresh.EntitySelector, raising=True)
-    monkeypatch.setattr(config_flow_module.selector, "EntitySelectorConfig", fresh.EntitySelectorConfig, raising=True)
-    monkeypatch.setattr(options_flow_module.selector, "EntitySelector", fresh.EntitySelector, raising=True)
-    monkeypatch.setattr(options_flow_module.selector, "EntitySelectorConfig", fresh.EntitySelectorConfig, raising=True)
+    # Fund (pc-ap): Die Modul-Bindung patchen, nicht Attribute am geteilten
+    # conftest-Mock. Unter pytest 9.2.0 löscht der monkeypatch-Teardown die
+    # nur auto-erzeugten Mock-Children am geteilten Mock wieder — jeder
+    # zweite Test starb dann beim Fixture-Setup, und test_options_flow.py
+    # fand selector.EntitySelector nicht mehr (6 failed + 1 error).
+    monkeypatch.setattr(config_flow_module, "selector", fresh)
+    monkeypatch.setattr(options_flow_module, "selector", fresh)
     return fresh
 
 
