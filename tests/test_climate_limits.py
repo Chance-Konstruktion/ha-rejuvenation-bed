@@ -1,0 +1,50 @@
+"""K4: Das Klima-Slider-Maximum folgt dem Comfort-Limit der Bett-Konfiguration.
+
+Der Wasserbett-Slider bot bislang ABSOLUTE_MAX_TEMP (38°C) an, obwohl das
+Bett laut Konfiguration bei 30°C liegt und die Software erst ab 34°C
+(OVERHEAT_CRITICAL) eingreift. Die Heizmatten-Anzeige bleibt unverändert:
+deren Config-Maximum (40) liegt über der Hardware-Grenze, es gilt
+weiterhin ABSOLUTE_MAX_TEMP.
+"""
+
+import sys
+from unittest.mock import MagicMock
+
+# Echte Basisklassen statt Mock, bevor climate.py importiert wird (Muster aus
+# test_nightstand_config.py: zwei MagicMocks als Basen werfen einen
+# Metaclass-Konflikt).
+class _FakeCoordinatorEntity:
+    def __init__(self, coordinator, *args, **kwargs):
+        self.coordinator = coordinator
+
+
+sys.modules["homeassistant"].helpers.update_coordinator.CoordinatorEntity = _FakeCoordinatorEntity
+sys.modules["homeassistant.helpers.update_coordinator"].CoordinatorEntity = _FakeCoordinatorEntity
+sys.modules["homeassistant"].components.climate.ClimateEntity = type("ClimateEntity", (), {})
+sys.modules["homeassistant.components.climate"].ClimateEntity = sys.modules[
+    "homeassistant"
+].components.climate.ClimateEntity
+
+from custom_components.rejuvenation_bed.climate import RejuvenationBedClimate  # noqa: E402
+from custom_components.rejuvenation_bed.const import (  # noqa: E402
+    ABSOLUTE_MAX_TEMP,
+    HEATING_PAD_CONFIG,
+    WATERBED_CONFIG,
+)
+
+
+def _climate(bed_config):
+    coordinator = MagicMock()
+    coordinator.bed_config = bed_config.copy()
+    coordinator.config_entry = MagicMock(data={"zones": [{}]})
+    return RejuvenationBedClimate(coordinator, 0, "")
+
+
+def test_waterbed_slider_max_is_configured_comfort_limit():
+    assert _climate(WATERBED_CONFIG)._attr_max_temp == WATERBED_CONFIG["max_temp"]
+    assert _climate(WATERBED_CONFIG)._attr_max_temp == 30.0
+
+
+def test_pad_slider_max_stays_at_hardware_limit():
+    # Config-Maximum 40 liegt über ABSOLUTE_MAX_TEMP — Slider bleibt bei 38
+    assert _climate(HEATING_PAD_CONFIG)._attr_max_temp == ABSOLUTE_MAX_TEMP

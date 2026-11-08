@@ -107,6 +107,14 @@ class RejuvenationBedClimate(CoordinatorEntity, ClimateEntity):
         # Min-Temp aus Bed-Config (Heizmatte: 0°C, Wasserbett: 24°C)
         self._attr_min_temp = coordinator.bed_config.get("min_temp", 24.0)
 
+        # K4: Max-Temp ebenso aus der Bed-Config — das Comfort-Limit des
+        # Bett-Typs (Wasserbett: 30°C) war tot, der Slider bot bislang die
+        # Hardware-Obergrenze (38°C) an. Nie höher als ABSOLUTE_MAX_TEMP.
+        self._attr_max_temp = min(
+            coordinator.bed_config.get("max_temp", ABSOLUTE_MAX_TEMP),
+            ABSOLUTE_MAX_TEMP,
+        )
+
         # Ermittle Hardware-Level
         zones_config = coordinator.config_entry.data.get("zones", [])
         if zone_index < len(zones_config):
