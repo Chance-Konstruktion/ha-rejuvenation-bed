@@ -219,8 +219,10 @@ class BiorhythmusCurve:
         0.0 = bedtime
         1.0 = wake_time
 
-        NEU: Berücksichtigt Chronotyp-Offset!
-        Der Offset verschiebt den Nadir (tiefsten Punkt der Kurve).
+        K10: Der Chronotyp-Offset liegt NICHT mehr auf der aktuellen Zeit —
+        das verschob die ganze Kurve (Lerche war 1,5 h früher durch, Eule
+        kam 1,5 h zu spät in Schwung). Die Anker bleiben fest; der Offset
+        wandert in _phase_boundaries auf das Ende des Tiefschlaf-Plateaus.
 
         Beispiel:
         - bedtime = 23:00, wake_time = 07:00 (8h Schlaf)
@@ -241,18 +243,11 @@ class BiorhythmusCurve:
             else:
                 wake_dt += timedelta(days=1)
 
-        # NEU: Chronotyp-Offset anwenden
-        # Positiver Offset (Eule) = Nadir später = current_time erscheint früher im Zyklus
-        # Negativer Offset (Lerche) = Nadir früher = current_time erscheint später im Zyklus
-        # Wir erreichen das, indem wir die aktuelle Zeit verschieben
-        offset_td = timedelta(hours=self.nadir_offset_hours)
-        adjusted_current_time = current_time - offset_td
-
         # Gesamtdauer berechnen
         total_duration = (wake_dt - bedtime_dt).total_seconds()
 
-        # Aktuelle Position (mit Chronotyp-Anpassung)
-        elapsed = (adjusted_current_time - bedtime_dt).total_seconds()
+        # Aktuelle Position
+        elapsed = (current_time - bedtime_dt).total_seconds()
 
         # Normieren auf [0, 1]
         # Wenn wir außerhalb des Schlafzyklus sind, clippen wir
@@ -262,6 +257,35 @@ class BiorhythmusCurve:
             return 1.0
 
         return elapsed / total_duration
+
+    def _sleep_duration_hours(self) -> float:
+        """Schlafdauer in Stunden (mit Tagesüberlauf, mindestens 1 h)."""
+        bedtime_minutes = self.bedtime.hour * 60 + self.bedtime.minute
+        wake_minutes = self.wake_time.hour * 60 + self.wake_time.minute
+        if wake_minutes < bedtime_minutes:
+            wake_minutes += 24 * 60
+        return max(1.0, (wake_minutes - bedtime_minutes) / 60.0)
+
+    def _phase_boundaries(self) -> Tuple[float, float]:
+        """
+        (Ende des Tiefschlaf-Plateaus, Ende der Transition) mit Chronotyp.
+
+        K10: Der Chronotyp-Offset verschiebt NUR den Nadir — das Ende des
+        Tiefschlaf-Plateaus wandert um offset/Schlafdauer in normierter
+        Zeit. Einschlafphase (Anker bedtime) und Aufwachphase (Anker
+        Weckzeit) bleiben unverändert: die Kurve startet bei bedtime mit
+        sleep_temp und erreicht wake_temp genau zur Weckzeit.
+        """
+        deep_end = self.PHASE_LANDING + self.PHASE_DEEP_SLEEP
+        transition_end = deep_end + self.PHASE_TRANSITION
+
+        if self.nadir_offset_hours:
+            deep_end += self.nadir_offset_hours / self._sleep_duration_hours()
+            # Landing bleibt 0-0.08, die Aufwachphase startet spätestens
+            # bei transition_end — der Übergang kollabiert nie ganz.
+            deep_end = min(max(deep_end, self.PHASE_LANDING), transition_end - 0.01)
+
+        return deep_end, transition_end
 
     def _calculate_temperature(self, t: float) -> float:
         """
@@ -273,6 +297,9 @@ class BiorhythmusCurve:
         Returns:
             Temperatur in °C
         """
+        # K10: Phasengrenzen mit Chronotyp (nur das Tiefschlaf-Ende wandert)
+        deep_end, transition_end = self._phase_boundaries()
+
         # Phase 1: Landing (Einschlafphase) - Sanftes Absenken
         if t < self.PHASE_LANDING:
             # Fortschritt innerhalb dieser Phase [0...1]
@@ -280,20 +307,18 @@ class BiorhythmusCurve:
             # Cosinus-Interpolation für glatten Übergang
             return self._lerp(self.sleep_temp, self.deep_sleep_temp, self._smooth_cos(phase_t))
 
-        # Phase 2: Tiefschlaf - Konstante Temperatur
-        elif t < (self.PHASE_LANDING + self.PHASE_DEEP_SLEEP):
+        # Phase 2: Tiefschlaf - Konstante Temperatur (Nadir, Chronotyp-verschoben)
+        elif t < deep_end:
             return self.deep_sleep_temp
 
         # Phase 3: Transition - Sanfter Anstieg beginnt
-        elif t < (self.PHASE_LANDING + self.PHASE_DEEP_SLEEP + self.PHASE_TRANSITION):
-            phase_start = self.PHASE_LANDING + self.PHASE_DEEP_SLEEP
-            phase_t = (t - phase_start) / self.PHASE_TRANSITION
+        elif t < transition_end:
+            phase_t = (t - deep_end) / (transition_end - deep_end)
             return self._lerp(self.deep_sleep_temp, self.wake_temp, self._smooth_cos(phase_t))
 
-        # Phase 4: Wake - Finaler thermischer "Push"
+        # Phase 4: Wake - Finaler thermischer "Push" (unverändert am Wecker)
         else:
-            phase_start = self.PHASE_LANDING + self.PHASE_DEEP_SLEEP + self.PHASE_TRANSITION
-            phase_t = (t - phase_start) / self.PHASE_WAKE
+            phase_t = (t - transition_end) / (1.0 - transition_end)
 
             # Kleine Extra-Absenkung vor dem finalen Anstieg
             # (simuliert die natürliche Körpertemperatur-Dip kurz vor dem Aufwachen)
@@ -347,21 +372,22 @@ class BiorhythmusCurve:
         t = self._normalize_time(current_time)
         temp = self._calculate_temperature(t)
 
+        # K10: dieselben Phasengrenzen wie _calculate_temperature
+        deep_end, transition_end = self._phase_boundaries()
+
         # Aktuelle Phase ermitteln
         if t < self.PHASE_LANDING:
             phase = "Landing"
             phase_progress = t / self.PHASE_LANDING
-        elif t < (self.PHASE_LANDING + self.PHASE_DEEP_SLEEP):
+        elif t < deep_end:
             phase = "Tiefschlaf"
-            phase_progress = (t - self.PHASE_LANDING) / self.PHASE_DEEP_SLEEP
-        elif t < (self.PHASE_LANDING + self.PHASE_DEEP_SLEEP + self.PHASE_TRANSITION):
+            phase_progress = (t - self.PHASE_LANDING) / max(0.01, deep_end - self.PHASE_LANDING)
+        elif t < transition_end:
             phase = "Transition"
-            phase_start = self.PHASE_LANDING + self.PHASE_DEEP_SLEEP
-            phase_progress = (t - phase_start) / self.PHASE_TRANSITION
+            phase_progress = (t - deep_end) / max(0.01, transition_end - deep_end)
         else:
             phase = "Aufwachen"
-            phase_start = self.PHASE_LANDING + self.PHASE_DEEP_SLEEP + self.PHASE_TRANSITION
-            phase_progress = (t - phase_start) / self.PHASE_WAKE
+            phase_progress = (t - transition_end) / max(0.01, 1.0 - transition_end)
 
         return {
             "normalized_time": round(t, 3),
