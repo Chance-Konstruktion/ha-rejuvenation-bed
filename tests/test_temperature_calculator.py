@@ -149,3 +149,40 @@ class TestBoostTargetTemp:
         calc = self._boost_calc(options={"boost_target_temp": 30.0}, zone_boost=34)
         temp = asyncio.run(calc.async_calculate_target(0, {}, {}, coordinator=self._coord()))
         assert temp == 30.0
+
+
+class TestPreheatWindow:
+    """M4: Das Vorheizfenster der Heizmatte ist 15 Minuten — nicht die
+    180 Minuten des 3-h-Defaults, der griff, weil HEATING_PAD_CONFIG kein
+    preheat_hours kannte."""
+
+    @staticmethod
+    def _make_calc_with_hass(bed_config):
+        from types import SimpleNamespace as NS
+
+        hass = MagicMock()
+        hass.states.get = lambda entity_id: NS(state="on") if entity_id == "binary_sensor.workday" else None
+        config_entry = NS(options={}, data={"global": {}, "zones": [{}]})
+        return TemperatureCalculator(hass, config_entry, bed_config.copy())
+
+    def _target_one_hour_before_warm_from(self, bed_config):
+        import asyncio
+        from datetime import datetime as dt
+        from unittest.mock import patch
+
+        calc = self._make_calc_with_hass(bed_config)
+        with patch(
+            "custom_components.rejuvenation_bed.temperature_calculator.local_now",
+            return_value=dt(2026, 11, 8, 21, 0, 0),
+        ):
+            return asyncio.run(
+                calc.async_calculate_target(0, {"temperature_offset": 0.0}, {}, has_presence_sensor=False)
+            )
+
+    def test_heating_pad_does_not_preheat_60_minutes_before(self):
+        # 60 Min vor warm_from: Fenstergroesse 15 -> Standby (AUS), nicht Vorheizen
+        assert self._target_one_hour_before_warm_from(HEATING_PAD_CONFIG) == pytest.approx(0.0)
+
+    def test_waterbed_does_preheat_60_minutes_before(self):
+        # Gegenprobe Wasserbett: 5-h-Fenster -> 60 Min vorher wird vorgeheizt
+        assert self._target_one_hour_before_warm_from(WATERBED_CONFIG) == pytest.approx(28.0)

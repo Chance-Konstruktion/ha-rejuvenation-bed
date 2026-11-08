@@ -68,6 +68,7 @@ HEATING_PAD_CONFIG = {
     # Thermische Eigenschaften
     "heating_rate": 5.0,  # ~5°C/h (schnell!)
     "cooling_rate": 3.0,  # ~3°C/h (kühlt schnell ab)
+    "preheat_hours": 0.25,  # Vorheizfenster: 15 Min (M4; sonst griff der 3-h-Default)
     "preheat_minutes": 15,  # Nur 15 Min vor Schlafzeit
     # Features
     "thermal_battery": False,  # Kein Wärmespeicher
