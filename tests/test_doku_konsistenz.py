@@ -99,3 +99,16 @@ class TestK9Einliegezeit:
         text = io.open("README_DE.md", encoding="utf-8").read()
         assert "~3 Min" not in text
         assert "~20 Min" in text
+
+
+class TestK12PytestHaIniKommentar:
+    """K12: Der pythonpath-Kommentar in pytest-ha.ini erklaerte ein
+    Nachbarsprojekt (custom_components.spatial_hub, hilfen.py) — beides
+    existiert hier nicht; der Helfer heisst tests_ha/conftest.py."""
+
+    def test_kommentar_beschreibt_diese_suite(self):
+        ini = io.open("pytest-ha.ini", encoding="utf-8").read()
+        assert "spatial_hub" not in ini
+        assert "hilfen.py" not in ini
+        assert "rejuvenation_bed" in ini
+        assert "conftest.py" in ini
