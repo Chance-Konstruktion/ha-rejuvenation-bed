@@ -63,14 +63,14 @@
           "total_power_rating": "Gesamt-Heizleistung (Watt)",
           "energy_sensor": "Energiezähler-Sensor",
           "compare_to_legacy": "Vergleich mit klassischem Wasserbett",
-          "electricity_price": "Strompreis (€/kWh)"
+          "electricity_price": "Strompreis (ct/kWh)"
         },
         "data_description": {
           "enable_tracking": "📊 Erfasse Heizstunden, Verbrauch und Ersparnis.\n\nEmpfohlen: **Aktiviert** für volle Transparenz!",
           "total_power_rating": "⚡ Die **Nennleistung** aller Heizelemente zusammen.\n\nTypisch: **200-400W** pro Heizzone\n\nSteht auf dem Typenschild der Heizung. Bei dir: ca. {total_power}W (aus Zonen-Config)",
           "energy_sensor": "🔌 Optional: Echter **Energiezähler** (kWh-Sensor vom Smart Plug).\n\n• **Mit Sensor**: Exakter Verbrauch\n• **Ohne Sensor**: Berechnet aus Heizzeit × Leistung\n\nBeide Methoden funktionieren gut!",
           "compare_to_legacy": "📈 Zeigt wie viel du im Vergleich zu einer **klassischen Wasserbett-Heizung** sparst.\n\nKlassisch (80er Jahre): Thermostat hält konstant 28°C, ~70% Einschaltdauer\n\nSmart: Biorhythmus-Kurve, nur heizen wenn nötig, Solar nutzen",
-          "electricity_price": "💰 Dein durchschnittlicher Strompreis für Ersparnis-Berechnung.\n\nDeutschland Ø: **0.30-0.35 €/kWh**\n\nWird nur für die Kostenersparnis-Anzeige verwendet."
+          "electricity_price": "💰 Dein durchschnittlicher Strompreis für Ersparnis-Berechnung.\n\nDeutschland Ø: **30-35 ct/kWh**\n\nWird nur für die Kostenersparnis-Anzeige verwendet."
         }
       },
       "global_config": {

@@ -51,7 +51,7 @@
           "total_power_rating": "Gesamt-Heizleistung (Watt)",
           "energy_sensor": "Energiezähler-Sensor",
           "compare_to_legacy": "Vergleich mit klassischem Wasserbett",
-          "electricity_price": "Strompreis (€/kWh)"
+          "electricity_price": "Strompreis (ct/kWh)"
         }
       },
       "global_config": {
