@@ -486,6 +486,9 @@ class BedSolarPercentageSensor(RejuvenationBedEnergySensor):
     """Zeigt Solar-Anteil am Gesamtverbrauch."""
 
     _attr_native_unit_of_measurement = "%"
+    # K8: wie beim Thermische-Batterie-Sensor — ohne state_class keine
+    # Langzeitstatistik.
+    _attr_state_class = SensorStateClass.MEASUREMENT
     _attr_icon = "mdi:solar-power"
 
     def __init__(self, coordinator):
@@ -861,6 +864,9 @@ class BedLegacyComparisonSensor(RejuvenationBedEnergySensor):
 
     _attr_icon = "mdi:chart-bar"
     _attr_native_unit_of_measurement = "%"
+    # K8: wie beim Thermische-Batterie-Sensor — ohne state_class keine
+    # Langzeitstatistik.
+    _attr_state_class = SensorStateClass.MEASUREMENT
 
     def __init__(self, coordinator):
         super().__init__(coordinator)
