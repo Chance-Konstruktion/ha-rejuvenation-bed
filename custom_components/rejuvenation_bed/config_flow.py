@@ -117,7 +117,9 @@ class RejuvenationBedConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             data_schema=vol.Schema(
                 {
                     vol.Required("heater"): selector.EntitySelector(
-                        selector.EntitySelectorConfig(domain=["switch", "light", "number", "input_boolean"])
+                        # M5: keine "number"-Entities — sie haben weder turn_on
+                        # noch turn_off, der Coordinator koennte sie nie schalten.
+                        selector.EntitySelectorConfig(domain=["switch", "light", "input_boolean"])
                     ),
                     vol.Optional("temp_sensor"): selector.EntitySelector(
                         selector.EntitySelectorConfig(domain="sensor", device_class="temperature")

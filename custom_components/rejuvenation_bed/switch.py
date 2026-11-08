@@ -299,7 +299,8 @@ class BedTariffModeSwitch(CoordinatorEntity, SwitchEntity):
     Benötigt: Strompreis-Sensor (z.B. Tibber, aWATTar)
 
     Verhalten je nach Bett-Typ:
-    - Wasserbett: Max. -2°C Absenkung bei hohen Preisen (nie unter 26°C!)
+    - Wasserbett: Max. -2°C Absenkung bei hohen Preisen (Klemme an
+      min_temp = 24°C; eco_min_temp wird nirgends gelesen)
     - Heizmatte: Kann bei hohen Preisen komplett AUS gehen
 
     Bei günstigen Preisen: Vorheizen / thermische Batterie laden
@@ -349,7 +350,10 @@ class BedTariffModeSwitch(CoordinatorEntity, SwitchEntity):
             return {
                 "strompreis_status": price_status,
                 "absenkung_bei_teuer": "Max. 2°C",
-                "min_temperatur": "26°C",
+                # K3: die effektive Untergrenze ist min_temp (24°C, Anti-
+                # Kalt-Garantie im TemperatureCalculator); eco_min_temp wird
+                # nirgends gelesen — das Attribut versprach "26°C".
+                "min_temperatur": "24°C",
                 "info": (
                     "Bei hohen Strompreisen wird die Temperatur um max. 2°C gesenkt. "
                     "Bei günstigen Preisen wird das Wasserbett als thermische Batterie vorgeheizt."

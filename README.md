@@ -9,7 +9,7 @@
 Biorhythm-based temperature curve, learned bedtime prediction, solar surplus stored as heat, presence detection without extra sensors, and a fail-safe that survives every sensor it depends on. Works with waterbeds, heating pads and heated mattress toppers.
 
 [![HACS](https://img.shields.io/badge/HACS-Default-E8A33D.svg?style=flat-square)](https://github.com/hacs/integration)
-[![Version](https://img.shields.io/badge/version-v260728-B47326.svg?style=flat-square)](https://github.com/Chance-Konstruktion/ha-rejuvenation-bed/releases)
+[![Version](https://img.shields.io/badge/version-v260804-B47326.svg?style=flat-square)](https://github.com/Chance-Konstruktion/ha-rejuvenation-bed/releases)
 [![License](https://img.shields.io/badge/license-MIT-7BA968.svg?style=flat-square)](LICENSE)
 [![Home Assistant](https://img.shields.io/badge/Home%20Assistant-2024.6+-41BDF5.svg?style=flat-square)](https://www.home-assistant.io/)
 
@@ -239,7 +239,7 @@ Per zone (one zone for single beds, two for dual-core waterbeds):
 <br>
 
 - **Sick** — constant temperature for N days
-- **Boost** — target + offset for 60 min
+- **Boost** — fixed boost target (default 34 °C) for 60 min
 - **Vacation** — minimal 24 °C holding (frost / condensation protection)
 - **Comfort** — sleep-in offset for weekends and off-days
 
@@ -331,7 +331,7 @@ Per zone (one zone for single beds, two for dual-core waterbeds):
 
 | Mode         | Activation                                      | Effect |
 | :----------- | :---------------------------------------------- | :--- |
-| **Boost**    | `switch.bett_boost`                             | Target + offset for 60 min |
+| **Boost**    | `switch.bett_boost`                             | Fixed boost target (default 34 °C) for 60 min |
 | **Sick**     | `switch.bett_krank_modus`                       | Constant temperature for N days |
 | **Vacation** | `switch.bett_urlaub_modus` or service           | Minimal 24 °C holding temperature |
 | **Solar**    | `switch.bett_solar_batterie`                    | Store PV surplus as heat |
@@ -489,7 +489,7 @@ The integration degrades automatically. The SHT41 can fail without affecting hea
 
 <br>
 
-Waterbeds use variance analysis inside the water body. Heating pads use the **temperature trend**: if the heater is off and the surface keeps rising, a body is on it. This needs a pad-mounted thermistor. Without a sensor, presence detection is disabled and the system runs as a Level-A timer. After a ~3-minute settling time, detection is reliable, if a touch less precise than on a waterbed.
+Waterbeds use variance analysis inside the water body. Heating pads use the **temperature trend**: if the heater is off and the surface keeps rising, a body is on it. This needs a pad-mounted thermistor. Without a sensor, presence detection is disabled and the system runs as a Level-A timer. After a ~20-minute settling time (20 samples at the 60-second loop), detection is reliable, if a touch less precise than on a waterbed.
 
 </details>
 

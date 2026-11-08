@@ -16,6 +16,7 @@ from homeassistant.helpers import device_registry as dr, entity_registry as er
 from custom_components.rejuvenation_bed.const import DOMAIN
 
 DIENSTE = [
+    "clear_emergency",
     "set_boost",
     "set_sick_mode",
     "set_vacation_mode",
@@ -25,16 +26,12 @@ DIENSTE = [
 ]
 
 
-async def test_bett_laedt_in_einem_echten_home_assistant(
-    hass: HomeAssistant, bett
-) -> None:
+async def test_bett_laedt_in_einem_echten_home_assistant(hass: HomeAssistant, bett) -> None:
     assert bett.state is ConfigEntryState.LOADED
     assert bett.entry_id in hass.data[DOMAIN]
 
 
-async def test_alle_vier_plattformen_bringen_entitaeten_mit(
-    hass: HomeAssistant, bett
-) -> None:
+async def test_alle_vier_plattformen_bringen_entitaeten_mit(hass: HomeAssistant, bett) -> None:
     """climate, sensor, binary_sensor, switch -- jede muss etwas liefern.
 
     Eine Plattform, die still nichts anlegt, faellt sonst niemandem auf:
@@ -49,9 +46,7 @@ async def test_alle_vier_plattformen_bringen_entitaeten_mit(
         assert plattform in domains, f"{plattform} hat keine Entitaet angelegt"
 
 
-async def test_das_bett_ist_ein_geraet_in_home_assistant(
-    hass: HomeAssistant, bett
-) -> None:
+async def test_das_bett_ist_ein_geraet_in_home_assistant(hass: HomeAssistant, bett) -> None:
     """Ohne Geraet haengen die Entitaeten lose im Raum.
 
     Sie liessen sich dann keinem Bereich zuordnen -- und damit auch nicht
@@ -103,9 +98,7 @@ async def test_neu_laden_funktioniert_zweimal(hass: HomeAssistant, bett) -> None
         assert hass.services.has_service(DOMAIN, dienst)
 
 
-async def test_die_nachttisch_karte_wird_ausgeliefert(
-    hass: HomeAssistant, bett, hass_client
-) -> None:
+async def test_die_nachttisch_karte_wird_ausgeliefert(hass: HomeAssistant, bett, hass_client) -> None:
     """Die Karte kommt aus der Integration, nicht aus /config/www.
 
     Genau das ist der Komfort, den die Integration verspricht: kein
