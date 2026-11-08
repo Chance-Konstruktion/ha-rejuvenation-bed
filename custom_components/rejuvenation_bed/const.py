@@ -68,6 +68,7 @@ HEATING_PAD_CONFIG = {
     # Thermische Eigenschaften
     "heating_rate": 5.0,  # ~5°C/h (schnell!)
     "cooling_rate": 3.0,  # ~3°C/h (kühlt schnell ab)
+    "preheat_hours": 0.25,  # Vorheizfenster: 15 Min (M4; sonst griff der 3-h-Default)
     "preheat_minutes": 15,  # Nur 15 Min vor Schlafzeit
     # Features
     "thermal_battery": False,  # Kein Wärmespeicher
@@ -118,7 +119,6 @@ def get_bed_config(bed_type: str) -> dict:
 
 DEFAULT_SICK_MODE_TEMP = 30.0  # Konstante Temp im Krank-Modus
 DEFAULT_SICK_MODE_DAYS = 3  # Dauer Krank-Modus in Tagen
-DEFAULT_BOOST_OFFSET = 2.0  # +2°C beim Schnellheizen
 DEFAULT_COMFORT_OFFSET = 0.5  # +0.5°C beim Ausschlafen
 BOOST_MAX_TEMP = 34.0  # Absolute Obergrenze Boost (Hardware-Thermostat = Backup)
 

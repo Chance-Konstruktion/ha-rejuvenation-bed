@@ -107,6 +107,14 @@ class RejuvenationBedClimate(CoordinatorEntity, ClimateEntity):
         # Min-Temp aus Bed-Config (Heizmatte: 0°C, Wasserbett: 24°C)
         self._attr_min_temp = coordinator.bed_config.get("min_temp", 24.0)
 
+        # K4: Max-Temp ebenso aus der Bed-Config — das Comfort-Limit des
+        # Bett-Typs (Wasserbett: 30°C) war tot, der Slider bot bislang die
+        # Hardware-Obergrenze (38°C) an. Nie höher als ABSOLUTE_MAX_TEMP.
+        self._attr_max_temp = min(
+            coordinator.bed_config.get("max_temp", ABSOLUTE_MAX_TEMP),
+            ABSOLUTE_MAX_TEMP,
+        )
+
         # Ermittle Hardware-Level
         zones_config = coordinator.config_entry.data.get("zones", [])
         if zone_index < len(zones_config):
@@ -261,6 +269,38 @@ class RejuvenationBedClimate(CoordinatorEntity, ClimateEntity):
             if not hasattr(self.coordinator, "manual_boost"):
                 self.coordinator.manual_boost = {}
             self.coordinator.manual_boost[self._zone_idx] = True
+
+        if preset_mode == PRESET_AWAY:
+            # K11: AWAY war wirkungslos — es speicherte nur manual_preset,
+            # während die Zieltemperatur ausschließlich vacation_mode_enabled
+            # folgte. Der Preset aktiviert jetzt denselben Urlaub wie der
+            # Vacation-Switch (Frostschutz-Haltetemperatur, global).
+            #
+            # Fund (pc-ap): Dabei das Ablaufdatum mitsetzen, wie der
+            # Vacation-Switch (14 Tage Standard). Wer vorher per Schalter
+            # oder Dienst im Urlaub war, hat ein alt-abgelaufenes
+            # vacation_until stehen (der Auto-Ablauf im Coordinator löscht
+            # nur die Flagge, nie das Datum) — und genau das schaltete den
+            # soeben aktivierten Urlaub beim nächsten Update sofort wieder
+            # ab.
+            if not hasattr(self.coordinator, "vacation_mode_enabled"):
+                self.coordinator.vacation_mode_enabled = False
+            self.coordinator.vacation_mode_enabled = True
+            self.coordinator.vacation_until = local_now() + timedelta(days=14)
+        elif preset_mode == PRESET_NONE:
+            # Zurück auf "zu Hause": Vacation wieder aus — symmetrisch zum
+            # Vacation-Switch, der dieselbe Koordinator-Flagge schaltet.
+            # Fund (pc-ap): Dabei auch das Datum abräumen, wie der Switch
+            # beim Abschalten — sonst bleibt ein altes Ablaufdatum liegen
+            # und vergiftet den nächsten Urlaub.
+            # Fund (pc-au): und den Temperatur-Override mit abräumen —
+            # Switch, cancel_special_mode und der Auto-Ablauf löschen
+            # ihn ebenfalls; sonst hält der nächste Urlaub wieder die
+            # alte Override-Temperatur statt der konfigurierten.
+            if getattr(self.coordinator, "vacation_mode_enabled", False):
+                self.coordinator.vacation_mode_enabled = False
+            self.coordinator.vacation_until = None
+            self.coordinator.vacation_temp_override = None
 
         await self.coordinator.async_request_refresh()
 

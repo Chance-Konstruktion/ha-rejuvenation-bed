@@ -154,3 +154,41 @@ class TestDiagnostics:
 
         diag = manager.get_diagnostics()
         assert diag["blocked_switches"] >= 1
+
+
+class TestHistoryAfter24h:
+    """M3: Letzter Schaltvorgang > 24 h her — der Eintrag fällt mit der
+    24-h-Bereinigung weg; das Ausschalten darf dann nicht mit einem KeyError
+    durch den Fail-Safe-Pfad fallen."""
+
+    def test_turn_off_after_25h_does_not_raise(self, manager):
+        alt = datetime.now() - timedelta(hours=25)
+        manager._state_history["switch.heater"] = {
+            "current_state": True,
+            "last_change": alt,
+            "last_on_time": alt,
+            "last_off_time": None,
+        }
+
+        allowed, reason = manager.can_switch("switch.heater", True, False, 28.5, 28.0)
+
+        assert allowed
+        assert "Ausschalten" in reason
+        # History wurde neu angelegt, nicht gelöscht
+        assert "switch.heater" in manager._state_history
+        assert manager._state_history["switch.heater"]["last_change"] > alt
+
+    def test_turn_on_after_25h_does_not_raise(self, manager):
+        alt = datetime.now() - timedelta(hours=25)
+        manager._state_history["switch.heater"] = {
+            "current_state": False,
+            "last_change": alt,
+            "last_on_time": None,
+            "last_off_time": alt,
+        }
+
+        allowed, reason = manager.can_switch("switch.heater", False, True, 26.0, 28.0)
+
+        assert allowed
+        assert "Einschalten" in reason
+        assert "switch.heater" in manager._state_history

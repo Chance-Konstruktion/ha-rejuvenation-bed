@@ -11,6 +11,7 @@ from types import SimpleNamespace
 from unittest.mock import MagicMock
 
 import pytest
+from datetime import time
 
 from custom_components.rejuvenation_bed.const import (
     WATERBED_CONFIG,
@@ -149,3 +150,142 @@ class TestBoostTargetTemp:
         calc = self._boost_calc(options={"boost_target_temp": 30.0}, zone_boost=34)
         temp = asyncio.run(calc.async_calculate_target(0, {}, {}, coordinator=self._coord()))
         assert temp == 30.0
+
+
+class TestPreheatWindow:
+    """M4: Das Vorheizfenster der Heizmatte ist 15 Minuten — nicht die
+    180 Minuten des 3-h-Defaults, der griff, weil HEATING_PAD_CONFIG kein
+    preheat_hours kannte."""
+
+    @staticmethod
+    def _make_calc_with_hass(bed_config):
+        from types import SimpleNamespace as NS
+
+        hass = MagicMock()
+        hass.states.get = lambda entity_id: NS(state="on") if entity_id == "binary_sensor.workday" else None
+        config_entry = NS(options={}, data={"global": {}, "zones": [{}]})
+        return TemperatureCalculator(hass, config_entry, bed_config.copy())
+
+    def _target_one_hour_before_warm_from(self, bed_config):
+        import asyncio
+        from datetime import datetime as dt
+        from unittest.mock import patch
+
+        calc = self._make_calc_with_hass(bed_config)
+        with patch(
+            "custom_components.rejuvenation_bed.temperature_calculator.local_now",
+            return_value=dt(2026, 11, 8, 21, 0, 0),
+        ):
+            return asyncio.run(
+                calc.async_calculate_target(0, {"temperature_offset": 0.0}, {}, has_presence_sensor=False)
+            )
+
+    def test_heating_pad_does_not_preheat_60_minutes_before(self):
+        # 60 Min vor warm_from: Fenstergroesse 15 -> Standby (AUS), nicht Vorheizen
+        assert self._target_one_hour_before_warm_from(HEATING_PAD_CONFIG) == pytest.approx(0.0)
+
+    def test_waterbed_does_preheat_60_minutes_before(self):
+        # Gegenprobe Wasserbett: 5-h-Fenster -> 60 Min vorher wird vorgeheizt
+        assert self._target_one_hour_before_warm_from(WATERBED_CONFIG) == pytest.approx(28.0)
+
+
+class TestWakeAndOutdoorRefresh:
+    """M1: Weckzeit und Außentemperatur frieren beim ersten Update nicht ein.
+
+    Vorher löste der Calculator die Aufwachzeit genau einmal je
+    Coordinator-Leben auf und las die Außentemperatur nur beim ersten
+    Initialisieren — ein Handy-Wecker, der erst abends gestellt wird,
+    erreichte die laufende Kurve nie.
+    """
+
+    @staticmethod
+    def _make_calc(bed_config, states, zones=None, options=None, data_global=None):
+        from types import SimpleNamespace as NS
+
+        hass = MagicMock()
+        hass.states.get = lambda entity_id: states.get(entity_id)
+        config_entry = NS(
+            options=options or {},
+            data={"global": data_global or {}, "zones": zones or [{}]},
+        )
+        return TemperatureCalculator(hass, config_entry, bed_config.copy())
+
+    @staticmethod
+    def _state(value):
+        from types import SimpleNamespace as NS
+
+        return NS(state=value, domain="sensor", attributes={})
+
+    def _calculate(self, calc):
+        import asyncio
+        from datetime import datetime as dt
+        from unittest.mock import patch
+
+        with patch(
+            "custom_components.rejuvenation_bed.temperature_calculator.local_now",
+            return_value=dt(2026, 11, 8, 21, 0, 0),
+        ):
+            return asyncio.run(
+                calc.async_calculate_target(0, {"temperature_offset": 0.0}, {}, has_presence_sensor=False)
+            )
+
+    def test_wake_time_follows_later_alarm(self, monkeypatch):
+        from datetime import datetime, time
+        from types import SimpleNamespace as NS
+        import sys
+
+        # Echtes ISO-Parsing an der dt-Attrappe. Der Resolver hat dt_util
+        # beim Import als Attribut des Parent-Mocks gebunden
+        # (homeassistant.util.dt) — genau dieses Objekt wird gepatcht.
+        dt_mod = sys.modules["homeassistant.util"].dt
+        monkeypatch.setattr(dt_mod, "parse_datetime", datetime.fromisoformat, raising=False)
+        monkeypatch.setattr(dt_mod, "as_local", lambda d: d, raising=False)
+
+        states = {
+            "binary_sensor.workday": NS(state="on", domain="binary_sensor", attributes={}),
+            "sensor.alarm": self._state("2026-11-08T06:30:00"),
+        }
+        calc = self._make_calc(WATERBED_CONFIG, states, zones=[{"alarm_entity": "sensor.alarm"}])
+
+        self._calculate(calc)
+        assert calc._curves[0].wake_time == time(6, 30)
+
+        # Abends wird der Wecker auf später gestellt
+        states["sensor.alarm"] = self._state("2026-11-08T09:00:00")
+        self._calculate(calc)
+        assert calc._curves[0].wake_time == time(9, 0)
+
+    def test_outdoor_temp_refresh_keeps_user_sleep_temp(self):
+        from types import SimpleNamespace as NS
+
+        states = {
+            "binary_sensor.workday": NS(state="on", domain="binary_sensor", attributes={}),
+            "sensor.outside": self._state("5.0"),  # Winter-Profil
+        }
+        calc = self._make_calc(
+            WATERBED_CONFIG,
+            states,
+            options={"zone_0_sleep_temp": 28.5},  # Nutzer-Vorgabe
+            data_global={"outdoor_sensor": "sensor.outside"},
+        )
+
+        self._calculate(calc)
+        curve = calc._curves[0]
+        assert curve.deep_sleep_temp == 27.5  # Winter
+        assert curve.sleep_temp == 28.5  # Nutzer-Vorgabe
+
+        states["sensor.outside"] = self._state("25.0")  # Sommer-Profil
+        self._calculate(calc)
+        curve = calc._curves[0]
+        assert curve.deep_sleep_temp == 26.0  # saisonal nachgezogen
+        assert curve.sleep_temp == 28.5  # Nutzer-Vorgabe bleibt stehen
+
+    def test_update_outdoor_temp_without_user_temps_stays_seasonal(self):
+        # Direkt an der Kurve: ohne Nutzer-Vorgaben wandert alles mit (altes Verhalten)
+        from custom_components.rejuvenation_bed.biorhythmus_curve import BiorhythmusCurve
+
+        curve = BiorhythmusCurve(bedtime=time(23, 0), wake_time=time(7, 0), outdoor_temp=5.0)
+        curve.update_outdoor_temp(25.0)
+        assert curve.sleep_temp == 27.0
+        assert curve.deep_sleep_temp == 26.0
+        assert curve.wake_temp == 28.0

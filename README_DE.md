@@ -3,7 +3,7 @@
 **Intelligente Bett-Heizungssteuerung für Home Assistant**
 
 [![HACS Badge](https://img.shields.io/badge/HACS-Default-orange.svg)](https://github.com/hacs/integration)
-[![Version](https://img.shields.io/badge/version-v260728-blue.svg)](https://github.com/Chance-Konstruktion/ha-rejuvenation-bed/releases)
+[![Version](https://img.shields.io/badge/version-v260804-blue.svg)](https://github.com/Chance-Konstruktion/ha-rejuvenation-bed/releases)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 
 > ### → [**Zur gerenderten Editorial-README**](https://chance-konstruktion.github.io/ha-rejuvenation-bed/)
@@ -152,6 +152,7 @@ Die Integration erstellt drei Geräte in Home Assistant:
 | `rejuvenation_bed.cancel_special_mode` | Alle Sondermodi beenden |
 | `rejuvenation_bed.preheat_bed` | Bett vorheizen (Temperatur + Dauer) |
 | `rejuvenation_bed.reset_energy_budget` | Energiestatistiken zurücksetzen |
+| `rejuvenation_bed.clear_emergency` | Not-Aus einer Zone freigeben (nach Prüfung von Relais, Hardware-Thermostat und Fühler-Sitz) |
 
 ---
 
@@ -159,7 +160,7 @@ Die Integration erstellt drei Geräte in Home Assistant:
 
 | Modus | Aktivierung | Wirkung |
 |-------|------------|---------|
-| **Boost** | `switch.bett_boost` | Schnellheizen: Zieltemperatur + Offset für 60 Min |
+| **Boost** | `switch.bett_boost` | Schnellheizen: feste Zieltemperatur (Standard 34°C) für 60 Min |
 | **Krank** | `switch.bett_krank_modus` | Konstante Temperatur für konfigurierbare Tage |
 | **Urlaub** | `switch.bett_urlaub_modus` oder Service | Minimale 24°C Haltetemperatur (mit optionaler Temperatur) |
 | **Solar** | `switch.bett_solar_batterie` | PV-Überschuss als Wärme speichern |
@@ -321,7 +322,7 @@ Empfohlen. Ohne Sensor läuft das System als intelligente Zeitschaltuhr (Level A
 Die Integration degradiert automatisch. Der SHT41 kann ausfallen ohne Auswirkung auf die Heizung. Selbst der Wasser-Temperatursensor hat einen Fail-Safe (30% Duty-Cycle).
 
 **Wie funktioniert die Präsenz-Erkennung bei Heizmatten?**
-Anders als beim Wasserbett (Varianz-Analyse im Wasserkörper) nutzt die Heizmatten-Erkennung den **Temperatur-Trend**: Wenn die Heizung aus ist und die Temperatur trotzdem steigt, liegt jemand drauf (Körperwärme). Voraussetzung ist ein Temperatursensor an der Matte. Ohne Sensor ist keine Präsenz-Erkennung möglich — das System läuft dann als Zeitschaltuhr (Level A). Die Erkennung ist weniger präzise als beim Wasserbett, funktioniert aber zuverlässig nach einer kurzen Einliegezeit (~3 Min).
+Anders als beim Wasserbett (Varianz-Analyse im Wasserkörper) nutzt die Heizmatten-Erkennung den **Temperatur-Trend**: Wenn die Heizung aus ist und die Temperatur trotzdem steigt, liegt jemand drauf (Körperwärme). Voraussetzung ist ein Temperatursensor an der Matte. Ohne Sensor ist keine Präsenz-Erkennung möglich — das System läuft dann als Zeitschaltuhr (Level A). Die Erkennung ist weniger präzise als beim Wasserbett, funktioniert aber zuverlässig nach einer Einliegezeit von ~20 Min (20 Messwerte im 60-Sekunden-Loop).
 
 **Welchen Temperatursensor?**
 DS18B20 wasserdicht (IM Wasser) + optional SHT41 (OBEN auf dem Kern).
