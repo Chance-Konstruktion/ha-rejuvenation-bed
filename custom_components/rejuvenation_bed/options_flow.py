@@ -355,7 +355,9 @@ class RejuvenationBedOptionsFlow(config_entries.OptionsFlow):
 
         # Pflicht: Heizungsschalter
         schema_dict[vol.Required("heater", default=current_zone.get("heater", ""))] = selector.EntitySelector(
-            selector.EntitySelectorConfig(domain=["switch", "light", "number", "input_boolean"])
+            # M5: keine "number"-Entities — sie haben weder turn_on noch
+            # turn_off, der Coordinator koennte sie nie schalten.
+            selector.EntitySelectorConfig(domain=["switch", "light", "input_boolean"])
         )
 
         # Optional: Kern-Sensoren
