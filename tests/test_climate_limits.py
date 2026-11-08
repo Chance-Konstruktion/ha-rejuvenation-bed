@@ -78,6 +78,10 @@ class TestAwayPresetActivatesVacation:
         assert coordinator.vacation_mode_enabled is True
 
     def test_none_preset_turns_vacation_off(self):
+        """Fund (pc-au): PRESET_NONE räumt auch den Temperatur-Override
+        ab, wie der Vacation-Switch, cancel_special_mode und der
+        Auto-Ablauf — sonst schaltet der nächste Urlaub wieder auf die
+        alte Override-Temperatur."""
         import asyncio
 
         coordinator = MagicMock()
@@ -85,12 +89,14 @@ class TestAwayPresetActivatesVacation:
         coordinator.config_entry = MagicMock(data={"zones": [{}]})
         coordinator.async_request_refresh = AsyncMock()
         coordinator.vacation_mode_enabled = True
+        coordinator.vacation_temp_override = 30.0
         entity = RejuvenationBedClimate(coordinator, 0, "")
 
         preset_none = sys.modules["homeassistant.components.climate"].PRESET_NONE
         asyncio.run(entity.async_set_preset_mode(preset_none))
 
         assert coordinator.vacation_mode_enabled is False
+        assert coordinator.vacation_temp_override is None
 
     def test_away_renews_expired_vacation_until(self):
         """Fund (pc-ap): AWAY erneuert ein alt-abgelaufenes vacation_until.
