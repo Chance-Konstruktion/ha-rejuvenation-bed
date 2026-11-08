@@ -246,3 +246,59 @@ class TestSmoothCos:
             val = BiorhythmusCurve._smooth_cos(x)
             assert val >= prev
             prev = val
+
+
+class TestChronotypeNadirOnly:
+    """K10: Der Chronotyp verschiebt nur den Nadir, nicht die ganze Kurve.
+
+    Der Offset lag auf der aktuellen Zeit: die Lerche war 1,5 h früher
+    durch (Aufwachphase endete vor dem Wecker), die Eule hinkte 1,5 h
+    hinterher und war beim Wecker noch im Anstieg. Jetzt bleiben
+    bedtime und Weckzeit Anker — das Tiefschlaf-Plateau wandert.
+    """
+
+    def _curve(self, chronotype):
+        from custom_components.rejuvenation_bed.biorhythmus_curve import BiorhythmusCurve
+
+        return BiorhythmusCurve(
+            bedtime=time(23, 0),
+            wake_time=time(7, 0),
+            sleep_temp=28.0,
+            deep_sleep_temp=27.0,
+            wake_temp=28.5,
+            chronotype=chronotype,
+        )
+
+    @staticmethod
+    def _at(hour, minute):
+        return datetime(2026, 11, 8, hour, minute, 0)
+
+    def test_anchors_hold_for_all_chronotypes(self):
+        # Einschlafen bei bedtime: sleep_temp; Aufwachen beim Wecker: wake_temp
+        for chronotype in ("normal", "lerche", "eule"):
+            curve = self._curve(chronotype)
+            assert curve.get_target_temperature(self._at(23, 0)) == curve.sleep_temp, chronotype
+            assert curve.get_target_temperature(self._at(7, 0)) == curve.wake_temp, chronotype
+
+    def test_plateau_is_shifted_not_the_whole_curve(self):
+        # Normal: Plateau-Ende bei 0.63 * 8 h ≈ 04:02
+        normal = self._curve("normal")
+        assert normal.get_target_temperature(self._at(3, 30)) == normal.deep_sleep_temp
+        assert normal.get_target_temperature(self._at(4, 30)) > normal.deep_sleep_temp
+
+        # Lerche: Plateau endet 1,5 h früher (≈ 02:32), Anker unverändert
+        lerche = self._curve("lerche")
+        assert lerche.get_target_temperature(self._at(2, 0)) == lerche.deep_sleep_temp
+        assert lerche.get_target_temperature(self._at(3, 30)) > lerche.deep_sleep_temp
+
+        # Eule: Plateau endet 1,5 h später (≈ 05:32), Anker unverändert
+        eule = self._curve("eule")
+        assert eule.get_target_temperature(self._at(5, 0)) == eule.deep_sleep_temp
+        assert eule.get_target_temperature(self._at(6, 0)) > eule.deep_sleep_temp
+
+    def test_normal_is_unchanged(self):
+        # Kontrollfall: ohne Chronotyp-Offset exakt das alte Verhalten
+        curve = self._curve("normal")
+        assert curve.get_target_temperature(self._at(0, 0)) == curve.deep_sleep_temp
+        # Landing endet nach 0.08 * 8 h = 23:38, danach Plateau
+        assert curve.get_target_temperature(self._at(23, 45)) == curve.deep_sleep_temp
