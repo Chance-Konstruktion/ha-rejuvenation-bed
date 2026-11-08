@@ -8,7 +8,7 @@ weiterhin ABSOLUTE_MAX_TEMP.
 """
 
 import sys
-from unittest.mock import MagicMock
+from unittest.mock import AsyncMock, MagicMock
 
 # Echte Basisklassen statt Mock, bevor climate.py importiert wird (Muster aus
 # test_nightstand_config.py: zwei MagicMocks als Basen werfen einen
@@ -48,3 +48,43 @@ def test_waterbed_slider_max_is_configured_comfort_limit():
 def test_pad_slider_max_stays_at_hardware_limit():
     # Config-Maximum 40 liegt über ABSOLUTE_MAX_TEMP — Slider bleibt bei 38
     assert _climate(HEATING_PAD_CONFIG)._attr_max_temp == ABSOLUTE_MAX_TEMP
+
+
+class TestAwayPresetActivatesVacation:
+    """K11: Der AWAY-Preset aktiviert den Urlaub (Frostschutz), wie der
+    Vacation-Switch; PRESET_NONE beendet ihn wieder."""
+
+    @staticmethod
+    def _run(coro):
+        import asyncio
+
+        return asyncio.run(coro)
+
+    def test_away_preset_turns_vacation_on(self):
+        import asyncio
+
+        coordinator = MagicMock()
+        coordinator.bed_config = WATERBED_CONFIG.copy()
+        coordinator.config_entry = MagicMock(data={"zones": [{}]})
+        coordinator.async_request_refresh = AsyncMock()
+        entity = RejuvenationBedClimate(coordinator, 0, "")
+
+        preset_away = sys.modules["homeassistant.components.climate"].PRESET_AWAY
+        asyncio.run(entity.async_set_preset_mode(preset_away))
+
+        assert coordinator.vacation_mode_enabled is True
+
+    def test_none_preset_turns_vacation_off(self):
+        import asyncio
+
+        coordinator = MagicMock()
+        coordinator.bed_config = WATERBED_CONFIG.copy()
+        coordinator.config_entry = MagicMock(data={"zones": [{}]})
+        coordinator.async_request_refresh = AsyncMock()
+        coordinator.vacation_mode_enabled = True
+        entity = RejuvenationBedClimate(coordinator, 0, "")
+
+        preset_none = sys.modules["homeassistant.components.climate"].PRESET_NONE
+        asyncio.run(entity.async_set_preset_mode(preset_none))
+
+        assert coordinator.vacation_mode_enabled is False

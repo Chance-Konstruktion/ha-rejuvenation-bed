@@ -1340,6 +1340,11 @@ class RejuvenationBedCoordinator(DataUpdateCoordinator):
             return HVACMode.HEAT, PRESET_BOOST
 
         if self.vacation_mode_enabled:
+            # K11: Level A bietet das AWAY-Preset gar nicht an
+            # (climate._adjust_modes_for_hardware) — es nicht zu melden,
+            # meldet der Vacation-Fall dort kein nicht angebotenes Preset.
+            if hardware_level == "A":
+                return HVACMode.AUTO, PRESET_NONE
             return HVACMode.AUTO, PRESET_AWAY
 
         sick_until = self.sick_mode_until.get(zone_index)
