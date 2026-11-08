@@ -112,3 +112,17 @@ class TestK12PytestHaIniKommentar:
         assert "hilfen.py" not in ini
         assert "rejuvenation_bed" in ini
         assert "conftest.py" in ini
+
+
+class TestK14VersionsBadge:
+    """K14: Die Versions-Badges beider READMEs zeigen die Version aus der
+    manifest.json — sie hinkten mit v260728 hinter manifest 260804 her."""
+
+    @pytest.mark.parametrize("path", ["README.md", "README_DE.md"])
+    def test_badge_entspricht_manifest(self, path):
+        manifest = json.load(
+            io.open("custom_components/rejuvenation_bed/manifest.json", encoding="utf-8")
+        )
+        text = io.open(path, encoding="utf-8").read()
+        assert f"version-v{manifest['version']}" in text
+        assert "version-v260728" not in text
