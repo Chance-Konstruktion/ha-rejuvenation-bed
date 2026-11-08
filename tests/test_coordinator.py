@@ -409,3 +409,36 @@ class TestSleepTrackingRecordsHeatingCycles:
             )
         )
         assert calc._current_night == {}
+
+
+class TestVacationPresetReporting:
+    """K11: Der Vacation-Fall meldet das AWAY-Preset nur, wenn die Zone es
+    anbietet — Level A kennt nur NONE und BOOST."""
+
+    @staticmethod
+    def _fake_self(hardware_level):
+        # registrierte Modul-Attrappe: genau die, aus der der Coordinator
+        # in _determine_hvac_mode importiert
+        climate_const = sys.modules["homeassistant.components.climate.const"]
+
+        return SimpleNamespace(
+            manual_hvac_mode={},
+            manual_preset={},
+            manual_boost={},
+            vacation_mode_enabled=True,
+            sick_mode_until={},
+            eco_mode_enabled=False,
+            _climate_const=climate_const,
+        ), climate_const
+
+    def test_level_a_reports_no_away(self):
+        from datetime import datetime as _dt  # noqa: F401
+
+        fake, climate_const = self._fake_self("A")
+        hvac, preset = RejuvenationBedCoordinator._determine_hvac_mode(fake, 0, False, {"hardware_level": "A"})
+        assert preset is climate_const.PRESET_NONE
+
+    def test_level_b_reports_away(self):
+        fake, climate_const = self._fake_self("B")
+        hvac, preset = RejuvenationBedCoordinator._determine_hvac_mode(fake, 0, False, {"hardware_level": "B"})
+        assert preset is climate_const.PRESET_AWAY

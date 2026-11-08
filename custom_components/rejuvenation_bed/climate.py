@@ -270,6 +270,20 @@ class RejuvenationBedClimate(CoordinatorEntity, ClimateEntity):
                 self.coordinator.manual_boost = {}
             self.coordinator.manual_boost[self._zone_idx] = True
 
+        if preset_mode == PRESET_AWAY:
+            # K11: AWAY war wirkungslos — es speicherte nur manual_preset,
+            # während die Zieltemperatur ausschließlich vacation_mode_enabled
+            # folgte. Der Preset aktiviert jetzt denselben Urlaub wie der
+            # Vacation-Switch (Frostschutz-Haltetemperatur, global).
+            if not hasattr(self.coordinator, "vacation_mode_enabled"):
+                self.coordinator.vacation_mode_enabled = False
+            self.coordinator.vacation_mode_enabled = True
+        elif preset_mode == PRESET_NONE:
+            # Zurück auf "zu Hause": Vacation wieder aus — symmetrisch zum
+            # Vacation-Switch, der dieselbe Koordinator-Flagge schaltet.
+            if getattr(self.coordinator, "vacation_mode_enabled", False):
+                self.coordinator.vacation_mode_enabled = False
+
         await self.coordinator.async_request_refresh()
 
     @property
