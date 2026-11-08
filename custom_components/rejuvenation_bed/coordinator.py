@@ -1221,6 +1221,11 @@ class RejuvenationBedCoordinator(DataUpdateCoordinator):
         if self._night_tracking_active.get(zone_index, False):
             self.sleep_score_calculator.record_temperature(zone_index, current_temp, target_temp)
 
+            # M2: Heiz-Zyklen mitaufzeichnen — ohne sie blieben
+            # heating_cycles/total_heating_minutes in den Nacht-Daten leer
+            # und die Heizzyklen-Effizienz des Schlaf-Scores war pauschal 100.
+            self.sleep_score_calculator.record_heating_state(zone_index, bool(should_heat))
+
             # CO2: Zuerst aus Zone, dann Options, dann global (Rückwärtskompatibilität)
             zones = self.config_entry.data.get("zones", [])
             zone_conf = zones[zone_index] if zone_index < len(zones) else {}
