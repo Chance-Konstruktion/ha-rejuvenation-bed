@@ -16,6 +16,7 @@ from homeassistant.helpers import device_registry as dr, entity_registry as er
 from custom_components.rejuvenation_bed.const import DOMAIN
 
 DIENSTE = [
+    "clear_emergency",
     "set_boost",
     "set_sick_mode",
     "set_vacation_mode",
