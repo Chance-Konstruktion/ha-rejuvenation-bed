@@ -12,7 +12,7 @@ Echte Schlafnächte, Sensor-Rohdaten und Gerätekennungen bleiben lokal auf der 
 - `FakeIbiQuelle` liefert deterministische Unit-Test-Eingaben.
 - `SamsungHealthSensorSdkIbiQuelle` verweigert fail-closed, solange die optionale AAR-Brücke nicht vorhanden ist.
 - `IbiMesspunktSpeicher` verwendet eine private, begrenzte SQLite-Datenbank (maximal zehn Stunden / 40.000 Werte).
-- `SleepHrvExtractor` prüft physiologische IBI-Grenzen, optionale Provider-Signalqualität und lokale Artefakte. Er berechnet RMSSD, SDNN, ungefähre IBI-Zeitabdeckung sowie Bewegungsvarianz aus vorhandenen Schrittintervallen. Fehlende Bewegungs-Buckets werden nicht als Nullbewegung erfunden.
+- `SleepHrvExtractor` prüft physiologische IBI-Grenzen, optionale Provider-Signalqualität und lokale Artefakte. Er berechnet RMSSD, SDNN, ungefähre IBI-Zeitabdeckung sowie Bewegungsvarianz aus vorhandenen Schrittintervallen. `rawIbiCount` zählt alle zeitlich im Fenster liegenden Eingaben; `acceptedIbiCount + rejectedIbiCount == rawIbiCount`. Fehlende Bewegungs-Buckets werden nicht als Nullbewegung erfunden.
 
 ## Regelmodell v0
 
@@ -24,7 +24,7 @@ Der experimentelle Schalter ist in `SleepEstimatorSettings` persistent und stand
 
 `HealthConnectSleepQuelle` liest Schlafphasen-Segmente aus `SleepSessionRecord.stages` ausschließlich mit der Nutzerberechtigung `READ_SLEEP`. Es werden keine Daten zurückgeschrieben. Generische `SLEEPING`- und `UNKNOWN`-Segmente sind keine genaue Referenzklasse und werden vom Vergleich ausgeschlossen.
 
-`SleepLocalValidation` erstellt Schätzungen aus rollierenden vollständigen 30-Minuten-Fenstern im 5-Minuten-Schritt. `SleepStageAgreement` richtet diese Schätzungen und Health-Connect-Referenzsegmente auf einem 5-Minuten-Raster aus und liefert Konfusionsmatrix, Accuracy und Cohen-Kappa. Die Unit-Tests benutzen ausschließlich synthetische IBI-, Bewegungs- und Phasenfolgen. Der Vergleich muss nach dem Einwilligen auf dem Gerät lokal ausgeführt werden; reale Nächte werden nicht in CI oder Git hochgeladen.
+`SleepLocalValidation` erstellt Schätzungen aus rollierenden vollständigen 30-Minuten-Fenstern im 5-Minuten-Schritt. Der Aufruf verlangt ein explizites `enabled=true`, damit ein versehentliches Validieren nicht den standardmäßig ausgeschalteten Experiment-Schalter umgeht. `SleepStageAgreement` richtet diese Schätzungen und Health-Connect-Referenzsegmente auf einem 5-Minuten-Raster aus und liefert Konfusionsmatrix, Accuracy und Cohen-Kappa. Die Unit-Tests benutzen ausschließlich synthetische IBI-, Bewegungs- und Phasenfolgen. Der Vergleich muss nach dem Einwilligen auf dem Gerät lokal ausgeführt werden; reale Nächte werden nicht in CI oder Git hochgeladen.
 
 ## Was die Implementierung noch nicht beweist
 
