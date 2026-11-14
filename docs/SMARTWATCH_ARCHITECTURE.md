@@ -126,8 +126,8 @@ Wear-OS-Projekt, Amber-UI, zwei Seiten, normierte Datenmodelle, Tests und Health
 ### M1 – Sensorzugriff (erster Teil umgesetzt)
 Passiver Health-Services-Listener für Herzfrequenz und optionale Schritt-Deltas, expliziter Berechtigungsfluss, lokale begrenzte Puffer und Stop-/Löschfunktion sind angelegt. Deskriptive Puls-/Schritt-Merkmalsfenster sind implementiert. Offen bleiben rohe Beschleunigungsdaten, IBI/PPG, Trage-/Batteriestatus und Laufzeitvalidierung auf echter Watch-Hardware.
 
-### M2 – Lokale Analyse (Vorbereitung umgesetzt)
-Deskriptive 30-Minuten-Feature-Fenster für Puls und Schritt-Deltas sind vorhanden. Auf unterstützten Geräten wird zusätzlich der grobe Health-Services-Status schlafend/wach gespeichert. Es fehlt weiterhin ein validiertes REM-/Leicht-/Tiefschlaf-Modell. Der UNKNOWN-Fallback bleibt aktiv, bis Referenzdaten und ein reproduzierbares Validierungsverfahren vorliegen.
+### M2 – Lokale Analyse (Schätzer v0 in Arbeit)
+Deskriptive 30-Minuten-Feature-Fenster für Puls und Schritt-Deltas, die IBI-Adaptergrenze, ein deterministischer HRV-/Bewegungs-Extraktor und das regelbasierte Modell `m2-rules-0.1` sind angelegt. Der Modell-Schalter ist standardmäßig AUS. Ohne Samsung-AAR-Brücke oder bei schlechter Datenqualität bleibt `unknown`. Der Health-Connect-Leser und die Konfusionsmatrix-/Cohen-Kappa-Waage sind für synthetische Tests vorhanden; echte Watch-4-Referenzvalidierung steht aus. Details und offene Grenzen: `docs/SLEEP_STAGE_M2.md` und `docs/IBI_ADAPTER.md`.
 
 ### M3 – Sichere HA-Verbindung
 mDNS, ECDH/SAS, Android-Keystore-Geräteschlüssel, Replay-Schutz, Rate-Limits und Widerruf.
