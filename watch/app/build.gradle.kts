@@ -15,6 +15,17 @@ android {
         versionName = "0.2.0"
     }
 
+    signingConfigs {
+        getByName("debug") {
+            // Fester Debug-Schlüssel (Android-Standardwerte, kein Geheimnis): jede CI-Fassung lässt sich über
+            // die vorige installieren, ohne Deinstallieren und ohne Verlust der Messdaten und Rechte auf der Uhr.
+            storeFile = rootProject.file("debug.keystore")
+            storePassword = "android"
+            keyAlias = "androiddebugkey"
+            keyPassword = "android"
+        }
+    }
+
     buildFeatures {
         compose = true
     }

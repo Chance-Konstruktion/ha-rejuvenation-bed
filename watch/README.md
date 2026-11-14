@@ -54,6 +54,9 @@ adb shell run-as net.schanz.rejuvenationbed.watch cat files/debug/protokoll.txt
 adb logcat -s RBW
 ```
 
+Die Debug-Fassung ist mit einem festen Schlüssel signiert (`watch/debug.keystore`, Android-Standardwerte). Eine neue
+CI-Fassung geht deshalb mit `adb install -r` über die alte, ohne Deinstallieren; Messdaten und Rechte bleiben.
+
 `rbw.blatt` öffnet THERMO, SCHLAF oder DEBUG direkt (Vorschau-Tür wie bei ADL). Protokoll-Arten: `APP`, `FAEHIG`,
 `KANAL`, `RECHT`, `REG` (Registrierung), `DATEN` (Lieferung, auch verworfene mit Grund), `PLATT` (Plattform-Schlafstatus
 roh → gemappt), `LIVE`, `SENSOR`, `NOWBAR`.
