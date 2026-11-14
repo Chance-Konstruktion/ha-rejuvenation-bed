@@ -12,7 +12,7 @@ Alle Änderungen am Rejuvenation Bed Projekt.
 - Now Bar: laufende Aktivität während der Hintergrundmessung („Nur Symbole“ / „Symbole mit Text“).
 - Gestalt kommt jetzt aus dem eingebauten chance-framework; zwei Gesichter: Bett (gedimmter Bernstein, nachts und
   im Schlaf) und Sofa (Tag, mit Kraft), Wahl auf dem Debug-Blatt.
-- Dunkler Start: eigenes Thema mit schwarzem Fenster und schwarzem Startbildschirm, dazu ein eigenes Startsymbol im gedimmten Bett-Akzent ohne weißen Kreis; kein heller Blitz im Bett.
+- Dunkler Start: eigenes Thema mit schwarzem Fenster und schwarzem Startbildschirm, dazu ein eigenes Startsymbol im gedimmten Bett-Akzent ohne weißen Kreis (ganz im inneren Kreis); kein heller Blitz im Bett.
 - Fester Debug-Schlüssel: neue CI-Fassungen lassen sich ohne Deinstallieren über die alte spielen.
 
 ### Home Assistant 2026.11
