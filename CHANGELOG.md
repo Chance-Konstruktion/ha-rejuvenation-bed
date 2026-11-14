@@ -12,6 +12,9 @@ Alle Änderungen am Rejuvenation Bed Projekt.
 - Now Bar: laufende Aktivität während der Hintergrundmessung („Nur Symbole“ / „Symbole mit Text“).
 - Gestalt kommt jetzt aus dem eingebauten chance-framework; zwei Gesichter: Bett (gedimmter Bernstein, nachts und
   im Schlaf) und Sofa (Tag, mit Kraft), Wahl auf dem Debug-Blatt.
+- Bett-Schriften alle lesbar (Fund w14-tp): die BETT-Tokens grau2 und ROT_BETT sind heller (grau2 5,05:1, ROT_BETT
+  5,24:1 auf Schwarz, höchstens 7,5:1, weiter nichts Grünes oder Gelbes im Bett); der Kontrast-Wächter prüft jetzt
+  jede Bett-Schrift (grau2 und ROT_BETT eingeschlossen) auf jeder Bett-Fläche ≥ 4,5:1.
 - Dunkler Start: eigenes Thema mit schwarzem Fenster und schwarzem Startbildschirm, dazu ein eigenes Startsymbol im gedimmten Bett-Akzent ohne weißen Kreis (ganz im inneren Kreis); kein heller Blitz im Bett.
 - Fester Debug-Schlüssel: neue CI-Fassungen lassen sich ohne Deinstallieren über die alte spielen.
 
