@@ -53,24 +53,28 @@ class SleepHrvExtractorTest {
             repeat(600) { index ->
                 add(IbiMesspunkt((index + 1L) * 1_000L, 850.0, 0.95))
             }
+            // More than 20% of the timestamped input is explicitly marked
+            // as low-quality, so the quality gate must actually fail.
+            repeat(151) { index ->
+                add(IbiMesspunkt(400_100L + index, 850.0, 0.10))
+            }
             add(IbiMesspunkt(599_500L, 1_900.0, 0.95))
-            add(IbiMesspunkt(599_600L, 850.0, 0.10))
             add(IbiMesspunkt(599_700L, 2_500.0, 0.95))
         }
 
         val result = SleepHrvExtractor.extract(samples, emptyList(), start, end)
 
         assertEquals(600, result.acceptedIbiCount)
-        assertEquals(603, result.rawIbiCount)
-        assertEquals(3, result.rejectedIbiCount)
-        assertEquals(600.0 / 603.0, result.signalQuality, 0.0001)
+        assertEquals(753, result.rawIbiCount)
+        assertEquals(153, result.rejectedIbiCount)
+        assertEquals(600.0 / 753.0, result.signalQuality, 0.0001)
         assertFalse(result.hasReliableIbi)
     }
 
     @Test
     fun movementVarianceIsUnknownWithoutThreeObservedBuckets() {
         val start = 0L
-        val steps = listOf(StepIntervalSample(0L, 60_000L, 4), StepIntervalSample(60_000L, 120_000L, 8))
+        val steps = listOf(StepIntervalSample(0L, 60_000L, 4), StepIntervalSample(60_000L, 360_000L, 8))
         val result = SleepHrvExtractor.extract(emptyList(), steps, start, 1_800_000L)
         assertEquals(2.0 / 6.0, result.movementCoverage, 0.0001)
         assertEquals(null, result.movementVarianceStepsPerMinuteSquared)
