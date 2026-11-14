@@ -18,7 +18,7 @@ Echte Schlafnächte, Sensor-Rohdaten und Gerätekennungen bleiben lokal auf der 
 
 Die feste Regelversion ist `m2-rules-0.1`. Ihre Schwellen sind ausdrücklich Hypothesen für reproduzierbare Vergleiche. Die Regeln verwenden mittleres IBI, RMSSD, SDNN und Bewegungsvarianz. Sie liefern nur dann eine Kandidatenphase, wenn die Mindestzahl an IBI-Werten, die Signalqualität, Abdeckung, Bewegungsabdeckung und Konfidenz ausreichen. Andernfalls lautet das Ergebnis `unknown`.
 
-Der experimentelle Schalter ist in `SleepEstimatorSettings` persistent und standardmäßig AUS. `SleepStageEstimate.measuredAtEpochMillis` ist der Zeitpunkt der Schätzung, nicht der Mittelpunkt des 30-Minuten-Fensters.
+Der experimentelle Schalter ist in `SleepEstimatorSettings` persistent und standardmäßig AUS. In der Info-Ebene des Schlaf-Blatts wird er über die deutlich beschriftete Touch-Aktion „EXPERIMENT EINSCHALTEN/AUSSCHALTEN“ bedient; auf dem Hauptblatt bleibt die Anzeige ohne aktivierten Schalter oder bei einem fehlgeschlagenen Qualitäts-Gate „unbekannt“. `SleepStageEstimate.measuredAtEpochMillis` ist der Zeitpunkt der Schätzung, nicht der Mittelpunkt des 30-Minuten-Fensters.
 
 ## Health-Connect-Abgleich
 
@@ -31,7 +31,8 @@ Der experimentelle Schalter ist in `SleepEstimatorSettings` persistent und stand
 1. Die Samsung-AAR-Brücke ist nicht enthalten. Die offizielle Samsung-Integration bleibt gesondert zu beziehen und auf der Watch 4 mit Capability- und Berechtigungsprüfung einzubauen.
 2. Die Regeln sind noch nicht gegen eine echte Health-Connect-Referenznacht validiert.
 3. Die Watch-4-Nacht mit eingeschaltetem Experiment-Schalter und lokalem Abgleich steht aus.
-4. Erst nach dieser Prüfung darf eine andere Sitzung melden, dass die Schätzung „trägt“. Bis dahin bleibt die Standardausgabe `unknown`.
+4. Der Health-Connect-Leser prüft `READ_SLEEP`, enthält aber noch keinen eigenen UI-Berechtigungsdialog; die Berechtigung muss vor dem lokalen Abgleich erteilt sein.
+5. Erst nach der Watch-4-Prüfung und dem lokalen Referenzabgleich darf eine andere Sitzung melden, dass die Schätzung „trägt“. Bis dahin bleibt die Standardausgabe `unknown`.
 
 ## Testdaten- und Datenschutzregel
 
