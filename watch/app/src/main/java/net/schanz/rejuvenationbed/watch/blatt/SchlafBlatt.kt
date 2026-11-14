@@ -103,7 +103,12 @@ fun rememberSchlafStand(context: Context, experimentAktiv: Boolean): SchlafStand
         val fensterEnde = Math.floorDiv(jetzt, SleepFeatureExtractor.DEFAULT_WINDOW_MILLIS) *
             SleepFeatureExtractor.DEFAULT_WINDOW_MILLIS
         val fensterStart = fensterEnde - SleepFeatureExtractor.DEFAULT_WINDOW_MILLIS
-        val ibi = IbiMesspunktSpeicher(context).lesen(fensterStart, fensterEnde)
+        val ibiSpeicher = IbiMesspunktSpeicher(context)
+        val ibi = try {
+            ibiSpeicher.lesen(fensterStart, fensterEnde)
+        } finally {
+            ibiSpeicher.close()
+        }
         val hrv = SleepHrvExtractor.extract(
             ibiSamples = ibi,
             stepIntervals = schritte,
