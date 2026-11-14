@@ -61,7 +61,9 @@ class SleepHrvExtractorTest {
         val result = SleepHrvExtractor.extract(samples, emptyList(), start, end)
 
         assertEquals(600, result.acceptedIbiCount)
-        assertEquals(600, result.rawIbiCount)
+        assertEquals(603, result.rawIbiCount)
+        assertEquals(3, result.rejectedIbiCount)
+        assertEquals(600.0 / 603.0, result.signalQuality, 0.0001)
         assertFalse(result.hasReliableIbi)
     }
 

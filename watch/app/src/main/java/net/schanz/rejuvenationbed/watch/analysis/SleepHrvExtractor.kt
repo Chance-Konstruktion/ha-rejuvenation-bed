@@ -59,16 +59,21 @@ object SleepHrvExtractor {
         require(movementBucketMillis > 0L) { "movement bucket must be positive" }
 
         val windowDuration = (endEpochMillis - startEpochMillis).toDouble()
-        val raw = ibiSamples
+        // Count every timestamped input before filtering so raw + rejected = accepted + rejected.
+        // Invalid intervals, poor provider quality, duplicate timestamps and artefacts all
+        // contribute to the rejected count and lower the reported signal-quality fraction.
+        val inWindow = ibiSamples.filter {
+            it.measuredAtEpochMillis in (startEpochMillis + 1L)..endEpochMillis
+        }
+        val candidates = inWindow
             .asSequence()
-            .filter { it.measuredAtEpochMillis in (startEpochMillis + 1L)..endEpochMillis }
             .filter { it.intervalMillis.isFinite() && it.intervalMillis in MIN_IBI_MILLIS..MAX_IBI_MILLIS }
             .filter { it.signalQuality == null || it.signalQuality >= PROVIDER_QUALITY_FLOOR }
             .distinctBy { it.measuredAtEpochMillis }
             .sortedBy { it.measuredAtEpochMillis }
             .toList()
 
-        val accepted = removeArtefacts(raw)
+        val accepted = removeArtefacts(candidates)
         val intervals = accepted.map { it.intervalMillis }
         val mean = intervals.takeIf { it.isNotEmpty() }?.average()
         val differences = intervals.zipWithNext { left, right -> right - left }
@@ -81,7 +86,7 @@ object SleepHrvExtractor {
         }
         val acceptedDuration = intervals.sum()
         val coverage = (acceptedDuration / windowDuration).coerceIn(0.0, 1.0)
-        val rawCount = raw.size
+        val rawCount = inWindow.size
         val signalQuality = if (rawCount == 0) 0.0 else accepted.size.toDouble() / rawCount
 
         val movement = movementFeatures(
@@ -96,9 +101,7 @@ object SleepHrvExtractor {
             endEpochMillis = endEpochMillis,
             rawIbiCount = rawCount,
             acceptedIbiCount = accepted.size,
-            rejectedIbiCount = (ibiSamples.count {
-                it.measuredAtEpochMillis in (startEpochMillis + 1L)..endEpochMillis
-            } - accepted.size).coerceAtLeast(0),
+            rejectedIbiCount = (rawCount - accepted.size).coerceAtLeast(0),
             meanIbiMillis = mean,
             rmssdMillis = rmssd,
             sdnnMillis = sdnn,
