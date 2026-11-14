@@ -1,7 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- Startbildschirm-Symbol: das Bett im gedimmten Bett-Akzent, ohne Fläche dahinter. Das Startersymbol
      ist kein adaptives Symbol; das System legt es auf dem Startbildschirm in einen weißen Kreis.
-     Mit eigenem Symbol bleibt der Kreis weg. Rand von 12 auf 72: der Inhalt liegt im inneren Kreis (2/3). -->
+     Mit eigenem Symbol bleibt der Kreis weg. Rand von 12 auf 72, dazu 0,9 um die Mitte: die Bettfüße (24,2 vom Mittelpunkt) liegen so mit Rundkappe
+     bei 22,8 und damit im inneren Kreis (2/3, Radius 24). -->
 <vector xmlns:android="http://schemas.android.com/apk/res/android"
     android:width="72dp"
     android:height="72dp"
@@ -9,7 +10,11 @@
     android:viewportHeight="72">
     <group
         android:translateX="12"
-        android:translateY="12">
+        android:translateY="12"
+        android:pivotX="24"
+        android:pivotY="24"
+        android:scaleX="0.9"
+        android:scaleY="0.9">
         <path
             android:fillColor="#00000000"
             android:strokeColor="#B47726"
