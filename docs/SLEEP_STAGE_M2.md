@@ -4,7 +4,9 @@
 
 Der M2-Schätzer ist ein **experimenteller, regelbasierter Kandidat**, kein medizinisches Modell. Die Nutzereinstellung ist standardmäßig AUS. Bei fehlenden, veralteten oder qualitativ unzureichenden IBI-/Bewegungsdaten bleibt die Ausgabe `unknown`. Eine Schätzung wird nicht an Home Assistant übertragen und verändert keine Temperaturregel.
 
-Echte Schlafnächte, Sensor-Rohdaten und Gerätekennungen bleiben lokal auf der Uhr. Im Repository liegen ausschließlich synthetische Testdaten.
+Echte Schlafnächte und IBI-Rohdaten bleiben auf der Uhr. Nur abgeleitete Phasen, Zeitstempel, Konfidenz, Abdeckung und Algorithmusversion werden nach ausdrücklichem Tastendruck über die lokale Wear Data Layer-Verbindung zum gekoppelten Smartphone gesendet. Dort liest die separate Phone-App die Health-Connect-Referenz; weder Referenzdaten noch Rohsensorwerte gehen zurück auf die Watch oder in ein Netzwerk. Im Repository liegen ausschließlich synthetische Testdaten.
+
+**Plattformgrenze:** Health Connect wird von Wear OS nicht unterstützt. Samsung Health synchronisiert Schlafdaten von der Watch zunächst zur Samsung-Health-App auf dem Smartphone und von dort zu Health Connect. Darum liegt der Health-Connect-Leser und die Berechtigungsoberfläche in `watch/phone`, nicht im Wear-Modul.
 
 ## IBI und Merkmale
 
@@ -22,17 +24,17 @@ Der experimentelle Schalter ist in `SleepEstimatorSettings` persistent und stand
 
 ## Health-Connect-Abgleich
 
-`HealthConnectSleepQuelle` liest Schlafphasen-Segmente aus `SleepSessionRecord.stages` ausschließlich mit der Nutzerberechtigung `READ_SLEEP`. Es werden keine Daten zurückgeschrieben. Generische `SLEEPING`- und `UNKNOWN`-Segmente sind keine genaue Referenzklasse und werden vom Vergleich ausgeschlossen.
+`watch/phone` enthält die Smartphone-Begleit-App. Sie fordert dort die Nutzerberechtigung `READ_SLEEP` an und liest Schlafphasen-Segmente aus `SleepSessionRecord.stages`. Es werden keine Daten zurückgeschrieben. Generische `SLEEPING`- und `UNKNOWN`-Segmente sind keine genaue Referenzklasse und werden vom Vergleich ausgeschlossen. Der Watch-Leser wurde entfernt, weil Health Connect nicht auf Wear OS verfügbar ist.
 
-`SleepLocalValidation` erstellt Schätzungen aus rollierenden vollständigen 30-Minuten-Fenstern im 5-Minuten-Schritt. Der Aufruf verlangt ein explizites `enabled=true`, damit ein versehentliches Validieren nicht den standardmäßig ausgeschalteten Experiment-Schalter umgeht. `SleepStageAgreement` richtet diese Schätzungen und Health-Connect-Referenzsegmente auf einem 5-Minuten-Raster aus und liefert Konfusionsmatrix, Accuracy und Cohen-Kappa. Die Unit-Tests benutzen ausschließlich synthetische IBI-, Bewegungs- und Phasenfolgen. Der Vergleich muss nach dem Einwilligen auf dem Gerät lokal ausgeführt werden; reale Nächte werden nicht in CI oder Git hochgeladen.
+`SleepLocalValidation` erstellt Schätzungen aus rollierenden vollständigen 30-Minuten-Fenstern im 5-Minuten-Schritt. Der Aufruf verlangt ein explizites `enabled=true`. Auf ausdrücklichen Tastendruck sendet die Watch ausschließlich diese abgeleiteten Schätzungen über `WearSleepPredictionSender` an das gekoppelte Smartphone. Die Phone-App validiert Schema, Zeitbereich und Modellversion, liest die Health-Connect-Referenz lokal und lässt `SleepStageAgreement` Konfusionsmatrix, Accuracy und Cohen-Kappa auf einem 5-Minuten-Raster berechnen. Die Unit-Tests benutzen ausschließlich synthetische IBI-, Bewegungs- und Phasenfolgen. Reale Nächte werden nicht in CI oder Git hochgeladen.
 
 ## Was die Implementierung noch nicht beweist
 
 1. Die Samsung-AAR-Brücke ist nicht enthalten. Die offizielle Samsung-Integration bleibt gesondert zu beziehen und auf der Watch 4 mit Capability- und Berechtigungsprüfung einzubauen.
 2. Die Regeln sind noch nicht gegen eine echte Health-Connect-Referenznacht validiert.
 3. Die Watch-4-Nacht mit eingeschaltetem Experiment-Schalter und lokalem Abgleich steht aus.
-4. Der Health-Connect-Leser prüft `READ_SLEEP`, enthält aber noch keinen eigenen UI-Berechtigungsdialog; die Berechtigung muss vor dem lokalen Abgleich erteilt sein.
-5. Erst nach der Watch-4-Prüfung und dem lokalen Referenzabgleich darf eine andere Sitzung melden, dass die Schätzung „trägt“. Bis dahin bleibt die Standardausgabe `unknown`.
+4. Die lokale Datenübergabe über Wear Data Layer und die Health-Connect-Phone-App müssen auf echten gekoppelten Geräten erprobt werden; Unit-Tests ersetzen die Pairing-/Geräteprüfung nicht.
+5. Die Samsung-AAR-Brücke und eine echte Watch-4-Nacht mit lokalem Health-Connect-Abgleich stehen aus. Erst danach darf eine andere Sitzung melden, dass die Schätzung „trägt“. Bis dahin bleibt die Standardausgabe `unknown`.
 
 ## Testdaten- und Datenschutzregel
 
