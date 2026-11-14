@@ -4,6 +4,13 @@ Alle Änderungen am Rejuvenation Bed Projekt.
 
 ## [Unreleased]
 
+### Uhr (Wear OS)
+- Oberfläche auf die Chance-Gestalt umgebaut (Vorbild ADL-Designbuch): Zifferblatt, Status-Punkt mit Wort,
+  Los-Knopf, AMOLED/Bernstein; Blätter THERMO ‹ SCHLAF › DEBUG, Info-Ebene auf SCHLAF.
+- Debug-Blatt und Debug-Protokoll für die Sensor-Kette (Lieferungen mit Verzug, verworfene Lieferungen mit Grund,
+  Plattform-Schlafstatus roh, Live-Pulstest, Sensorliste); Abruf per adb.
+- Now Bar: laufende Aktivität während der Hintergrundmessung („Nur Symbole“ / „Symbole mit Text“).
+
 ### Home Assistant 2026.11
 - Use the native climate temperature properties when provided by Core, while keeping the older property names only for older supported versions.
 - Use the modern DeviceInfo parent-device ID on Core versions that support it, with a feature-detected fallback for older versions.
