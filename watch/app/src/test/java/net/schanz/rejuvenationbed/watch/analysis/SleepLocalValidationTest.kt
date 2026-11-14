@@ -43,6 +43,11 @@ class SleepLocalValidationTest {
         assertEquals(30L * 60L * 1000L, predictions.first().measuredAtEpochMillis)
         assertEquals(end, predictions.last().measuredAtEpochMillis)
         assertTrue(predictions.all { it.stage != SleepStage.UNKNOWN })
+        assertTrue(predictions.all { it.confidence in 0.0..1.0 })
+        assertTrue(predictions.all { it.sampleCoverage in 0.0..1.0 })
+        assertTrue(predictions.all {
+            it.algorithmVersion == net.schanz.rejuvenationbed.watch.sleep.SleepStageEstimator.ALGORITHM_VERSION
+        })
     }
 
     @Test
@@ -56,6 +61,10 @@ class SleepLocalValidationTest {
         )
         assertEquals(7, predictions.size)
         assertTrue(predictions.all { it.stage == SleepStage.UNKNOWN })
+        assertTrue(predictions.all { it.confidence == 0.0 })
+        assertTrue(predictions.all {
+            it.algorithmVersion == net.schanz.rejuvenationbed.watch.sleep.SleepStageEstimator.ALGORITHM_VERSION
+        })
     }
 
     @Test
