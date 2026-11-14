@@ -54,6 +54,13 @@ private fun SchlafAbgleichApp() {
         mutableStateOf("Health Connect liegt auf dem Smartphone. Die Watch sendet nur abgeleitete Schätzungen.")
     }
     var resultText by remember { mutableStateOf("Noch kein Abgleich ausgeführt.") }
+    var empfangText by remember {
+        mutableStateOf(
+            prefs.getLong("received_at", 0L).takeIf { it > 0L }
+                ?.let { "Letzter Watch-Empfang: ${java.time.Instant.ofEpochMilli(it)}" }
+                ?: "Noch keine Watch-Daten empfangen."
+        )
+    }
     var matrixRows by remember { mutableStateOf(emptyList<String>()) }
 
     val requiredPermissions = remember {
@@ -77,6 +84,7 @@ private fun SchlafAbgleichApp() {
             ) {
                 Text("Schlafphasen-Abgleich", style = MaterialTheme.typography.headlineSmall)
                 Text(status, style = MaterialTheme.typography.bodyMedium)
+                Text(empfangText, style = MaterialTheme.typography.bodySmall)
                 Button(
                     onClick = {
                         when (reader.sdkStatus()) {
@@ -99,6 +107,12 @@ private fun SchlafAbgleichApp() {
                                 val raw = prefs.getString(SleepPredictionWire.PHONE_PAYLOAD_KEY, null)
                                     ?: throw IllegalStateException("Noch keine Watch-Schätzung empfangen")
                                 val payload = WatchPredictionPayload.decode(raw)
+                                val empfangen = prefs.getLong("received_at", 0L)
+                                empfangText = if (empfangen > 0L) {
+                                    "Letzter Watch-Empfang: ${java.time.Instant.ofEpochMilli(empfangen)}"
+                                } else {
+                                    "Empfangszeit nicht bekannt."
+                                }
                                 val healthConnect = HealthConnectClient.getOrCreate(context)
                                 if (HealthConnectSleepQuelle.READ_SLEEP_PERMISSION !in
                                     healthConnect.permissionController.getGrantedPermissions()
