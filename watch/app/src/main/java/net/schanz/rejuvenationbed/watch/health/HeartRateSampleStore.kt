@@ -25,8 +25,18 @@ data class StepIntervalSample(
     val steps: Long
 )
 
+/** Ergebnis einer Lieferung: was angenommen wurde und warum nicht. */
+data class Annahme(
+    val grund: String?,
+    val puls: List<HeartRateSample>,
+    val schritte: List<StepIntervalSample>,
+    val rohPuls: Int,
+    val rohSchritte: Int
+)
+
 /**
- * Private, bounded on-device store. No health values are logged or uploaded.
+ * Private, bounded on-device store. Nothing is uploaded; the debug protocol
+ * (debug/DebugProtokoll) keeps per-delivery summaries on the watch only.
  */
 object HeartRateSampleStore {
     private const val PREFERENCES = "rejuvenation_bed_watch_health"
@@ -43,14 +53,17 @@ object HeartRateSampleStore {
     private const val MAX_ACTIVITY_STATE_AGE_MILLIS = 18L * 60L * 60L * 1000L
 
     @Synchronized
-    fun append(context: Context, dataPoints: DataPointContainer) {
+    fun append(context: Context, dataPoints: DataPointContainer): Annahme {
+        val rohPuls = dataPoints.getData(DataType.HEART_RATE_BPM).size
+        val rohSchritte = dataPoints.getData(DataType.STEPS).size
+        fun abgelehnt(grund: String) = Annahme(grund, emptyList(), emptyList(), rohPuls, rohSchritte)
         val preferences = context.getSharedPreferences(PREFERENCES, Context.MODE_PRIVATE)
-        if (!preferences.getBoolean(KEY_ENABLED, false)) return
+        if (!preferences.getBoolean(KEY_ENABLED, false)) return abgelehnt("Messung aus")
 
         // Reject delayed callbacks from a passive registration belonging to a prior boot.
         val bootInstant = currentBootInstant()
         val registeredBootMarker = preferences.getLong(KEY_BOOT_MARKER, -1L)
-        if (!isCurrentBoot(registeredBootMarker, bootInstant)) return
+        if (!isCurrentBoot(registeredBootMarker, bootInstant)) return abgelehnt("anderer Gerätestart")
 
         val newHeartRateSamples = dataPoints.getData(DataType.HEART_RATE_BPM).mapNotNull { point ->
             val bpm = point.value
@@ -79,7 +92,7 @@ object HeartRateSampleStore {
             }
         }
 
-        if (newHeartRateSamples.isEmpty() && newStepIntervals.isEmpty()) return
+        if (newHeartRateSamples.isEmpty() && newStepIntervals.isEmpty()) return abgelehnt("keine gültigen Werte")
 
         val now = System.currentTimeMillis()
         val cutoff = now - MAX_AGE_MILLIS
@@ -126,22 +139,23 @@ object HeartRateSampleStore {
         }
 
         preferences.edit().putString(KEY_STATUS, "collecting").apply()
+        return Annahme(null, newHeartRateSamples, newStepIntervals, rohPuls, rohSchritte)
     }
 
     @Synchronized
-    fun appendUserActivity(context: Context, info: UserActivityInfo) {
+    fun appendUserActivity(context: Context, info: UserActivityInfo): String? {
         val preferences = context.getSharedPreferences(PREFERENCES, Context.MODE_PRIVATE)
-        if (!preferences.getBoolean(KEY_ENABLED, false)) return
+        if (!preferences.getBoolean(KEY_ENABLED, false)) return "Messung aus"
 
         val bootInstant = currentBootInstant()
         val registeredBootMarker = preferences.getLong(KEY_BOOT_MARKER, -1L)
-        if (!isCurrentBoot(registeredBootMarker, bootInstant)) return
+        if (!isCurrentBoot(registeredBootMarker, bootInstant)) return "anderer Gerätestart"
 
         val changedAt = info.stateChangeTime.toEpochMilli()
         val now = System.currentTimeMillis()
         // Health Services may report the actual transition long after it occurred.
         // Retain historical transition time, but reject clearly stale/future events.
-        if (changedAt !in (now - MAX_ACTIVITY_STATE_AGE_MILLIS)..(now + 30_000L)) return
+        if (changedAt !in (now - MAX_ACTIVITY_STATE_AGE_MILLIS)..(now + 30_000L)) return "Zeitpunkt außerhalb 18 h"
 
         val newEvent = PlatformSleepStateEvent(
             state = PlatformSleepState.fromHealthServices(info),
@@ -166,6 +180,32 @@ object HeartRateSampleStore {
             .putString(KEY_USER_ACTIVITY, encoded.toString())
             .putString(KEY_STATUS, "collecting")
             .apply()
+        return null
+    }
+
+    /** Alle Plattform-Statuswechsel der letzten 18 Stunden (Info-Ebene). */
+    fun platformSleepStates(context: Context): List<PlatformSleepStateEvent> {
+        val now = System.currentTimeMillis()
+        val preferences = context.getSharedPreferences(PREFERENCES, Context.MODE_PRIVATE)
+        return parseActivity(preferences.getString(KEY_USER_ACTIVITY, null))
+            .filter { it.isFresh(now, MAX_ACTIVITY_STATE_AGE_MILLIS) }
+            .sortedBy { it.changedAtEpochMillis }
+    }
+
+    /** Roh-Zustand der Registrierung für das Debug-Blatt. */
+    fun diagnose(context: Context): List<Pair<String, String>> {
+        val preferences = context.getSharedPreferences(PREFERENCES, Context.MODE_PRIVATE)
+        val marker = preferences.getLong(KEY_BOOT_MARKER, -1L)
+        return listOf(
+            "status roh" to (preferences.getString(KEY_STATUS, "not_started") ?: "not_started"),
+            "status" to status(context),
+            "schreibt" to if (preferences.getBoolean(KEY_ENABLED, false)) "ja" else "nein",
+            "gerätestart" to when {
+                marker < 0L -> "—"
+                isCurrentBoot(marker, currentBootInstant()) -> "passt"
+                else -> "ANDERER"
+            }
+        )
     }
 
     fun heartRateSamples(context: Context): List<HeartRateSample> {

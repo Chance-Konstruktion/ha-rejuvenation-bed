@@ -33,6 +33,8 @@ dependencies {
     implementation("androidx.compose.ui:ui-tooling-preview")
     implementation("androidx.wear.compose:compose-material3:1.7.1")
     implementation("androidx.health:health-services-client:1.1.0")
+    implementation("androidx.wear:wear-ongoing:1.0.0")
+    implementation("androidx.core:core:1.13.1")
 
     debugImplementation("androidx.compose.ui:ui-tooling")
     testImplementation("junit:junit:4.13.2")
