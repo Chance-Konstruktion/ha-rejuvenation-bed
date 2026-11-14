@@ -5,8 +5,18 @@ import net.schanz.rejuvenationbed.watch.sleep.SleepStage
 /** One timestamped watch estimate. UNKNOWN remains a prediction class. */
 data class SleepStagePrediction(
     val measuredAtEpochMillis: Long,
-    val stage: SleepStage
-)
+    val stage: SleepStage,
+    val confidence: Double = 0.0,
+    val sampleCoverage: Double = 0.0,
+    val algorithmVersion: String? = null
+) {
+    init {
+        require(measuredAtEpochMillis >= 0L)
+        require(confidence in 0.0..1.0)
+        require(sampleCoverage in 0.0..1.0)
+        require(algorithmVersion == null || algorithmVersion.isNotBlank())
+    }
+}
 
 /** A Health Connect SleepSessionRecord stage interval. */
 data class SleepStageReferenceInterval(

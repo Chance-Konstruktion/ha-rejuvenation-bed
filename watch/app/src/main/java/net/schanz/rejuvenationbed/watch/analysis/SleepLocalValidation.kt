@@ -48,7 +48,10 @@ object SleepLocalValidation {
             )
             result += SleepStagePrediction(
                 measuredAtEpochMillis = windowEnd,
-                stage = estimate.stage
+                stage = estimate.stage,
+                confidence = estimate.confidence,
+                sampleCoverage = estimate.sampleCoverage,
+                algorithmVersion = estimate.algorithmVersion
             )
             windowEnd += predictionStepMillis
         }
