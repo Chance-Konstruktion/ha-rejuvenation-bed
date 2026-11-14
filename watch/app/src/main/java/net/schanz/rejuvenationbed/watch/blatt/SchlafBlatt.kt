@@ -4,6 +4,7 @@ import android.content.Context
 import android.content.SharedPreferences
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -27,7 +28,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
-import androidx.wear.compose.material3.Switch
 import androidx.compose.ui.text.style.TextAlign
 import net.schanz.chance.gestalt.Augenbraue
 import net.schanz.chance.gestalt.BlattHinweis
@@ -287,10 +287,16 @@ private fun SchlafInfo(
             else "Regeln v0.1 ausgeschaltet · Standard",
             style = thema.klein.copy(color = thema.grau2, textAlign = TextAlign.Center)
         )
-        Switch(
-            checked = experimentAktiv,
-            onCheckedChange = onExperimentAendern,
-            modifier = Modifier.padding(vertical = Raum.s1)
+        BasicText(
+            if (experimentAktiv) "EXPERIMENT AUSSCHALTEN"
+            else "EXPERIMENT EINSCHALTEN",
+            style = thema.daten.copy(
+                color = thema.text,
+                textAlign = TextAlign.Center
+            ),
+            modifier = Modifier
+                .clickable { onExperimentAendern(!experimentAktiv) }
+                .padding(vertical = Raum.s1)
         )
         BasicText(
             "Schätzung: ${stand.schaetzung.stage.wireValue} · Konfidenz " +
