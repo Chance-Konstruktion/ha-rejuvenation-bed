@@ -229,9 +229,9 @@ fun Karte(modifier: Modifier = Modifier, inhalt: @Composable () -> Unit) {
 @Composable
 fun DatenZeile(schluessel: String, wert: String, wertFarbe: Color = Farbe.Text) {
     Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-        BasicText(schluessel, style = Schrift.klein)
+        BasicText(schluessel, style = Schrift.klein, modifier = Modifier.weight(1f))
         Spacer(Modifier.width(Raum.s2))
-        BasicText(wert, style = Schrift.daten.copy(color = wertFarbe, textAlign = TextAlign.End))
+        BasicText(wert, style = Schrift.daten.copy(color = wertFarbe, textAlign = TextAlign.End), maxLines = 1, softWrap = false)
     }
 }
 
