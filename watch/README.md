@@ -5,9 +5,18 @@ Eigenständige Wear-OS-Begleit-App für die Samsung Galaxy Watch 4 (Wear OS 3) u
 ## Status: M2-Vorbereitung – lokaler Puls-/Schrittkanal, Feature-Fenster und Plattform-Schlafstatus
 
 Enthalten:
-- Kotlin-App mit Wear Compose Material 3
-- AMOLED-Oberfläche in Schwarz und Bernstein, Bettkontur als Vektor
-- zwei wischbare Seiten: Schlafanalyse und Thermostat
+- Kotlin-App mit Jetpack Compose für Wear OS
+- Oberfläche in der **Chance-Gestalt** (Vorbild: das Designbuch von ADL, `co-work/android-device-lab` → `DESIGN.md`):
+  AMOLED-Schwarz, EIN Bernstein-Akzent `#D99130`, Zifferblatt mit 60 Minuten-Strichen, Status-Punkt mit Wort,
+  ein Los-Knopf, Raum im 4er-Takt, Typo-Skala UHR 11/14/20 (+ Bühnenzahl 30). Die Gesetze stehen JVM-pur in
+  `ui/GestaltRegel.kt` und sind in `GestaltRegelTest` geprüft.
+- drei Blätter: **THERMO ‹ SCHLAF › DEBUG** (SCHLAF ist START; hoch/runter auf SCHLAF = Info-Ebene mit den
+  30-Minuten-Fenstern und dem Plattform-Verlauf; die Krone scrollt)
+- **Debug-Blatt** für die Sensor-Kette: Kanäle (passiv/live), Rechte, Registrierung, letzte Lieferung mit Verzug,
+  Plattform-Schlafstatus, Live-Pulstest über den MeasureClient, Hardware-Sensorliste, Protokoll
+- **Now Bar**: Während die Hintergrundmessung läuft, hält ein kleiner Vordergrunddienst eine laufende Aktivität
+  (Ongoing Activity). One UI Watch zeigt sie in der Now Bar – bei „Now Bar-Stil: Nur Symbole“ als Bettkontur, bei
+  „Symbole mit Text“ zusätzlich mit Kurztext (`misst` bzw. `62 bpm`, höchstens 10 Zeichen). Ein Tipp öffnet SCHLAF.
 - Laufzeit-Capability-Check für passiven Puls-, Schritt- und optionalen Plattform-Schlafstatus
 - Nutzerstart mit den erforderlichen Health-Services-Berechtigungen
 - passiver Hintergrunddienst empfängt gebündelte Herzfrequenz- und Schritt-Deltas
@@ -27,10 +36,23 @@ Die Schlafphase bleibt bewusst `unknown`. Der Plattformstatus ist nur ein grober
 
 ## Datenschutz und Berechtigungen
 
-Puls- und Schrittwerte werden nur lokal gespeichert. Es gibt keinen Netzwerk-Upload und keine Protokollierung einzelner Messwerte. Die App fordert Berechtigungen erst nach Nutzeraktion an:
+Puls- und Schrittwerte werden nur lokal gespeichert. Es gibt keinen Netzwerk-Upload. Das Debug-Protokoll hält je Lieferung von Health Services eine Zusammenfassung fest (Anzahl, Puls-Spanne min–max, Zeitspanne, Verzug) – nur auf der Uhr, App-privat in `files/debug/protokoll.txt` (höchstens ~96 kB) und im Logcat unter dem Tag `RBW`. Leeren über „LEEREN“ auf dem Debug-Blatt. Die App fordert Berechtigungen erst nach Nutzeraktion an:
 - Herzfrequenz: `BODY_SENSORS` oder auf API 36+ `READ_HEART_RATE`
 - Hintergrundmessung: `BODY_SENSORS_BACKGROUND` (API 33–35) oder `READ_HEALTH_DATA_IN_BACKGROUND` (API 36+)
 - Schrittkanal und Plattform-Schlafstatus: `ACTIVITY_RECOGNITION`
+- Now Bar: `FOREGROUND_SERVICE_HEALTH` (Manifest) und `POST_NOTIFICATIONS`; der Dienst startet nur mit erteiltem Pulsrecht
+
+## Debuggen am PC
+
+```bash
+adb shell am start -n net.schanz.rejuvenationbed.watch/.MainActivity --es rbw.blatt DEBUG
+adb shell run-as net.schanz.rejuvenationbed.watch cat files/debug/protokoll.txt
+adb logcat -s RBW
+```
+
+`rbw.blatt` öffnet THERMO, SCHLAF oder DEBUG direkt (Vorschau-Tür wie bei ADL). Protokoll-Arten: `APP`, `FAEHIG`,
+`KANAL`, `RECHT`, `REG` (Registrierung), `DATEN` (Lieferung, auch verworfene mit Grund), `PLATT` (Plattform-Schlafstatus
+roh → gemappt), `LIVE`, `SENSOR`, `NOWBAR`.
 
 Health Services liefert passive Messungen in geräteabhängig gebündelten Abständen. Die App setzt keine feste Sample-Frequenz voraus. Die 5-Minuten-Bucket-Belegung zeigt nur die Verteilung eingetroffener Samples, keine kontinuierliche Sensorabdeckung.
 
