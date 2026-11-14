@@ -10,6 +10,8 @@ Alle Änderungen am Rejuvenation Bed Projekt.
 - Debug-Blatt und Debug-Protokoll für die Sensor-Kette (Lieferungen mit Verzug, verworfene Lieferungen mit Grund,
   Plattform-Schlafstatus roh, Live-Pulstest, Sensorliste); Abruf per adb.
 - Now Bar: laufende Aktivität während der Hintergrundmessung („Nur Symbole“ / „Symbole mit Text“).
+- Gestalt kommt jetzt aus dem eingebauten chance-framework; zwei Gesichter: Bett (gedimmter Bernstein, nachts und
+  im Schlaf) und Sofa (Tag, mit Kraft), Wahl auf dem Debug-Blatt.
 
 ### Home Assistant 2026.11
 - Use the native climate temperature properties when provided by Core, while keeping the older property names only for older supported versions.
