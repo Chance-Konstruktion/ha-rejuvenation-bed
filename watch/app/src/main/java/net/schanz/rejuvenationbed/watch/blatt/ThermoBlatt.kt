@@ -18,15 +18,14 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.text.style.TextAlign
+import net.schanz.chance.gestalt.Augenbraue
+import net.schanz.chance.gestalt.BlattHinweis
+import net.schanz.chance.gestalt.GestaltRegel
+import net.schanz.chance.gestalt.LocalChanceThema
+import net.schanz.chance.gestalt.Raum
+import net.schanz.chance.gestalt.StatusZeile
+import net.schanz.chance.gestalt.Zifferblatt
 import net.schanz.rejuvenationbed.watch.dial.TemperatureDialScale
-import net.schanz.rejuvenationbed.watch.ui.Augenbraue
-import net.schanz.rejuvenationbed.watch.ui.BlattHinweis
-import net.schanz.rejuvenationbed.watch.ui.Farbe
-import net.schanz.rejuvenationbed.watch.ui.GestaltRegel
-import net.schanz.rejuvenationbed.watch.ui.Raum
-import net.schanz.rejuvenationbed.watch.ui.Schrift
-import net.schanz.rejuvenationbed.watch.ui.StatusZeile
-import net.schanz.rejuvenationbed.watch.ui.Zifferblatt
 import java.util.Locale
 import kotlin.math.min
 import kotlin.math.sqrt
@@ -41,6 +40,7 @@ private const val MAX_BETT = 36.0f
  */
 @Composable
 fun ThermoBlatt() {
+    val thema = LocalChanceThema.current
     var ziel by remember { mutableFloatStateOf(29.0f) }
     val anteil = ((ziel - MIN_BETT) / (MAX_BETT - MIN_BETT)).coerceIn(0f, 1f)
 
@@ -83,10 +83,10 @@ fun ThermoBlatt() {
             StatusZeile(GestaltRegel.Status("vorschau", GestaltRegel.StatusArt.STILL))
             Spacer(Modifier.height(Raum.s2))
             Augenbraue("ZIEL")
-            BasicText(String.format(Locale.GERMANY, "%.1f°", ziel), style = Schrift.buehne)
+            BasicText(String.format(Locale.GERMANY, "%.1f°", ziel), style = thema.buehne)
             BasicText(
                 "nicht verbunden",
-                style = Schrift.klein.copy(color = Farbe.Grau2, textAlign = TextAlign.Center)
+                style = thema.klein.copy(color = thema.grau2, textAlign = TextAlign.Center)
             )
         }
         BlattHinweis(

@@ -25,6 +25,16 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
 import androidx.health.services.client.data.DataType
 import kotlinx.coroutines.delay
+import net.schanz.chance.gestalt.Augenbraue
+import net.schanz.chance.gestalt.BlattHinweis
+import net.schanz.chance.gestalt.DatenZeile
+import net.schanz.chance.gestalt.GestaltRegel
+import net.schanz.chance.gestalt.Karte
+import net.schanz.chance.gestalt.LocalChanceThema
+import net.schanz.chance.gestalt.Raum
+import net.schanz.chance.gestalt.StatusZeile
+import net.schanz.chance.gestalt.UmrissKnopf
+import net.schanz.chance.gestalt.kroneScrollt
 import net.schanz.rejuvenationbed.watch.debug.DebugProtokoll
 import net.schanz.rejuvenationbed.watch.debug.DebugText
 import net.schanz.rejuvenationbed.watch.debug.KanalBericht
@@ -33,17 +43,7 @@ import net.schanz.rejuvenationbed.watch.debug.LiveStand
 import net.schanz.rejuvenationbed.watch.debug.SensorDiagnose
 import net.schanz.rejuvenationbed.watch.health.HeartRateSampleStore
 import net.schanz.rejuvenationbed.watch.nowbar.NowBarDienst
-import net.schanz.rejuvenationbed.watch.ui.Augenbraue
-import net.schanz.rejuvenationbed.watch.ui.BlattHinweis
-import net.schanz.rejuvenationbed.watch.ui.DatenZeile
-import net.schanz.rejuvenationbed.watch.ui.Farbe
-import net.schanz.rejuvenationbed.watch.ui.GestaltRegel
-import net.schanz.rejuvenationbed.watch.ui.Karte
-import net.schanz.rejuvenationbed.watch.ui.Raum
-import net.schanz.rejuvenationbed.watch.ui.Schrift
-import net.schanz.rejuvenationbed.watch.ui.StatusZeile
-import net.schanz.rejuvenationbed.watch.ui.UmrissKnopf
-import net.schanz.rejuvenationbed.watch.ui.kroneScrollt
+import net.schanz.rejuvenationbed.watch.ui.UhrRegel
 import java.util.Locale
 
 /**
@@ -53,7 +53,13 @@ import java.util.Locale
  * sichtbar ist; die Krone scrollt.
  */
 @Composable
-fun DebugBlatt(aktiv: Boolean) {
+fun DebugBlatt(
+    aktiv: Boolean,
+    wahl: UhrRegel.GesichtWahl,
+    modus: GestaltRegel.Modus,
+    onWahl: (UhrRegel.GesichtWahl) -> Unit
+) {
+    val thema = LocalChanceThema.current
     val context = LocalContext.current
     val rollen = rememberScrollState()
     var takt by remember { mutableIntStateOf(0) }
@@ -108,16 +114,23 @@ fun DebugBlatt(aktiv: Boolean) {
         StatusZeile(status)
 
         Karte {
+            Augenbraue("GESICHT")
+            DatenZeile("wahl", wahl.wort)
+            DatenZeile("jetzt", modus.name.lowercase(Locale.ROOT))
+            UmrissKnopf("WECHSELN", hervor = wahl != UhrRegel.GesichtWahl.AUTO) { onWahl(wahl.naechste()) }
+        }
+
+        Karte {
             Augenbraue("KANÄLE")
             val k = kanaele
             if (k == null) {
-                BasicText("prüft …", style = Schrift.klein)
+                BasicText("prüft …", style = thema.klein)
             } else {
                 janein("Puls passiv", DataType.HEART_RATE_BPM.name in k.passiv)
                 janein("Schritte", DataType.STEPS.name in k.passiv)
                 janein("Schlafstatus", k.aktivitaetsZustaende.any { "ASLEEP" in it.uppercase(Locale.ROOT) })
                 janein("Puls live", DataType.HEART_RATE_BPM.name in k.live)
-                if (k.fehler != null) DatenZeile("fehler", k.fehler, Farbe.status(GestaltRegel.StatusArt.FEHLER))
+                if (k.fehler != null) DatenZeile("fehler", k.fehler, thema.status(GestaltRegel.StatusArt.FEHLER))
             }
         }
 
@@ -150,7 +163,7 @@ fun DebugBlatt(aktiv: Boolean) {
             DatenZeile("wert", live.bpm?.let { "${it.toInt()} bpm" } ?: "—")
             DatenZeile("werte", "${live.werte}")
             DatenZeile("erster nach", live.ersterWertNachMs?.let { DebugText.alter(it) } ?: "—")
-            if (live.fehler != null) DatenZeile("fehler", live.fehler!!, Farbe.status(GestaltRegel.StatusArt.FEHLER))
+            if (live.fehler != null) DatenZeile("fehler", live.fehler!!, thema.status(GestaltRegel.StatusArt.FEHLER))
             UmrissKnopf(if (live.laeuft) "LIVE STOPP" else "LIVE START", hervor = live.laeuft) {
                 if (live.laeuft) livePuls.stoppen() else livePuls.starten()
             }
@@ -158,10 +171,10 @@ fun DebugBlatt(aktiv: Boolean) {
 
         Augenbraue("PROTOKOLL")
         if (protokoll.isEmpty()) {
-            BasicText("leer", style = Schrift.klein.copy(color = Farbe.Grau2))
+            BasicText("leer", style = thema.klein.copy(color = thema.grau2))
         }
         protokoll.reversed().forEach { zeile ->
-            BasicText(zeile, style = Schrift.daten.copy(color = Farbe.Grau))
+            BasicText(zeile, style = thema.daten.copy(color = thema.grau))
         }
         Row(horizontalArrangement = Arrangement.spacedBy(Raum.s2)) {
             UmrissKnopf("SENSOREN") {
@@ -175,7 +188,7 @@ fun DebugBlatt(aktiv: Boolean) {
         }
         BasicText(
             "${Build.MODEL} · API ${Build.VERSION.SDK_INT}\nadb shell run-as net.schanz.rejuvenationbed.watch cat files/debug/protokoll.txt",
-            style = Schrift.klein.copy(color = Farbe.Grau2, textAlign = TextAlign.Center)
+            style = thema.klein.copy(color = thema.grau2, textAlign = TextAlign.Center)
         )
         Spacer(Modifier.height(Raum.s2))
         BlattHinweis("SCHLAF", null)
@@ -184,9 +197,10 @@ fun DebugBlatt(aktiv: Boolean) {
 
 @Composable
 private fun janein(schluessel: String, ja: Boolean) {
+    val thema = LocalChanceThema.current
     DatenZeile(
         schluessel,
         if (ja) "ja" else "nein",
-        Farbe.status(if (ja) GestaltRegel.StatusArt.BEREIT else GestaltRegel.StatusArt.FEHLER)
+        thema.status(if (ja) GestaltRegel.StatusArt.BEREIT else GestaltRegel.StatusArt.FEHLER)
     )
 }
