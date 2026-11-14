@@ -1,4 +1,6 @@
 // KOPIE aus chance-framework 0.1.0 (3500d1a) – hier nicht ändern, im Framework ändern und neu einbauen.
+// Abweichung von 3500d1a (Fund w14-tp, hier an der Wurzel geheilt): die BETT-Tokens grau2 und ROT_BETT
+// sind heller, weil beide im Bett als echte Schrift auftreten – jede Bett-Schrift hält ≥ 4,5:1.
 package net.schanz.chance.gestalt
 
 /**
@@ -106,7 +108,7 @@ object GestaltRegel {
         )
         Modus.BETT -> Rollen(
             argb(0x000000), argb(0x000000), argb(0x120C05), argb(0x2B1D0C), argb(0x000000),
-            argb(0x0E0904), argb(0xB68D56), argb(0xA97439), argb(0x64451F), argb(0xB47726), argb(0x000000)
+            argb(0x0E0904), argb(0xB68D56), argb(0xA97439), argb(0xA57233), argb(0xB47726), argb(0x000000)
         )
         Modus.SOFA -> Rollen(
             argb(0x000000), argb(0x1C1307), argb(0x33230D), argb(0x4A3417), argb(0x0E0904),
@@ -155,8 +157,8 @@ object GestaltRegel {
     const val GELB = 0xFFFBBF24.toInt()
     const val ROT = 0xFFF85149.toInt()
 
-    /** Im Bett leuchtet nichts Grünes oder Gelbes; der Fehler bleibt rot, aber gedimmt. Das Wort trägt. */
-    const val ROT_BETT = 0xFFB03A2E.toInt()
+    /** Im Bett leuchtet nichts Grünes oder Gelbes; der Fehler bleibt rot, aber gedimmt (5,24:1 auf Schwarz). Das Wort trägt. */
+    const val ROT_BETT = 0xFFE14A3B.toInt()
 
     /** LAEUFT trägt den Akzent, STILL das grau2 der Fläche. */
     fun statusFarbe(art: StatusArt, modus: Modus = Modus.AMOLED): Int {
@@ -216,7 +218,9 @@ object GestaltRegel {
 
     /**
      * Das Bett ist warm und gedimmt: jede Rolle hat Rot ≥ Grün ≥ Blau (kein Weiß, kein Blaustich),
-     * und keine Schrift ist heller als [BETT_TEXT_HOECHSTENS] gegen Schwarz.
+     * und jede Bett-Schrift ist nicht heller als [BETT_TEXT_HOECHSTENS] gegen Schwarz. Jede
+     * Bett-Schrift hält ≥ 4,5:1 auf jeder Bett-Fläche – grau2 und ROT_BETT eingeschlossen, denn
+     * beide treten im Bett als echte Schrift auf (Fund w14-tp).
      */
     fun bettIstWarmUndGedimmt(): Boolean {
         val r = rollen(Modus.BETT)
@@ -229,8 +233,11 @@ object GestaltRegel {
             rot >= gruen && gruen >= blau
         }
         val schwarz = argb(0x000000)
-        val gedimmt = listOf(r.text, r.grau, r.akzent).all { kontrast(it, schwarz) <= BETT_TEXT_HOECHSTENS }
-        return warm && gedimmt
+        val schriften = listOf(r.text, r.grau, r.grau2, r.akzent, ROT_BETT)
+        val flaechen = listOf(r.hintergrund, r.karte, r.gedrueckt, r.knopf)
+        val lesbar = schriften.all { s -> flaechen.all { f -> kontrast(s, f) >= KONTRAST_MINDESTENS } }
+        val gedimmt = schriften.all { kontrast(it, schwarz) <= BETT_TEXT_HOECHSTENS }
+        return warm && lesbar && gedimmt
     }
 
     /** AMOLED ist ehrlich: Hintergrund UND Karte sind echtes Schwarz. */

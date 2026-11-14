@@ -66,6 +66,41 @@ class UhrRegelTest {
     }
 
     @Test
+    fun bettSchriftHaeltDieFundPaare() {
+        // Fund w14-tp: grau2 und ROT_BETT treten im Bett als echte Schrift auf (SchlafInfo, ThermoBlatt,
+        // DebugBlatt, BlattHinweis, inaktiver Los-Knopf). Jede Bett-Schrift hält ≥ 4,5:1 auf jeder
+        // Bett-Fläche und bleibt ≤ 7,5:1 gegen Schwarz; die Zahlen sind mit der WCAG-Formel gerechnet.
+        val r = GestaltRegel.rollen(GestaltRegel.Modus.BETT)
+        val schriften = listOf(
+            "text" to r.text, "grau" to r.grau, "grau2" to r.grau2,
+            "akzent" to r.akzent, "ROT_BETT" to GestaltRegel.ROT_BETT
+        )
+        val flaechen = listOf(
+            "hintergrund" to r.hintergrund, "karte" to r.karte,
+            "gedrueckt" to r.gedrueckt, "knopf" to r.knopf
+        )
+        schriften.forEach { (name, schrift) ->
+            flaechen.forEach { (flaeche, hintergrund) ->
+                assertTrue(
+                    "$name auf $flaeche: ${GestaltRegel.kontrast(schrift, hintergrund)}",
+                    GestaltRegel.kontrast(schrift, hintergrund) >= GestaltRegel.KONTRAST_MINDESTENS
+                )
+            }
+            assertTrue(
+                "$name auf Schwarz zu hell: ${GestaltRegel.kontrast(schrift, r.hintergrund)}",
+                GestaltRegel.kontrast(schrift, r.hintergrund) <= GestaltRegel.BETT_TEXT_HOECHSTENS
+            )
+        }
+        // Die im Fund genannten Lücken, mit den geheilten Tokens geschlossen (Δ 0,001):
+        assertEquals(5.0546, GestaltRegel.kontrast(r.grau2, r.hintergrund), 0.001)
+        assertEquals(5.2442, GestaltRegel.kontrast(GestaltRegel.ROT_BETT, r.hintergrund), 0.001)
+        assertEquals(4.7707, GestaltRegel.kontrast(r.grau2, r.knopf), 0.001)
+        // Die gesetzlichen Paare bleiben unverändert:
+        assertEquals(6.9333, GestaltRegel.kontrast(r.text, r.hintergrund), 0.001)
+        assertEquals(4.8535, GestaltRegel.kontrast(r.grau, r.gedrueckt), 0.001)
+    }
+
+    @Test
     fun nowBarTextIstKurz() {
         assertEquals("62 bpm", NowBarText.puls(62.4))
         assertEquals("misst", NowBarText.puls(null))
