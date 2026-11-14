@@ -41,9 +41,11 @@ import net.schanz.chance.gestalt.kroneScrollt
 import net.schanz.rejuvenationbed.watch.analysis.SleepFeatureExtractor
 import net.schanz.rejuvenationbed.watch.analysis.SleepFeatureWindow
 import net.schanz.rejuvenationbed.watch.analysis.SleepHrvExtractor
+import net.schanz.rejuvenationbed.watch.analysis.SleepPredictionPayloadBuilder
 import net.schanz.rejuvenationbed.watch.health.IbiMesspunktSpeicher
 import net.schanz.rejuvenationbed.watch.health.IbiQuelleStatus
 import net.schanz.rejuvenationbed.watch.health.SamsungHealthSensorSdkIbiQuelle
+import net.schanz.rejuvenationbed.watch.health.WearSleepPredictionSender
 import net.schanz.rejuvenationbed.watch.sleep.SleepEstimatorSettings
 import net.schanz.rejuvenationbed.watch.sleep.SleepStageEstimator
 import net.schanz.rejuvenationbed.watch.debug.DebugProtokoll
@@ -134,15 +136,37 @@ fun SchlafBlatt(aktiv: Boolean) {
     var experimentAktiv by remember(context) {
         mutableStateOf(SleepEstimatorSettings.isEnabled(context))
     }
+    var abgleichStatus by remember { mutableStateOf("Noch kein Abgleich gesendet.") }
     val ebenen = rememberPagerState(pageCount = { 2 })
     VerticalPager(state = ebenen, modifier = Modifier.fillMaxSize()) { ebene ->
         if (ebene == 0) SchlafGesicht(experimentAktiv)
         else SchlafInfo(
             aktiv = aktiv && ebenen.currentPage == 1,
             experimentAktiv = experimentAktiv,
+            abgleichStatus = abgleichStatus,
             onExperimentAendern = { neu ->
                 experimentAktiv = neu
                 SleepEstimatorSettings.setEnabled(context, neu)
+            },
+            onAbgleichSenden = {
+                if (!experimentAktiv) {
+                    abgleichStatus = "Zuerst das Experiment einschalten."
+                } else {
+                    val payload = runCatching {
+                        SleepPredictionPayloadBuilder.build(context, enabled = true)
+                    }
+                    payload.onSuccess { json ->
+                        abgleichStatus = "Sende abgeleitete Schätzungen …"
+                        WearSleepPredictionSender.senden(context, json) { result ->
+                            abgleichStatus = result.fold(
+                                { "An das gekoppelte Smartphone gesendet." },
+                                { "Nicht gesendet: §{it.message ?: it.javaClass.simpleName}" }
+                            )
+                        }
+                    }.onFailure { error ->
+                        abgleichStatus = "Nicht bereit: §{error.message ?: error.javaClass.simpleName}"
+                    }
+                }
             }
         )
     }
@@ -266,7 +290,9 @@ private fun SchlafGesicht(experimentAktiv: Boolean) {
 private fun SchlafInfo(
     aktiv: Boolean,
     experimentAktiv: Boolean,
-    onExperimentAendern: (Boolean) -> Unit
+    abgleichStatus: String,
+    onExperimentAendern: (Boolean) -> Unit,
+    onAbgleichSenden: () -> Unit
 ) {
     val thema = LocalChanceThema.current
     val context = LocalContext.current
@@ -303,6 +329,15 @@ private fun SchlafInfo(
                 "${(stand.schaetzung.confidence * 100).toInt()} %",
             style = thema.daten.copy(textAlign = TextAlign.Center)
         )
+        BasicText(
+            if (experimentAktiv) "ABGLEICH AM SMARTPHONE SENDEN"
+            else "Zum Senden erst das Experiment einschalten",
+            style = thema.daten.copy(color = thema.text, textAlign = TextAlign.Center),
+            modifier = Modifier
+                .clickable(enabled = experimentAktiv) { onAbgleichSenden() }
+                .padding(vertical = Raum.s1)
+        )
+        BasicText(abgleichStatus, style = thema.klein.copy(color = thema.grau2, textAlign = TextAlign.Center))
         BasicText("IBI-Quelle: ${stand.ibiQuelleStatus}", style = thema.klein.copy(color = thema.grau2))
         BasicText(
             "IBI ${stand.hrv.acceptedIbiCount}/${stand.hrv.rawIbiCount} · " +
