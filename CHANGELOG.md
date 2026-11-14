@@ -12,6 +12,8 @@ Alle Änderungen am Rejuvenation Bed Projekt.
 - Now Bar: laufende Aktivität während der Hintergrundmessung („Nur Symbole“ / „Symbole mit Text“).
 - Gestalt kommt jetzt aus dem eingebauten chance-framework; zwei Gesichter: Bett (gedimmter Bernstein, nachts und
   im Schlaf) und Sofa (Tag, mit Kraft), Wahl auf dem Debug-Blatt.
+- Dunkler Start: eigenes Thema mit schwarzem Fenster und schwarzem Startbildschirm, kein heller Blitz im Bett.
+- Fester Debug-Schlüssel: neue CI-Fassungen lassen sich ohne Deinstallieren über die alte spielen.
 
 ### Home Assistant 2026.11
 - Use the native climate temperature properties when provided by Core, while keeping the older property names only for older supported versions.
