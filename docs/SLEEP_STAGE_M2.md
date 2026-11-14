@@ -30,11 +30,10 @@ Der experimentelle Schalter ist in `SleepEstimatorSettings` persistent und stand
 
 ## Was die Implementierung noch nicht beweist
 
-1. Die Samsung-AAR-Brücke ist nicht enthalten. Die offizielle Samsung-Integration bleibt gesondert zu beziehen und auf der Watch 4 mit Capability- und Berechtigungsprüfung einzubauen.
-2. Die Regeln sind noch nicht gegen eine echte Health-Connect-Referenznacht validiert.
-3. Die Watch-4-Nacht mit eingeschaltetem Experiment-Schalter und lokalem Abgleich steht aus.
-4. Die lokale Datenübergabe über Wear Data Layer und die Health-Connect-Phone-App müssen auf echten gekoppelten Geräten erprobt werden; Unit-Tests ersetzen die Pairing-/Geräteprüfung nicht.
-5. Die Samsung-AAR-Brücke und eine echte Watch-4-Nacht mit lokalem Health-Connect-Abgleich stehen aus. Erst danach darf eine andere Sitzung melden, dass die Schätzung „trägt“. Bis dahin bleibt die Standardausgabe `unknown`.
+1. Die Samsung-AAR-Brücke ist nicht enthalten. Echte IBI-Live-Erfassung auf der Watch 4 ist daher noch nicht belegt.
+2. Die Regeln sind noch nicht gegen eine echte, von Samsung Health nach Health Connect synchronisierte Referenznacht validiert.
+3. Wear-Data-Layer-Übertragung und Smartphone-Abgleich müssen auf tatsächlich gekoppelten Geräten erprobt werden.
+4. Claude muss auf der Watch 4 eine Nacht mit eingeschaltetem Experiment beobachten und den lokalen Vergleich auf dem Smartphone prüfen. Erst danach darf eine andere Sitzung melden, dass die Schätzung „trägt“. Bis dahin bleibt die Standardausgabe `unknown`.
 
 ## Testdaten- und Datenschutzregel
 

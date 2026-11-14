@@ -1,6 +1,6 @@
 # Galaxy Watch Companion – Architektur und Umsetzungsplan
 
-**Stand: M2-Vorbereitung – lokaler Puls-/Schrittkanal plus deskriptive 30-Minuten-Merkmale.** Eine vierstufige Schlafphasen-Klassifikation und HA-Netzwerkbetrieb sind noch nicht produktiv implementiert.
+**Stand: M2-Schätzer v0 und Smartphone-Abgleich in Arbeit.** Die Watch besitzt einen experimentellen, standardmäßig ausgeschalteten Regelkandidaten. Die Validierung gegen Health Connect läuft auf dem Android-Smartphone, da Health Connect nicht auf Wear OS verfügbar ist. Eine echte Watch-4-Nacht ist noch nicht abgenommen; HA-Netzwerkbetrieb (M3/M4) ist nicht Teil dieses M2-Schritts.
 
 ## Ausgangslage im Rejuvenation-Bed-Repository
 
@@ -15,19 +15,28 @@ Die Watch darf daher **keine zweite Heizungs- oder Sicherheitslogik** implementi
 
 ```text
 Galaxy Watch 4 / Wear OS
-  ├─ Sensor capability check
-  ├─ Sensor adapter (Health Services / Samsung Health Sensor SDK)
-  ├─ lokale Feature-Extraktion + Schlafphasenmodell
-  ├─ Watch UI: Schlaf | Thermostat
-  └─ Pairing + authentisierte lokale Verbindung
+  ├─ Health Services / Samsung Health Sensor SDK (IBI-Adapter)
+  ├─ lokale IBI-/HRV-/Bewegungsmerkmale
+  ├─ Schlafphasen-Regelkandidat (Standard AUS, sonst unknown)
+  └─ expliziter Tastendruck: abgeleitete Schätzungen
+                │ Wear Data Layer (nur Phase, Zeit, Konfidenz,
+                │ Abdeckung, Algorithmusversion; keine Rohsensorwerte)
+                ▼
+Android-Smartphone
+  ├─ Health Connect READ_SLEEP-Berechtigung
+  ├─ Samsung-Health-Synchronisierung der Watch-Schlafsitzung
+  ├─ SleepSessionRecord.stages als lokale Referenz
+  └─ Konfusionsmatrix / Accuracy / Cohen-Kappa (lokal)
                 │
                 ▼
-Home Assistant – Rejuvenation Bed
-  ├─ lokale Discovery / Pairing / Gerätewiderruf
+Home Assistant – Rejuvenation Bed (M3/M4, später)
+  ├─ authentisierte Verbindung / Pairing / Gerätewiderruf
   ├─ Sensor: sensor.rejuvenation_bed_watch_sleep_stage
   ├─ bestehender SleepStageResolver
   └─ bestehende Climate-Entity + Safety-Manager
 ```
+
+**Plattformgrenze:** Health Connect wird auf dem Smartphone bereitgestellt, nicht auf Wear OS. Die Watch liest daher keine Health-Connect-Referenzdaten. Samsung Health muss die Schlafsitzung erst mit dem Smartphone synchronisieren; die Phone-App liest sie lokal und vergleicht nur die von der Watch gesendeten abgeleiteten Schätzungen.
 
 ## Galaxy-Watch-Sensorik
 
@@ -127,7 +136,7 @@ Wear-OS-Projekt, Amber-UI, zwei Seiten, normierte Datenmodelle, Tests und Health
 Passiver Health-Services-Listener für Herzfrequenz und optionale Schritt-Deltas, expliziter Berechtigungsfluss, lokale begrenzte Puffer und Stop-/Löschfunktion sind angelegt. Deskriptive Puls-/Schritt-Merkmalsfenster sind implementiert. Offen bleiben rohe Beschleunigungsdaten, IBI/PPG, Trage-/Batteriestatus und Laufzeitvalidierung auf echter Watch-Hardware.
 
 ### M2 – Lokale Analyse (Schätzer v0 in Arbeit)
-Deskriptive 30-Minuten-Feature-Fenster für Puls und Schritt-Deltas, die IBI-Adaptergrenze, ein deterministischer HRV-/Bewegungs-Extraktor und das regelbasierte Modell `m2-rules-0.1` sind angelegt. Der Modell-Schalter ist standardmäßig AUS. Ohne Samsung-AAR-Brücke oder bei schlechter Datenqualität bleibt `unknown`. Der Health-Connect-Leser und die Konfusionsmatrix-/Cohen-Kappa-Waage sind für synthetische Tests vorhanden; echte Watch-4-Referenzvalidierung steht aus. Details und offene Grenzen: `docs/SLEEP_STAGE_M2.md` und `docs/IBI_ADAPTER.md`.
+Deskriptive 30-Minuten-Fenster, IBI-Adaptergrenze, HRV-/Bewegungs-Extraktor und das regelbasierte Modell `m2-rules-0.1` sind angelegt. Der Modell-Schalter ist standardmäßig AUS; ohne Samsung-AAR-Brücke oder bei schlechter Datenqualität bleibt die Anzeige `unknown`. Die Watch sendet nur nach ausdrücklichem Tastendruck abgeleitete Schätzungen an die Phone-App. Diese liest Health-Connect-Referenzsegmente lokal und berechnet Konfusionsmatrix, Accuracy und Cohen-Kappa. Health Connect wird nicht auf der Watch verwendet. Der Samsung-AAR-Brückenweg und die echte Watch-4-Referenzvalidierung stehen aus. Details: `docs/SLEEP_STAGE_M2.md`, `docs/IBI_ADAPTER.md` und `watch/phone/README.md`.
 
 ### M3 – Sichere HA-Verbindung
 mDNS, ECDH/SAS, Android-Keystore-Geräteschlüssel, Replay-Schutz, Rate-Limits und Widerruf.

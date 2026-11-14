@@ -33,6 +33,13 @@ Voraussetzung für die nächste Integrationsstufe:
 
 ## Datengrenze
 
-IBI, HRV und Bewegungsdaten verbleiben lokal auf der Uhr. Keine Rohdaten, echten
-Nächte, Gerätekennungen oder Hausdaten gehören in Git. Tests verwenden nur
-synthetische Werte. Eine Wellness-Schätzung ist keine medizinische Messung.
+IBI, HRV und Bewegungsdaten verbleiben lokal auf der Uhr. Nach ausdrücklichem
+Tastendruck darf die Watch ausschließlich abgeleitete Schlafphasenwerte
+(Phase, Zeitstempel, Konfidenz, Abdeckung und Algorithmusversion) über den
+Wear Data Layer an das gekoppelte Smartphone senden. IBI-/BPM-/Schritt-Rohwerte
+werden nicht übertragen. Health-Connect-Referenzdaten verbleiben lokal auf dem
+Smartphone; es gibt keinen Upload und keine HA-Strecke in M2.
+
+Keine Rohdaten, echten Nächte, Gerätekennungen oder Hausdaten gehören in Git.
+Tests verwenden nur synthetische Werte. Eine Wellness-Schätzung ist keine
+medizinische Messung.
