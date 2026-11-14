@@ -53,9 +53,9 @@ class SleepHrvExtractorTest {
             repeat(600) { index ->
                 add(IbiMesspunkt((index + 1L) * 1_000L, 850.0, 0.95))
             }
-            add(IbiMesspunkt(601_000L, 1_900.0, 0.95))
-            add(IbiMesspunkt(602_000L, 850.0, 0.10))
-            add(IbiMesspunkt(603_000L, 2_500.0, 0.95))
+            add(IbiMesspunkt(599_500L, 1_900.0, 0.95))
+            add(IbiMesspunkt(599_600L, 850.0, 0.10))
+            add(IbiMesspunkt(599_700L, 2_500.0, 0.95))
         }
 
         val result = SleepHrvExtractor.extract(samples, emptyList(), start, end)
