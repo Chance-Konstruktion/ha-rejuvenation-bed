@@ -165,11 +165,11 @@ fun SchlafBlatt(aktiv: Boolean) {
                         WearSleepPredictionSender.senden(context, json) { result ->
                             abgleichStatus = result.fold(
                                 { "An das gekoppelte Smartphone gesendet." },
-                                { "Nicht gesendet: §{it.message ?: it.javaClass.simpleName}" }
+                                { "Nicht gesendet: ${it.message ?: it.javaClass.simpleName}" }
                             )
                         }
                     }.onFailure { error ->
-                        abgleichStatus = "Nicht bereit: §{error.message ?: error.javaClass.simpleName}"
+                        abgleichStatus = "Nicht bereit: ${error.message ?: error.javaClass.simpleName}"
                     }
                 }
             }
