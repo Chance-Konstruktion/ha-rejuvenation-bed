@@ -313,22 +313,27 @@ object HeartRateSampleStore {
     // Der Ring ist bis ~1,4 MB JSON groß. Lesen passiert aus der UI (Gesicht, Debug-Takt
     // alle 2 s); geparst wird nur, wenn sich der gespeicherte Text wirklich geändert hat
     // (SharedPreferences liefert bei unverändertem Wert dieselbe String-Instanz). Fund w15-ub an !16.
-    @Volatile private var pulsCacheRoh: String? = null
-    @Volatile private var pulsCache: List<HeartRateSample> = emptyList()
-    @Volatile private var schritteCacheRoh: String? = null
-    @Volatile private var schritteCache: List<StepIntervalSample> = emptyList()
+    // Roh-Text und geparste Werte hängen als unveränderliches Paar in einem @Volatile-Holder –
+    // ein Lesezugriff sieht immer beide Felder aus derselben Schreibgeneration, nie ein
+    // gemischtes Paar (neuer Roh-Text, alter Parse). Prüfnotiz w15-ue an !16.
+    private class Geparst<T>(val roh: String?, val werte: List<T>)
+
+    @Volatile private var pulsGeparst = Geparst<HeartRateSample>(null, emptyList())
+    @Volatile private var schritteGeparst = Geparst<StepIntervalSample>(null, emptyList())
 
     private fun parseHeartRate(raw: String?): List<HeartRateSample> {
-        if (raw === pulsCacheRoh) return pulsCache
+        val aktuell = pulsGeparst
+        if (raw === aktuell.roh) return aktuell.werte
         val neu = parseHeartRateRoh(raw)
-        pulsCache = neu; pulsCacheRoh = raw
+        pulsGeparst = Geparst(raw, neu)
         return neu
     }
 
     private fun parseStepIntervals(raw: String?): List<StepIntervalSample> {
-        if (raw === schritteCacheRoh) return schritteCache
+        val aktuell = schritteGeparst
+        if (raw === aktuell.roh) return aktuell.werte
         val neu = parseStepIntervalsRoh(raw)
-        schritteCache = neu; schritteCacheRoh = raw
+        schritteGeparst = Geparst(raw, neu)
         return neu
     }
 
