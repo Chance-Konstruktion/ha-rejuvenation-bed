@@ -73,16 +73,21 @@ android-watch:
     - test -d "$SDK_ROOT/platforms/android-37"
     - curl --fail --location --silent --show-error "https://services.gradle.org/distributions/gradle-9.3.1-bin.zip" --output /tmp/gradle.zip
     - unzip -q /tmp/gradle.zip -d /tmp
-    - /tmp/gradle-9.3.1/bin/gradle --no-daemon --stacktrace -p watch :app:assembleDebug :app:testDebugUnitTest
+    - /tmp/gradle-9.3.1/bin/gradle --no-daemon --stacktrace -p watch :core:test :app:assembleDebug :app:testDebugUnitTest :phone:assembleDebug :phone:testDebugUnitTest
   artifacts:
     when: always
     expire_in: 7 days
     reports:
       junit:
         - watch/app/build/test-results/testDebugUnitTest/TEST-*.xml
+        - watch/phone/build/test-results/testDebugUnitTest/TEST-*.xml
+        - watch/core/build/test-results/test/TEST-*.xml
     paths:
       - watch/app/build/outputs/apk/debug/
       - watch/app/build/reports/tests/testDebugUnitTest/
+      - watch/phone/build/outputs/apk/debug/
+      - watch/phone/build/reports/tests/testDebugUnitTest/
+      - watch/core/build/reports/tests/test/
   rules:
     - changes:
         - watch/**/*
