@@ -24,8 +24,8 @@ Enthalten:
 - Laufzeit-Capability-Check für passiven Puls-, Schritt- und optionalen Plattform-Schlafstatus
 - Nutzerstart mit den erforderlichen Health-Services-Berechtigungen
 - passiver Hintergrunddienst empfängt gebündelte Herzfrequenz- und Schritt-Deltas
-- lokale, private Speicherung (Puls: 10 Stunden / max. 2.500 Werte; Schritte: 10 Stunden / max. 4.000 Intervalle; Plattformstatus: max. 18 Stunden / max. 100 Statuswechsel)
-- Stop-Funktion beendet die Registrierung und löscht beide lokalen Datenpuffer
+- lokale, private Speicherung (Puls: 14 Stunden / max. 45.000 Werte; Schritte: 14 Stunden / max. 4.000 Intervalle; Plattformstatus: max. 18 Stunden / max. 100 Statuswechsel)
+- Stop-Funktion beendet die Registrierung, die aufgezeichneten Daten bleiben (#7); Löschen nur über die eigene Aktion „DATEN LÖSCHEN“ in der Info-Ebene (mit Rückfrage)
 - lokale 30-Minuten-Merkmalsfenster mit Pulsstatistik, Sample-Bucket-Verteilung und Schritt-Deltas
 - optionaler Health-Services-Plattformstatus `ASLEEP` / `PASSIVE` mit echtem Zustandswechsel-Zeitpunkt
 - Unit-Tests für Zeitfenster, unvollständige Daten und Mindestdatenqualität
