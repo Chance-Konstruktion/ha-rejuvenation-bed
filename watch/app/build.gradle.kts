@@ -15,6 +15,17 @@ android {
         versionName = "0.2.0"
     }
 
+    signingConfigs {
+        getByName("debug") {
+            // Fester Debug-Schlüssel (Android-Standardwerte, kein Geheimnis): jede CI-Fassung lässt sich über
+            // die vorige installieren, ohne Deinstallieren und ohne Verlust der Messdaten und Rechte auf der Uhr.
+            storeFile = rootProject.file("debug.keystore")
+            storePassword = "android"
+            keyAlias = "androiddebugkey"
+            keyPassword = "android"
+        }
+    }
+
     buildFeatures {
         compose = true
     }
@@ -33,6 +44,8 @@ dependencies {
     implementation("androidx.compose.ui:ui-tooling-preview")
     implementation("androidx.wear.compose:compose-material3:1.7.1")
     implementation("androidx.health:health-services-client:1.1.0")
+    implementation("com.google.android.gms:play-services-wearable:19.0.0")
+    implementation(project(":core"))
     implementation("androidx.wear:wear-ongoing:1.0.0")
     implementation("androidx.core:core:1.13.1")
 

@@ -17,7 +17,8 @@
         android:allowBackup="false"
         android:icon="@drawable/ic_bed_outline"
         android:label="Rejuvenation Bed"
-        android:supportsRtl="true">
+        android:supportsRtl="true"
+        android:theme="@style/Theme.RejuvenationBed">
         <meta-data
             android:name="com.google.android.wearable.standalone"
             android:value="true" />

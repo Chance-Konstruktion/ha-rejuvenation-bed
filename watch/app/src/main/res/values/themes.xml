@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Dunkel ab der ersten Millisekunde: ohne eigenes Thema blitzt beim Start ein hellgrauer
+         Systemhintergrund auf, im Bett im Dunkeln genau das Falsche. -->
+    <style name="Theme.RejuvenationBed" parent="@android:style/Theme.DeviceDefault.NoActionBar">
+        <item name="android:windowBackground">@android:color/black</item>
+    </style>
+</resources>

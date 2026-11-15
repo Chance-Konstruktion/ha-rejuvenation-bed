@@ -6,10 +6,14 @@ Eigenständige Wear-OS-Begleit-App für die Samsung Galaxy Watch 4 (Wear OS 3) u
 
 Enthalten:
 - Kotlin-App mit Jetpack Compose für Wear OS
-- Oberfläche in der **Chance-Gestalt** (Vorbild: das Designbuch von ADL, `co-work/android-device-lab` → `DESIGN.md`):
-  AMOLED-Schwarz, EIN Bernstein-Akzent `#D99130`, Zifferblatt mit 60 Minuten-Strichen, Status-Punkt mit Wort,
-  ein Los-Knopf, Raum im 4er-Takt, Typo-Skala UHR 11/14/20 (+ Bühnenzahl 30). Die Gesetze stehen JVM-pur in
-  `ui/GestaltRegel.kt` und sind in `GestaltRegelTest` geprüft.
+- Oberfläche in der **Chance-Gestalt** aus dem eingebauten `chance-framework` (`chance-konstruktion/chance-framework`,
+  Quellkopie unter `app/src/main/java/net/schanz/chance/`, Stand in `CHANCE_FRAMEWORK.txt`; dort nicht ändern, im
+  Framework ändern und mit `werkzeug/einbauen.py` neu einbauen). Zwei Gesichter:
+  - **Bett** (21–7 Uhr oder wenn die Uhr Schlaf meldet): nur gedimmter Bernstein auf Schwarz, kein Weiß, dünne
+    Ziffern, keine leuchtenden Flächen.
+  - **Sofa** (am Tag): warmes Weiß, kräftiger Bernstein, schwere Ziffern.
+  Auf dem Debug-Blatt lässt sich das Gesicht fest wählen (auto → bett → sofa). App-eigene Regeln stehen in
+  `ui/UhrRegel.kt` und sind in `UhrRegelTest` geprüft.
 - drei Blätter: **THERMO ‹ SCHLAF › DEBUG** (SCHLAF ist START; hoch/runter auf SCHLAF = Info-Ebene mit den
   30-Minuten-Fenstern und dem Plattform-Verlauf; die Krone scrollt)
 - **Debug-Blatt** für die Sensor-Kette: Kanäle (passiv/live), Rechte, Registrierung, letzte Lieferung mit Verzug,
@@ -49,6 +53,9 @@ adb shell am start -n net.schanz.rejuvenationbed.watch/.MainActivity --es rbw.bl
 adb shell run-as net.schanz.rejuvenationbed.watch cat files/debug/protokoll.txt
 adb logcat -s RBW
 ```
+
+Die Debug-Fassung ist mit einem festen Schlüssel signiert (`watch/debug.keystore`, Android-Standardwerte). Eine neue
+CI-Fassung geht deshalb mit `adb install -r` über die alte, ohne Deinstallieren; Messdaten und Rechte bleiben.
 
 `rbw.blatt` öffnet THERMO, SCHLAF oder DEBUG direkt (Vorschau-Tür wie bei ADL). Protokoll-Arten: `APP`, `FAEHIG`,
 `KANAL`, `RECHT`, `REG` (Registrierung), `DATEN` (Lieferung, auch verworfene mit Grund), `PLATT` (Plattform-Schlafstatus
