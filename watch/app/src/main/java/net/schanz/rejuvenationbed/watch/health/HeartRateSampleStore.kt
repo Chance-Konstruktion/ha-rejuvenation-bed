@@ -46,8 +46,8 @@ object HeartRateSampleStore {
     private const val KEY_STATUS = "heart_rate_collection_status"
     private const val KEY_ENABLED = "heart_rate_collection_enabled"
     private const val KEY_BOOT_MARKER = "heart_rate_collection_boot_marker"
-    private const val MAX_AGE_MILLIS = 10L * 60L * 60L * 1000L
-    private const val MAX_HEART_RATE_SAMPLES = 2500
+    private const val MAX_AGE_MILLIS = 14L * 60L * 60L * 1000L
+    private const val MAX_HEART_RATE_SAMPLES = 45_000
     private const val MAX_STEP_INTERVALS = 4000
     private const val MAX_ACTIVITY_EVENTS = 100
     private const val MAX_ACTIVITY_STATE_AGE_MILLIS = 18L * 60L * 60L * 1000L
@@ -275,8 +275,23 @@ object HeartRateSampleStore {
         editor.apply()
     }
 
+    /**
+     * Stopp der Aufzeichnung: keine neuen Werte mehr annehmen, aber die
+     * aufgezeichneten Daten BEHALTEN (#7). Ein Stopp nach dem Aufwachen ist
+     * der Normalfall – genau dann sind die Nachtdaten am wertvollsten.
+     */
     @Synchronized
-    fun clear(context: Context) {
+    fun stopWriting(context: Context) {
+        context.getSharedPreferences(PREFERENCES, Context.MODE_PRIVATE)
+            .edit()
+            .putBoolean(KEY_ENABLED, false)
+            .putString(KEY_STATUS, "stopped")
+            .apply()
+    }
+
+    /** Löschen nur als ausdrückliche, eigene Aktion – nie als Nebenwirkung von Stopp (#7). */
+    @Synchronized
+    fun loeschen(context: Context) {
         context.getSharedPreferences(PREFERENCES, Context.MODE_PRIVATE)
             .edit()
             .remove(KEY_SAMPLES)
@@ -295,7 +310,29 @@ object HeartRateSampleStore {
         System.currentTimeMillis() - SystemClock.elapsedRealtime()
     )
 
+    // Der Ring ist bis ~1,4 MB JSON groß. Lesen passiert aus der UI (Gesicht, Debug-Takt
+    // alle 2 s); geparst wird nur, wenn sich der gespeicherte Text wirklich geändert hat
+    // (SharedPreferences liefert bei unverändertem Wert dieselbe String-Instanz). Fund w15-ub an !16.
+    @Volatile private var pulsCacheRoh: String? = null
+    @Volatile private var pulsCache: List<HeartRateSample> = emptyList()
+    @Volatile private var schritteCacheRoh: String? = null
+    @Volatile private var schritteCache: List<StepIntervalSample> = emptyList()
+
     private fun parseHeartRate(raw: String?): List<HeartRateSample> {
+        if (raw === pulsCacheRoh) return pulsCache
+        val neu = parseHeartRateRoh(raw)
+        pulsCache = neu; pulsCacheRoh = raw
+        return neu
+    }
+
+    private fun parseStepIntervals(raw: String?): List<StepIntervalSample> {
+        if (raw === schritteCacheRoh) return schritteCache
+        val neu = parseStepIntervalsRoh(raw)
+        schritteCache = neu; schritteCacheRoh = raw
+        return neu
+    }
+
+    private fun parseHeartRateRoh(raw: String?): List<HeartRateSample> {
         if (raw.isNullOrBlank()) return emptyList()
         return runCatching {
             val array = JSONArray(raw)
@@ -313,7 +350,7 @@ object HeartRateSampleStore {
         }.getOrDefault(emptyList())
     }
 
-    private fun parseStepIntervals(raw: String?): List<StepIntervalSample> {
+    private fun parseStepIntervalsRoh(raw: String?): List<StepIntervalSample> {
         if (raw.isNullOrBlank()) return emptyList()
         return runCatching {
             val array = JSONArray(raw)

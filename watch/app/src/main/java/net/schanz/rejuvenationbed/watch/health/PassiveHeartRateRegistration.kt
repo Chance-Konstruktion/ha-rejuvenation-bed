@@ -61,8 +61,8 @@ object PassiveHeartRateRegistration {
 
     fun stop(context: Context, onComplete: (Result<Unit>) -> Unit) {
         val appContext = context.applicationContext
-        // Disable writes immediately; a late callback must not repopulate deleted data.
-        HeartRateSampleStore.clear(appContext)
+        // Disable writes immediately; recorded data stays (#7).
+        HeartRateSampleStore.stopWriting(appContext)
         val future = try {
             HealthServices.getClient(appContext)
                 .passiveMonitoringClient
@@ -82,7 +82,7 @@ object PassiveHeartRateRegistration {
                 if (result.isFailure) HeartRateSampleStore.setStatus(appContext, "stop_failed")
                 DebugProtokoll.ereignis(
                     appContext, "REG",
-                    result.exceptionOrNull()?.let { "Stopp fehlgeschlagen: ${it.javaClass.simpleName}" } ?: "gestoppt, Daten gelöscht"
+                    result.exceptionOrNull()?.let { "Stopp fehlgeschlagen: ${it.javaClass.simpleName}" } ?: "gestoppt, Daten behalten (Puls ${HeartRateSampleStore.sampleCount(appContext)}, Schritte ${HeartRateSampleStore.stepIntervalCount(appContext)})"
                 )
                 onComplete(result)
             },
