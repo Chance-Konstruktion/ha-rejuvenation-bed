@@ -15,4 +15,4 @@ dependencyResolutionManagement {
 }
 
 rootProject.name = "RejuvenationBedWatch"
-include(":app")
+include(":core", ":app", ":phone")
