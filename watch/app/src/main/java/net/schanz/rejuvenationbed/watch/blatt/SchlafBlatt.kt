@@ -23,6 +23,9 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
+import kotlinx.coroutines.withContext
+import kotlinx.coroutines.Dispatchers
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -89,7 +92,17 @@ fun rememberSchlafStand(context: Context, experimentAktiv: Boolean): SchlafStand
         einstellungen.registerOnSharedPreferenceChangeListener(horcher)
         onDispose { einstellungen.unregisterOnSharedPreferenceChangeListener(horcher) }
     }
-    return remember(stand, experimentAktiv) {
+    // Erste Berechnung synchron (das Gesicht braucht sofort einen Stand), jede weitere
+    // nach einer Speicher-Änderung im Hintergrund – der Ring ist groß (Fund w15-ub an !16).
+    val erster = remember(experimentAktiv) { berechneSchlafStand(context, experimentAktiv) }
+    val ergebnis by produceState(erster, stand, experimentAktiv) {
+        if (stand == 0) return@produceState
+        value = withContext(Dispatchers.Default) { berechneSchlafStand(context, experimentAktiv) }
+    }
+    return ergebnis
+}
+
+private fun berechneSchlafStand(context: Context, experimentAktiv: Boolean): SchlafStand {
         val puls = HeartRateSampleStore.heartRateSamples(context)
         val schritte = HeartRateSampleStore.stepIntervals(context)
         val jetzt = System.currentTimeMillis()
@@ -120,7 +133,7 @@ fun rememberSchlafStand(context: Context, experimentAktiv: Boolean): SchlafStand
             IbiQuelleStatus.Verfuegbar -> "verfügbar"
             is IbiQuelleStatus.NichtVerfuegbar -> status.grund
         }
-        SchlafStand(
+        return SchlafStand(
             puls = puls,
             schrittIntervalle = schritte.size,
             fenster = fenster,
@@ -131,7 +144,6 @@ fun rememberSchlafStand(context: Context, experimentAktiv: Boolean): SchlafStand
             schaetzung = schaetzung,
             ibiQuelleStatus = ibiStatus
         )
-    }
 }
 
 /** START-Blatt: das Zifferblatt der Schlafmessung; hoch/runter = Info-Ebene. */

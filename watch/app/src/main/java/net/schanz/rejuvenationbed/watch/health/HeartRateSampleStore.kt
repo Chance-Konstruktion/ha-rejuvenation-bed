@@ -310,7 +310,29 @@ object HeartRateSampleStore {
         System.currentTimeMillis() - SystemClock.elapsedRealtime()
     )
 
+    // Der Ring ist bis ~1,4 MB JSON groß. Lesen passiert aus der UI (Gesicht, Debug-Takt
+    // alle 2 s); geparst wird nur, wenn sich der gespeicherte Text wirklich geändert hat
+    // (SharedPreferences liefert bei unverändertem Wert dieselbe String-Instanz). Fund w15-ub an !16.
+    @Volatile private var pulsCacheRoh: String? = null
+    @Volatile private var pulsCache: List<HeartRateSample> = emptyList()
+    @Volatile private var schritteCacheRoh: String? = null
+    @Volatile private var schritteCache: List<StepIntervalSample> = emptyList()
+
     private fun parseHeartRate(raw: String?): List<HeartRateSample> {
+        if (raw === pulsCacheRoh) return pulsCache
+        val neu = parseHeartRateRoh(raw)
+        pulsCache = neu; pulsCacheRoh = raw
+        return neu
+    }
+
+    private fun parseStepIntervals(raw: String?): List<StepIntervalSample> {
+        if (raw === schritteCacheRoh) return schritteCache
+        val neu = parseStepIntervalsRoh(raw)
+        schritteCache = neu; schritteCacheRoh = raw
+        return neu
+    }
+
+    private fun parseHeartRateRoh(raw: String?): List<HeartRateSample> {
         if (raw.isNullOrBlank()) return emptyList()
         return runCatching {
             val array = JSONArray(raw)
@@ -328,7 +350,7 @@ object HeartRateSampleStore {
         }.getOrDefault(emptyList())
     }
 
-    private fun parseStepIntervals(raw: String?): List<StepIntervalSample> {
+    private fun parseStepIntervalsRoh(raw: String?): List<StepIntervalSample> {
         if (raw.isNullOrBlank()) return emptyList()
         return runCatching {
             val array = JSONArray(raw)
