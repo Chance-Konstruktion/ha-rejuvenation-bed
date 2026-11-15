@@ -8,6 +8,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.height
@@ -39,6 +40,7 @@ import net.schanz.chance.gestalt.LocalChanceThema
 import net.schanz.chance.gestalt.LosKnopf
 import net.schanz.chance.gestalt.Raum
 import net.schanz.chance.gestalt.StatusZeile
+import net.schanz.chance.gestalt.UmrissKnopf
 import net.schanz.chance.gestalt.Zifferblatt
 import net.schanz.chance.gestalt.kroneScrollt
 import net.schanz.rejuvenationbed.watch.analysis.SleepFeatureExtractor
@@ -315,6 +317,13 @@ private fun SchlafInfo(
     val context = LocalContext.current
     val stand = rememberSchlafStand(context, experimentAktiv)
     val rollen = rememberScrollState()
+    // Die Lösch-Aktion ist nur erreichbar, wenn nicht gemessen wird (#7). Beginnt die
+    // Messung, verfällt eine offene Rückfrage – die Uhr kommt nicht mit halb offener
+    // Rückfrage in die Nacht.
+    var loeschRueckfrage by remember { mutableStateOf(false) }
+    LaunchedEffect(stand.misst) {
+        if (stand.misst) loeschRueckfrage = false
+    }
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -392,5 +401,38 @@ private fun SchlafInfo(
         }
         Spacer(Modifier.height(Raum.s2))
         BasicText("Ø Puls · σ Streuung · S Schritte · Belegung", style = thema.klein.copy(color = thema.grau2, textAlign = TextAlign.Center))
+        // Löschen ist eine ausdrückliche, eigene Aktion (#7, Prüfnotiz w15-ub an !16):
+        // nie als Nebenwirkung von Stopp. Sichtbar nur ohne laufende Messung, mit
+        // Rückfrage; Bestätigen ist nicht vorgewählt (UmrissKnopf, kein Hervor, kein Fokus).
+        if (!stand.misst) {
+            Spacer(Modifier.height(Raum.s2))
+            Augenbraue("DATEN")
+            if (loeschRueckfrage) {
+                BasicText(
+                    "Aufgezeichnete Daten löschen?",
+                    style = thema.daten.copy(textAlign = TextAlign.Center)
+                )
+                Row(horizontalArrangement = Arrangement.spacedBy(Raum.s2)) {
+                    UmrissKnopf("ABBRECHEN") { loeschRueckfrage = false }
+                    UmrissKnopf("BESTÄTIGEN") {
+                        loeschRueckfrage = false
+                        HeartRateSampleStore.loeschen(context)
+                        DebugProtokoll.ereignis(context, "REG", "Daten gelöscht (Nutzer)")
+                    }
+                }
+            } else {
+                BasicText(
+                    "DATEN LÖSCHEN",
+                    style = thema.daten.copy(color = thema.text, textAlign = TextAlign.Center),
+                    modifier = Modifier
+                        .clickable { loeschRueckfrage = true }
+                        .padding(vertical = Raum.s1)
+                )
+                BasicText(
+                    "löscht Puls, Schritte und Schlafstatus auf der Uhr",
+                    style = thema.klein.copy(color = thema.grau2, textAlign = TextAlign.Center)
+                )
+            }
+        }
     }
 }
