@@ -28,6 +28,15 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
+import net.schanz.chance.gestalt.Augenbraue
+import net.schanz.chance.gestalt.BlattHinweis
+import net.schanz.chance.gestalt.GestaltRegel
+import net.schanz.chance.gestalt.LocalChanceThema
+import net.schanz.chance.gestalt.LosKnopf
+import net.schanz.chance.gestalt.Raum
+import net.schanz.chance.gestalt.StatusZeile
+import net.schanz.chance.gestalt.Zifferblatt
+import net.schanz.chance.gestalt.kroneScrollt
 import net.schanz.rejuvenationbed.watch.analysis.SleepFeatureExtractor
 import net.schanz.rejuvenationbed.watch.analysis.SleepFeatureWindow
 import net.schanz.rejuvenationbed.watch.debug.DebugProtokoll
@@ -41,16 +50,7 @@ import net.schanz.rejuvenationbed.watch.health.PlatformSleepStateEvent
 import net.schanz.rejuvenationbed.watch.health.WearHealthPermissions
 import net.schanz.rejuvenationbed.watch.nowbar.NowBar
 import net.schanz.rejuvenationbed.watch.nowbar.NowBarText
-import net.schanz.rejuvenationbed.watch.ui.Augenbraue
-import net.schanz.rejuvenationbed.watch.ui.BlattHinweis
-import net.schanz.rejuvenationbed.watch.ui.Farbe
-import net.schanz.rejuvenationbed.watch.ui.GestaltRegel
-import net.schanz.rejuvenationbed.watch.ui.LosKnopf
-import net.schanz.rejuvenationbed.watch.ui.Raum
-import net.schanz.rejuvenationbed.watch.ui.Schrift
-import net.schanz.rejuvenationbed.watch.ui.StatusZeile
-import net.schanz.rejuvenationbed.watch.ui.Zifferblatt
-import net.schanz.rejuvenationbed.watch.ui.kroneScrollt
+import net.schanz.rejuvenationbed.watch.ui.UhrRegel
 import java.util.Locale
 
 /** Lokaler Stand der Schlafdaten, neu gelesen bei jeder Änderung im Speicher. */
@@ -106,6 +106,7 @@ fun SchlafBlatt(aktiv: Boolean) {
 
 @Composable
 private fun SchlafGesicht() {
+    val thema = LocalChanceThema.current
     val context = LocalContext.current
     var faehigkeit by remember { mutableStateOf<HeartRateCapability>(HeartRateCapability.Checking) }
     var schritteKanal by remember { mutableStateOf(false) }
@@ -141,8 +142,8 @@ private fun SchlafGesicht() {
         if (stand.misst) NowBar.starten(context, NowBarText.puls(stand.puls.lastOrNull()?.beatsPerMinute))
     }
 
-    val status = GestaltRegel.schlafStatus(faehigkeit, fehlendesRecht != null, stand.sammelStatus, beschaeftigt)
-    val knopf = GestaltRegel.losKnopf(faehigkeit, fehlendesRecht != null, stand.sammelStatus, beschaeftigt)
+    val status = UhrRegel.schlafStatus(faehigkeit, fehlendesRecht != null, stand.sammelStatus, beschaeftigt)
+    val knopf = UhrRegel.losKnopf(faehigkeit, fehlendesRecht != null, stand.sammelStatus, beschaeftigt)
     val juengster = stand.puls.lastOrNull()
     val held = juengster?.let { "${it.beatsPerMinute.toInt()} bpm" } ?: "— bpm"
     val unter = buildString {
@@ -166,10 +167,10 @@ private fun SchlafGesicht() {
         ) {
             StatusZeile(status)
             Spacer(Modifier.height(Raum.s1))
-            BasicText(held, style = Schrift.held)
-            BasicText(unter, style = Schrift.daten.copy(textAlign = TextAlign.Center))
+            BasicText(held, style = thema.held)
+            BasicText(unter, style = thema.daten.copy(textAlign = TextAlign.Center))
             if (plattform != null) {
-                BasicText(plattform, style = Schrift.klein.copy(textAlign = TextAlign.Center))
+                BasicText(plattform, style = thema.klein.copy(textAlign = TextAlign.Center))
             }
             Spacer(Modifier.height(Raum.s2))
             LosKnopf(knopf, aktiv = faehigkeit == HeartRateCapability.Supported && !beschaeftigt) {
@@ -206,6 +207,7 @@ private fun SchlafGesicht() {
 /** INFO-Ebene: die 30-Minuten-Fenster und der Plattform-Verlauf. */
 @Composable
 private fun SchlafInfo(aktiv: Boolean) {
+    val thema = LocalChanceThema.current
     val context = LocalContext.current
     val stand = rememberSchlafStand(context)
     val rollen = rememberScrollState()
@@ -220,7 +222,7 @@ private fun SchlafInfo(aktiv: Boolean) {
     ) {
         Augenbraue("FENSTER · 30 MIN")
         if (stand.fenster.isEmpty()) {
-            BasicText("noch keine Daten", style = Schrift.klein.copy(color = Farbe.Grau2))
+            BasicText("noch keine Daten", style = thema.klein.copy(color = thema.grau2))
         }
         stand.fenster.takeLast(10).reversed().forEach { f ->
             val mittel = f.heartRateMeanBpm?.let { String.format(Locale.GERMANY, "Ø%.0f", it) } ?: "Ø—"
@@ -228,20 +230,20 @@ private fun SchlafInfo(aktiv: Boolean) {
             BasicText(
                 "${DebugText.uhrzeit(f.startEpochMillis)} $mittel $streu ${f.stepsInWindow}S " +
                     "${f.heartRateOccupiedBuckets}/${f.heartRateBucketCount}",
-                style = Schrift.daten.copy(
-                    color = if (f.hasMinimumHeartRateFeatures) Farbe.Text else Farbe.Grau2
+                style = thema.daten.copy(
+                    color = if (f.hasMinimumHeartRateFeatures) thema.text else thema.grau2
                 )
             )
         }
         Spacer(Modifier.height(Raum.s2))
         Augenbraue("WEAR OS SCHLAF")
         if (stand.plattformVerlauf.isEmpty()) {
-            BasicText("kein Statuswechsel", style = Schrift.klein.copy(color = Farbe.Grau2))
+            BasicText("kein Statuswechsel", style = thema.klein.copy(color = thema.grau2))
         }
         stand.plattformVerlauf.takeLast(8).reversed().forEach { e ->
-            BasicText("${DebugText.uhrzeit(e.changedAtEpochMillis)} ${e.state.label}", style = Schrift.daten)
+            BasicText("${DebugText.uhrzeit(e.changedAtEpochMillis)} ${e.state.label}", style = thema.daten)
         }
         Spacer(Modifier.height(Raum.s2))
-        BasicText("Ø Puls · σ Streuung · S Schritte · Belegung", style = Schrift.klein.copy(color = Farbe.Grau2, textAlign = TextAlign.Center))
+        BasicText("Ø Puls · σ Streuung · S Schritte · Belegung", style = thema.klein.copy(color = thema.grau2, textAlign = TextAlign.Center))
     }
 }
