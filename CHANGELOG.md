@@ -5,6 +5,15 @@ Alle Änderungen am Rejuvenation Bed Projekt.
 ## [Unreleased]
 
 ### Uhr (Wear OS)
+- Stopp behält die Nachtdaten (#7): Der Stopp löscht nichts mehr – er beendet nur die Registrierung und
+  die Now Bar; die aufgezeichneten Daten bleiben, bis sie regulär verdrängt werden. Der Puls-Ring reicht
+  jetzt für eine Nacht (45.000 Werte bei ~1 Wert/s, Höchstalter 14 h statt 42 Minuten).
+- Daten löschen ist eine eigene, ausdrückliche Aktion in der Info-Ebene (nur sichtbar, wenn nicht
+  gemessen wird): „DATEN LÖSCHEN“ fragt nach – Abbrechen/Bestätigen, Bestätigen ist nicht vorgewählt –
+  und schreibt „REG Daten gelöscht (Nutzer)“ ins Protokoll.
+- Ring-Lesen ohne UI-Hänger (Fund w15-ub an !16): geparst wird nur, wenn sich die gespeicherte Datenlage
+  geändert hat, und nicht mehr am Hauptthread; Roh-Text und geparste Werte hängen als unveränderliches
+  Paar, damit kein Lesezugriff ein gemischtes Paar sieht (Prüfnotiz w15-ue an !16).
 - Oberfläche auf die Chance-Gestalt umgebaut (Vorbild ADL-Designbuch): Zifferblatt, Status-Punkt mit Wort,
   Los-Knopf, AMOLED/Bernstein; Blätter THERMO ‹ SCHLAF › DEBUG, Info-Ebene auf SCHLAF.
 - Debug-Blatt und Debug-Protokoll für die Sensor-Kette (Lieferungen mit Verzug, verworfene Lieferungen mit Grund,
