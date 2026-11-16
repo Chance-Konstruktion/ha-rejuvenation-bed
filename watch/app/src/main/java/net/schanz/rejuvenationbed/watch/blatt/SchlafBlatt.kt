@@ -51,7 +51,9 @@ import net.schanz.rejuvenationbed.watch.health.IbiMesspunktSpeicher
 import net.schanz.rejuvenationbed.watch.health.IbiQuelleStatus
 import net.schanz.rejuvenationbed.watch.health.SamsungHealthSensorSdkIbiQuelle
 import net.schanz.rejuvenationbed.watch.health.WearSleepPredictionSender
+import net.schanz.rejuvenationbed.watch.sleep.PulsBewegungsEstimator
 import net.schanz.rejuvenationbed.watch.sleep.SleepEstimatorSettings
+import net.schanz.rejuvenationbed.watch.sleep.SleepEstimatorWahl
 import net.schanz.rejuvenationbed.watch.sleep.SleepStageEstimator
 import net.schanz.rejuvenationbed.watch.debug.DebugProtokoll
 import net.schanz.rejuvenationbed.watch.debug.DebugText
@@ -173,7 +175,16 @@ private fun berechneSchlafStand(context: Context, experimentAktiv: Boolean): Sch
             startEpochMillis = fensterStart,
             endEpochMillis = fensterEnde
         )
-        val schaetzung = SleepStageEstimator.estimate(hrv, jetzt, enabled = experimentAktiv)
+        // Schätzer-Kette (Fund 39678 an !19): als JVM-geprüfte Funktion
+        // SleepEstimatorWahl — mit verlässlicher IBI der M2-Schätzer, ohne IBI
+        // die grobe Puls+Bewegungs-Schätzung; der Schalter geht an jeden Zweig.
+        val schaetzung = SleepEstimatorWahl.schaetzung(
+            hrv = hrv,
+            fenster = fenster.lastOrNull(),
+            hatBewegungsdaten = schritte.isNotEmpty(),
+            jetztEpochMillis = jetzt,
+            experimentAktiv = experimentAktiv
+        )
         val ibiStatus = when (val status = SamsungHealthSensorSdkIbiQuelle().status()) {
             IbiQuelleStatus.Verfuegbar -> "verfügbar"
             is IbiQuelleStatus.NichtVerfuegbar -> status.grund
@@ -268,6 +279,7 @@ private fun SchlafGesicht(experimentAktiv: Boolean) {
     }
 
     val stand = rememberSchlafStand(context, experimentAktiv)
+    val grob = stand.schaetzung.algorithmVersion == PulsBewegungsEstimator.ALGORITHM_VERSION
     val phasenText = if (stand.schaetzung.isUsable(nowEpochMillis = System.currentTimeMillis())) {
         val phase = when (stand.schaetzung.stage) {
             net.schanz.rejuvenationbed.watch.sleep.SleepStage.AWAKE -> "wach"
@@ -276,7 +288,8 @@ private fun SchlafGesicht(experimentAktiv: Boolean) {
             net.schanz.rejuvenationbed.watch.sleep.SleepStage.REM -> "REM"
             net.schanz.rejuvenationbed.watch.sleep.SleepStage.UNKNOWN -> "unbekannt"
         }
-        "Phase: $phase · ${(stand.schaetzung.confidence * 100).toInt()} %"
+        val kennzeichnung = if (grob) " · grobe Schätzung" else ""
+        "Phase: $phase · ${(stand.schaetzung.confidence * 100).toInt()} %$kennzeichnung"
     } else {
         // Ziel C (#8): „unbekannt“ allein hilft niemandem — das Gesicht nennt
         // den Grund (Schalter AUS / keine IBI / zu wenige IBI / …).
@@ -397,7 +410,7 @@ private fun SchlafInfo(
         )
         BasicText(
             "Schätzung: ${stand.schaetzung.stage.wireValue} · Konfidenz " +
-                "${(stand.schaetzung.confidence * 100).toInt()} %",
+                "${(stand.schaetzung.confidence * 100).toInt()} % · ${stand.schaetzung.algorithmVersion}",
             style = thema.daten.copy(textAlign = TextAlign.Center)
         )
         if (stand.schaetzung.stage == net.schanz.rejuvenationbed.watch.sleep.SleepStage.UNKNOWN) {
