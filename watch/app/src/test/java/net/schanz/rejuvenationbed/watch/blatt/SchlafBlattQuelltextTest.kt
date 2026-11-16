@@ -1,5 +1,6 @@
 package net.schanz.rejuvenationbed.watch.blatt
 
+import org.junit.Assert.assertFalse
 import org.junit.Assert.assertTrue
 import org.junit.Test
 import java.nio.file.Files
@@ -54,6 +55,45 @@ class SchlafBlattQuelltextTest {
         assertTrue(
             "die grobe Schätzung muss als „grobe Schätzung“ beschriftet sein",
             "grobe Schätzung" in text
+        )
+    }
+
+    /**
+     * #8/Ziel C: „Phase: unbekannt“ ohne Wort ist für niemanden brauchbar.
+     * Das Gesicht nennt den Grund (Schalter AUS / keine IBI / zu wenige IBI),
+     * die Info-Ebene sagt es ausdrücklich in Worten.
+     */
+    @Test
+    fun derFehlendePhasenGrundIstSichtbar() {
+        val text = Files.readString(quelle())
+        assertTrue(
+            "das Gesicht muss den Grund der unbekannten Phase anzeigen",
+            "Phase: unbekannt · \${stand.schaetzung.grund}" in text
+        )
+        assertTrue(
+            "die Info-Ebene muss den Grund ausdrücklich benennen",
+            "keine Phasen, weil: \${stand.schaetzung.grund}" in text
+        )
+    }
+
+    /**
+     * Fund 39678 an !19: das Schlaf-Blatt rief den groben Schätzer direkt und
+     * verlor dabei `enabled` — mit Schalter EIN blieb alles „unbekannt ·
+     * Schätzer ausgeschaltet“, die grobe Schätzung war nie erreichbar. Die
+     * Kette liegt jetzt als JVM-geprüfte Funktion (`SleepEstimatorWahl`) vor;
+     * das Blatt muss SIE rufen und darf den groben Schätzer nicht um die
+     * Kette herum selbst aufrufen.
+     */
+    @Test
+    fun dasBlattRuftDieGepruefteSchaetzerKette() {
+        val text = Files.readString(quelle())
+        assertTrue(
+            "das Schlaf-Blatt muss SleepEstimatorWahl.schaetzung verwenden",
+            "SleepEstimatorWahl.schaetzung(" in text
+        )
+        assertFalse(
+            "das Schlaf-Blatt darf den groben Schätzer nicht direkt rufen (Fund 39678)",
+            "PulsBewegungsEstimator.estimate(" in text
         )
     }
 }

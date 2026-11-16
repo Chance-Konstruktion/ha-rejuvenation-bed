@@ -95,14 +95,57 @@ fun rememberSchlafStand(context: Context, experimentAktiv: Boolean): SchlafStand
         einstellungen.registerOnSharedPreferenceChangeListener(horcher)
         onDispose { einstellungen.unregisterOnSharedPreferenceChangeListener(horcher) }
     }
-    // Erste Berechnung synchron (das Gesicht braucht sofort einen Stand), jede weitere
-    // nach einer Speicher-Änderung im Hintergrund – der Ring ist groß (Fund w15-ub an !16).
-    val erster = remember(experimentAktiv) { berechneSchlafStand(context, experimentAktiv) }
+    // Ziel A (#8): die Nacht-Auswertung liest aus der SQLite-Tabelle (36 h bei
+    // 1 Hz ≈ 130.000 Werte) — ALLES Laden läuft im Hintergrund, auch das erste.
+    // Das Gesicht startet mit einem leeren Stand und füllt sich im Bruchteil
+    // einer Sekunde; der Haupt-Thread hängt nie (Fund w15-ub an !16 wird damit
+    // zur Regel statt zur Ausnahme). Jede Speicher-Änderung (Puls-Takt, Schritte,
+    // Status) stößt neu an.
+    val erster = remember(experimentAktiv) { leererSchlafStand(context) }
     val ergebnis by produceState(erster, stand, experimentAktiv) {
-        if (stand == 0) return@produceState
         value = withContext(Dispatchers.Default) { berechneSchlafStand(context, experimentAktiv) }
+        if (value.misst) {
+            // Now Bar nach dem Nachladen mit dem echten Pulswert frischen (der
+            // leere Startstand hat noch keinen); no-op, wenn sie nicht läuft.
+            NowBar.aktualisieren(context, NowBarText.puls(value.puls.lastOrNull()?.beatsPerMinute))
+        }
     }
     return ergebnis
+}
+
+/** Anfangsstand ohne schwere Lesezugriffe: billige Status-Werte, leere Reihen. */
+private fun leererSchlafStand(context: Context): SchlafStand {
+    val hrv = net.schanz.rejuvenationbed.watch.analysis.SleepHrvFeatures(
+        startEpochMillis = 0L,
+        endEpochMillis = 0L,
+        rawIbiCount = 0,
+        acceptedIbiCount = 0,
+        rejectedIbiCount = 0,
+        meanIbiMillis = null,
+        rmssdMillis = null,
+        sdnnMillis = null,
+        ibiCoverage = 0.0,
+        signalQuality = 0.0,
+        movementBucketCount = 0,
+        movementCoverage = 0.0,
+        movementVarianceStepsPerMinuteSquared = null
+    )
+    return SchlafStand(
+        puls = emptyList(),
+        schrittIntervalle = 0,
+        fenster = emptyList(),
+        sammelStatus = HeartRateSampleStore.status(context),
+        plattform = HeartRateSampleStore.latestPlatformSleepState(context),
+        plattformVerlauf = emptyList(),
+        hrv = hrv,
+        schaetzung = SleepStageEstimator.estimate(hrv, 0L, enabled = false),
+        ibiQuelleStatus = SamsungHealthSensorSdkIbiQuelle().status().let { status ->
+            when (status) {
+                IbiQuelleStatus.Verfuegbar -> "verfügbar"
+                is IbiQuelleStatus.NichtVerfuegbar -> status.grund
+            }
+        }
+    )
 }
 
 private fun berechneSchlafStand(context: Context, experimentAktiv: Boolean): SchlafStand {
@@ -248,7 +291,9 @@ private fun SchlafGesicht(experimentAktiv: Boolean) {
         val kennzeichnung = if (grob) " · grobe Schätzung" else ""
         "Phase: $phase · ${(stand.schaetzung.confidence * 100).toInt()} %$kennzeichnung"
     } else {
-        "Phase: unbekannt"
+        // Ziel C (#8): „unbekannt“ allein hilft niemandem — das Gesicht nennt
+        // den Grund (Schalter AUS / keine IBI / zu wenige IBI / …).
+        "Phase: unbekannt · ${stand.schaetzung.grund}"
     }
     LaunchedEffect(stand.misst) {
         if (stand.misst) NowBar.starten(context, NowBarText.puls(stand.puls.lastOrNull()?.beatsPerMinute))
@@ -368,6 +413,13 @@ private fun SchlafInfo(
                 "${(stand.schaetzung.confidence * 100).toInt()} % · ${stand.schaetzung.algorithmVersion}",
             style = thema.daten.copy(textAlign = TextAlign.Center)
         )
+        if (stand.schaetzung.stage == net.schanz.rejuvenationbed.watch.sleep.SleepStage.UNKNOWN) {
+            // Ziel C (#8): deutlich und in Worten, warum keine Phase da ist.
+            BasicText(
+                "keine Phasen, weil: ${stand.schaetzung.grund}",
+                style = thema.daten.copy(color = thema.text, textAlign = TextAlign.Center)
+            )
+        }
         BasicText(
             if (experimentAktiv) "ABGLEICH AM SMARTPHONE SENDEN"
             else "Zum Senden erst das Experiment einschalten",
