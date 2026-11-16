@@ -24,7 +24,9 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
 import androidx.health.services.client.data.DataType
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.withContext
 import net.schanz.chance.gestalt.Augenbraue
 import net.schanz.chance.gestalt.BlattHinweis
 import net.schanz.chance.gestalt.DatenZeile
@@ -41,6 +43,7 @@ import net.schanz.rejuvenationbed.watch.debug.KanalBericht
 import net.schanz.rejuvenationbed.watch.debug.LivePuls
 import net.schanz.rejuvenationbed.watch.debug.LiveStand
 import net.schanz.rejuvenationbed.watch.debug.SensorDiagnose
+import net.schanz.rejuvenationbed.watch.health.HeartRateSample
 import net.schanz.rejuvenationbed.watch.health.HeartRateSampleStore
 import net.schanz.rejuvenationbed.watch.nowbar.NowBarDienst
 import net.schanz.rejuvenationbed.watch.ui.UhrRegel
@@ -84,7 +87,6 @@ fun DebugBlatt(
 
     // Bei jedem Takt neu gelesen (billig: SharedPreferences + kleine Datei).
     val jetzt = remember(takt) { System.currentTimeMillis() }
-    val puls = remember(takt) { HeartRateSampleStore.heartRateSamples(context) }
     val register = remember(takt) { HeartRateSampleStore.diagnose(context) }
     val plattform = remember(takt) { HeartRateSampleStore.platformSleepStates(context).lastOrNull() }
     val rechte = remember(takt) { SensorDiagnose.rechte(context) }
@@ -99,6 +101,21 @@ fun DebugBlatt(
             GestaltRegel.Status("wartet auf Daten", GestaltRegel.StatusArt.LAEUFT)
         rechte.any { !it.second } -> GestaltRegel.Status("recht fehlt", GestaltRegel.StatusArt.STILL)
         else -> GestaltRegel.Status("bereit", GestaltRegel.StatusArt.BEREIT)
+    }
+
+    // Ziel A (#8): der Puls liegt in der SQLite-Tabelle (36 h ≈ 130.000 Werte).
+    // Zählung und jüngster Wert kommen als günstige Einzeiler-Abfragen aus der
+    // Tabelle — im Hintergrund, nie auf dem Haupt-Thread.
+    var pulsAnzahl by remember { mutableIntStateOf(-1) }
+    var juengsterPuls by remember { mutableStateOf<HeartRateSample?>(null) }
+    LaunchedEffect(takt, aktiv) {
+        if (!aktiv) return@LaunchedEffect
+        withContext(Dispatchers.IO) {
+            val anzahl = HeartRateSampleStore.sampleCount(context)
+            val juengster = HeartRateSampleStore.juengsterPuls(context)
+            pulsAnzahl = anzahl
+            juengsterPuls = juengster
+        }
     }
 
     Column(
@@ -143,10 +160,10 @@ fun DebugBlatt(
             Augenbraue("MESSUNG")
             register.forEach { (k, v) -> DatenZeile(k, v) }
             DatenZeile("now bar", if (NowBarDienst.laeuft) "an" else "aus")
-            DatenZeile("pulswerte", "${puls.size}")
+            DatenZeile("pulswerte", if (pulsAnzahl < 0) "…" else "$pulsAnzahl")
             DatenZeile(
                 "jüngster",
-                puls.lastOrNull()?.let { "${it.beatsPerMinute.toInt()} bpm · ${DebugText.alter(jetzt - it.measuredAtEpochMillis)}" } ?: "—"
+                juengsterPuls?.let { "${it.beatsPerMinute.toInt()} bpm · ${DebugText.alter(jetzt - it.measuredAtEpochMillis)}" } ?: "—"
             )
             DatenZeile("lieferungen", "$lieferungen")
             DatenZeile("letzte", letzteLieferung?.let { "vor ${DebugText.alter(jetzt - it)}" } ?: "—")
