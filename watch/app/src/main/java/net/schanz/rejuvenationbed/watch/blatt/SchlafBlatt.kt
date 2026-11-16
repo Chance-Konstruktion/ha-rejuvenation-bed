@@ -64,9 +64,13 @@ import net.schanz.rejuvenationbed.watch.health.HeartRateSampleStore
 import net.schanz.rejuvenationbed.watch.health.PassiveHeartRateRegistration
 import net.schanz.rejuvenationbed.watch.health.PlatformSleepStateEvent
 import net.schanz.rejuvenationbed.watch.health.WearHealthPermissions
+import net.schanz.rejuvenationbed.watch.ha.HaUebertragung
+import net.schanz.rejuvenationbed.watch.ha.HaUebertragungModus
+import net.schanz.rejuvenationbed.watch.ha.HaUebertragungsEinstellungen
 import net.schanz.rejuvenationbed.watch.nowbar.NowBar
 import net.schanz.rejuvenationbed.watch.nowbar.NowBarText
 import net.schanz.rejuvenationbed.watch.ui.UhrRegel
+import androidx.compose.foundation.text.BasicTextField
 import java.util.Locale
 
 /** Lokaler Stand der Schlafdaten, neu gelesen bei jeder Änderung im Speicher. */
@@ -382,6 +386,21 @@ private fun SchlafInfo(
     LaunchedEffect(stand.misst) {
         if (stand.misst) loeschRueckfrage = false
     }
+    // HA-Übertragung: Statuszeile frisch lesen, wenn die Warteschlange sich bewegt.
+    var haSignal by remember { mutableIntStateOf(0) }
+    DisposableEffect(context) {
+        val einstellungen = context.getSharedPreferences("rejuvenation_bed_watch_ha", Context.MODE_PRIVATE)
+        val horcher = SharedPreferences.OnSharedPreferenceChangeListener { _, _ -> haSignal += 1 }
+        einstellungen.registerOnSharedPreferenceChangeListener(horcher)
+        onDispose { einstellungen.unregisterOnSharedPreferenceChangeListener(horcher) }
+    }
+    val haStatus = remember(haSignal) { HaUebertragung.statusZeile(context) }
+    val hatAdresse = remember(haSignal) { HaUebertragungsEinstellungen.hatAdresse(context) }
+    // Der Umschalt-Hinweis: einmal deutlich zeigen, was bei „Gesamtdaten“ geht —
+    // beim Umschalten selbst, nicht bei jedem Besuch der Ebene.
+    var gesamtdatenHinweis by remember { mutableStateOf(false) }
+    var adresseFeld by remember { mutableStateOf("") }
+    var haSendenStatus by remember { mutableStateOf("Noch kein Nachtbericht gesendet.") }
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -482,6 +501,8 @@ private fun SchlafInfo(
                     UmrissKnopf("BESTÄTIGEN") {
                         loeschRueckfrage = false
                         HeartRateSampleStore.loeschen(context)
+                        // Auch die HA-Warteschlange (Rohdaten-Kopien der Pakete) weg.
+                        HaUebertragung.vergessen(context)
                         DebugProtokoll.ereignis(context, "REG", "Daten gelöscht (Nutzer)")
                     }
                 }
@@ -499,5 +520,122 @@ private fun SchlafInfo(
                 )
             }
         }
+
+        Spacer(Modifier.height(Raum.s2))
+        Augenbraue("HA-ÜBERTRAGUNG")
+        val modus = remember(haSignal) { HaUebertragungsEinstellungen.modus(context) }
+        BasicText(
+            "Stellung: ${modus.anzeige}",
+            style = thema.daten.copy(textAlign = TextAlign.Center)
+        )
+        BasicText(
+            modus.kurzeBeschreibung,
+            style = thema.klein.copy(color = thema.grau2, textAlign = TextAlign.Center)
+        )
+        BasicText(
+            if (modus == HaUebertragungModus.PHASE_ONLY) "▸ NUR SCHLAFPHASE · Standard" else "NUR SCHLAFPHASE",
+            style = thema.daten.copy(
+                color = if (modus == HaUebertragungModus.PHASE_ONLY) thema.text else thema.grau2,
+                textAlign = TextAlign.Center
+            ),
+            modifier = Modifier
+                .clickable {
+                    if (modus != HaUebertragungModus.PHASE_ONLY) {
+                        HaUebertragungsEinstellungen.setzeModus(context, HaUebertragungModus.PHASE_ONLY)
+                        gesamtdatenHinweis = false
+                        DebugProtokoll.ereignis(context, "HA", "Schalter: Nur Schlafphase")
+                    }
+                }
+                .padding(vertical = Raum.s1)
+        )
+        BasicText(
+            if (modus == HaUebertragungModus.GESAMTDATEN) "▸ GESAMTDATEN" else "GESAMTDATEN",
+            style = thema.daten.copy(
+                color = if (modus == HaUebertragungModus.GESAMTDATEN) thema.text else thema.grau2,
+                textAlign = TextAlign.Center
+            ),
+            modifier = Modifier
+                .clickable {
+                    if (modus != HaUebertragungModus.GESAMTDATEN) {
+                        HaUebertragungsEinstellungen.setzeModus(context, HaUebertragungModus.GESAMTDATEN)
+                        // Beim Umschalten einmal deutlich zeigen, was übertragen wird.
+                        gesamtdatenHinweis = true
+                        DebugProtokoll.ereignis(context, "HA", "Schalter: Gesamtdaten")
+                    }
+                }
+                .padding(vertical = Raum.s1)
+        )
+        if (gesamtdatenHinweis) {
+            BasicText(
+                "Beim Senden gehen an Home Assistant:",
+                style = thema.daten.copy(color = thema.text, textAlign = TextAlign.Center)
+            )
+            modus.uebertrageneWerte.forEach { wert ->
+                BasicText("· $wert", style = thema.klein.copy(color = thema.text, textAlign = TextAlign.Center))
+            }
+            BasicText(
+                "Nicht übertragen:",
+                style = thema.daten.copy(color = thema.text, textAlign = TextAlign.Center)
+            )
+            modus.nichtUebermittelt.forEach { wert ->
+                BasicText("· $wert", style = thema.klein.copy(color = thema.grau2, textAlign = TextAlign.Center))
+            }
+            BasicText(
+                "Nur über den lokalen Webhook der hier gespeicherten Adresse — " +
+                    "nie Cloud, nie ein fremder Dienst. Messpunkte tragen ihren Zeitstempel; " +
+                    "Wiederholungen erzeugen keine Doppelungen.",
+                style = thema.klein.copy(color = thema.text, textAlign = TextAlign.Center)
+            )
+            UmrissKnopf("VERSTANDEN") { gesamtdatenHinweis = false }
+        }
+        BasicText(
+            if (hatAdresse) "HA-Adresse: gesetzt" else "HA-Adresse: nicht gesetzt",
+            style = thema.klein.copy(color = thema.grau2)
+        )
+        BasicTextField(
+            value = adresseFeld,
+            onValueChange = { adresseFeld = it },
+            textStyle = thema.daten.copy(color = thema.text, textAlign = TextAlign.Center),
+            decorationBox = { innen ->
+                if (adresseFeld.isEmpty()) {
+                    BasicText(
+                        "Adresse der Nachtbericht-Annahme",
+                        style = thema.klein.copy(color = thema.grau2, textAlign = TextAlign.Center)
+                    )
+                }
+                innen()
+            }
+        )
+        Row(horizontalArrangement = Arrangement.spacedBy(Raum.s2)) {
+            UmrissKnopf("SPEICHERN") {
+                HaUebertragungsEinstellungen.setzeAdresse(context, adresseFeld)
+                adresseFeld = ""
+                if (HaUebertragungsEinstellungen.hatAdresse(context)) {
+                    DebugProtokoll.ereignis(context, "HA", "Adresse gesetzt")
+                } else {
+                    DebugProtokoll.ereignis(context, "HA", "leere Adresse — nichts geändert")
+                }
+            }
+            UmrissKnopf("LEEREN") {
+                HaUebertragungsEinstellungen.setzeAdresse(context, null)
+                DebugProtokoll.ereignis(context, "HA", "Adresse entfernt")
+            }
+        }
+        BasicText(
+            "Pfad der Annahme: Attribut „annahme_pfad“ am Sensor „Bett Nachtbericht“",
+            style = thema.klein.copy(color = thema.grau2, textAlign = TextAlign.Center)
+        )
+        BasicText(
+            if (hatAdresse) "NACHTBERICHT AN HA SENDEN" else "Zum Senden erst die HA-Adresse setzen",
+            style = thema.daten.copy(color = thema.text, textAlign = TextAlign.Center),
+            modifier = Modifier
+                .clickable(enabled = hatAdresse) {
+                    haSendenStatus = "Sende …"
+                    HaUebertragung.jetztSenden(context) { ergebnis -> haSendenStatus = ergebnis }
+                }
+                .padding(vertical = Raum.s1)
+        )
+        BasicText(haSendenStatus, style = thema.klein.copy(color = thema.grau2, textAlign = TextAlign.Center))
+        BasicText(haStatus, style = thema.klein.copy(color = thema.grau2, textAlign = TextAlign.Center))
     }
 }

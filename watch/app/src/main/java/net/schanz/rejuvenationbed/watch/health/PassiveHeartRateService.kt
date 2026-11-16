@@ -24,6 +24,10 @@ class PassiveHeartRateService : PassiveListenerService() {
         }
         DebugProtokoll.ereignis(applicationContext, "DATEN", text)
         annahme.puls.lastOrNull()?.let { NowBar.aktualisieren(applicationContext, NowBarText.puls(it.beatsPerMinute)) }
+        // HA-Übertragung: die laufende Phase (beide Stellungen) anstellen und
+        // den Warteschlangen-Abholversuch anstoßen — im eigenen Hintergrund-
+        // Faden, der Messweg wird nicht berührt.
+        net.schanz.rejuvenationbed.watch.ha.HaUebertragung.beimLiefern(applicationContext)
     }
 
     override fun onUserActivityInfoReceived(info: UserActivityInfo) {

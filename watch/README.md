@@ -33,14 +33,56 @@ Enthalten:
 Noch **nicht** enthalten:
 - rohe Beschleunigungssensor- oder IBI/PPG-Erfassung
 - vierstufige Schlafphasen-Klassifikation oder eine validierte Schlafanalyse
-- Pairing / Verbindung mit Home Assistant
+- sicheres Pairing mit Home Assistant (M3 — heute nur der lokale Webhook ohne Bearer-Token)
 - Live-Temperaturanzeige und Live-Steuerung
 
 Die Schlafphase bleibt bewusst `unknown`. Der Plattformstatus ist nur ein grober Hinweis „schläft / wach“ und keine REM-/Tief-/Leichtschlaf-Erkennung. Er wird nur angezeigt, wenn das konkrete Gerät ihn unterstützt. Schritt-Deltas sind nur ein grober Bewegungsindikator, keine Rohdaten der Actigraphie. Herzfrequenz allein reicht ebenfalls nicht für eine belastbare Schlafphasenanalyse. Die lokale Feature-Extraktion weist daher nur Datenfenster aus und erzeugt ausdrücklich keine Schlafphase.
 
+## HA-Übertragung — der Schalter „Was geht an Home Assistant“
+
+Im Schlaf-Blatt (Info-Ebene) steht die HA-Übertragung mit zwei Stellungen:
+
+- **„Nur Schlafphase“ (Standard)** — die Rohdaten bleiben auf der Uhr; an HA
+  geht das Ergebnis: die laufende Phase während der Messung, der Nachtbericht
+  beim Stopp (Phasen-Zeitleiste mit Quelle je Segment, Puls min/Ø/max,
+  HRV-Kennzahlen aus IBI oder benannter Grund, Schritte gesamt).
+- **„Gesamtdaten“** — zusätzlich alle Messreihen der Nacht (Puls, IBI, falls
+  eine Quelle vorhanden ist, Bewegungsfenster, Plattform-Schlafstatus) je
+  5 Minuten als Paket. Beim Umschalten zeigt die App einmal deutlich, welche
+  Werte übertragen werden — und was nicht: Atemfrequenz, SpO2 und
+  Hauttemperatur, denn die Uhr stellt diese Kanäle nicht bereit; erfunden
+  wird nichts.
+
+Regeln, durchgezogen:
+
+- Gesendet wird **nur** über den lokalen Webhook der eigenen
+  Home-Assistant-Instanz (`local_only`, Pfad steht am Sensor „Bett
+  Nachtbericht“ als Attribut `annahme_pfad`). Die Adresse wird einmalig im
+  Schlaf-Blatt eingetragen, App-privat gespeichert — nie im Protokoll, nie in
+  einer Nutzlast. Nie Cloud, nie ein fremder Dienst; die Uhr folgt keiner
+  Umleitung (ein 3xx bricht die Sendung ab, statt die Nutzlast anderswohin zu
+  schicken).
+- Messen bleibt völlig unberührt — der Schalter wirkt nur auf das, was
+  gesendet wird; alle Sendungen laufen auf einem eigenen Hintergrund-Faden.
+- HA nicht erreichbar? Die Sendungen bleiben in einer Warteschlange auf der
+  Uhr (app-privat, begrenzt) und werden beim nächsten Anstoß wieder versucht.
+  Doppelungen sind unmöglich: jeder Eintrag trägt einen Schlüssel aus
+  Zeitstempeln bzw. der Nacht-Kennung, HA fasst Punkte zusätzlich über ihren
+  Zeitstempel zusammen.
+- „DATEN LÖSCHEN“ leert auch die Warteschlange — Rohdaten-Kopien der Pakete
+  leben nicht länger auf der Uhr als die Daten selbst.
+- Das Protokoll (Art `HA`) nennt Nacht-Datum, Anzahlen und Gründe — nie
+  Messwerte, nie die Adresse.
+
+Einrichtung: Attribut `annahme_pfad` am Sensor `sensor.bett_nachtbericht`
+lesen, die eigene Home-Assistant-Adresse davor setzen, einmalig im Schlaf-Blatt
+unter „HA-ÜBERTRAGUNG“ speichern. Details und Schema: `docs/NACHTBERICHT.md`.
+
 ## Datenschutz und Berechtigungen
 
-Puls- und Schrittwerte werden nur lokal gespeichert. Es gibt keinen Netzwerk-Upload. Das Debug-Protokoll hält je Lieferung von Health Services eine Zusammenfassung fest (Anzahl, Puls-Spanne min–max, Zeitspanne, Verzug) – nur auf der Uhr, App-privat in `files/debug/protokoll.txt` (höchstens ~96 kB) und im Logcat unter dem Tag `RBW`. Leeren über „LEEREN“ auf dem Debug-Blatt. Die App fordert Berechtigungen erst nach Nutzeraktion an:
+Puls- und Schrittwerte werden nur lokal gespeichert. Ein Netzweg existiert
+nur in Richtung des eigenen Home-Assistant-Webhooks und nur in der Stellung,
+die der Schalter beschreibt (siehe oben). Das Debug-Protokoll hält je Lieferung von Health Services eine Zusammenfassung fest (Anzahl, Puls-Spanne min–max, Zeitspanne, Verzug) – nur auf der Uhr, App-privat in `files/debug/protokoll.txt` (höchstens ~96 kB) und im Logcat unter dem Tag `RBW`. Leeren über „LEEREN“ auf dem Debug-Blatt. Die App fordert Berechtigungen erst nach Nutzeraktion an:
 - Herzfrequenz: `BODY_SENSORS` oder auf API 36+ `READ_HEART_RATE`
 - Hintergrundmessung: `BODY_SENSORS_BACKGROUND` (API 33–35) oder `READ_HEALTH_DATA_IN_BACKGROUND` (API 36+)
 - Schrittkanal und Plattform-Schlafstatus: `ACTIVITY_RECOGNITION`
