@@ -115,11 +115,18 @@ class StoppBehaeltDatenQuelltextTest {
     }
 
     @Test
-    fun ringReichtFuerEineNacht() {
-        val store = quelle("HeartRateSampleStore.kt")
-        val anzahl = Regex("""MAX_HEART_RATE_SAMPLES = ([\d_]+)""").find(store)!!.groupValues[1].replace("_", "").toInt()
-        val stunden = Regex("""MAX_AGE_MILLIS = (\d+)L \* 60L""").find(store)!!.groupValues[1].toInt()
-        assertTrue("Ring $anzahl < 10 h bei 1/s", anzahl >= 36_000)
-        assertTrue("Höchstalter $stunden h < 12 h", stunden >= 12)
+    fun aufbewahrungReichtFuerEineNachtUndMehr() {
+        // Ziel A (#8): der Puls liegt in einer SQLite-Tabelle mit Aufbewahrung
+        // nach ZEIT statt in einem Anzahls-Ring. Die Nacht 15./16.11.
+        // (02:22–15:43, ~13,5 h) war im 45.000-Ring schon nach 28 min angebrochen;
+        // 36 h nach Zeit übertrifft die alte Absicht („Ring reicht für eine Nacht“)
+        // deutlich. Die Konstante wird direkt geprüft, nicht aus dem Quelltext.
+        assertTrue(
+            "Aufbewahrung muss mindestens 36 h nach Zeit sein",
+            PulsAufbewahrung.RETENTION_MILLIS >= 36L * 60L * 60L * 1000L
+        )
+        val tabelle = quelle("PulsSampleSpeicher.kt")
+        assertFalse("die Puls-Tabelle darf keine Anzahl-Grenze haben (nur Zeit)", "takeLast" in tabelle)
+        assertTrue("die Puls-Tabelle räumt nach Zeit auf", "measured_at < ?" in tabelle)
     }
 }

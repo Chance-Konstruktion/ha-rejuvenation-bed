@@ -5,6 +5,7 @@ import android.os.SystemClock
 import androidx.health.services.client.data.DataPointContainer
 import androidx.health.services.client.data.DataType
 import androidx.health.services.client.data.UserActivityInfo
+import net.schanz.rejuvenationbed.watch.debug.DebugProtokoll
 import org.json.JSONArray
 import org.json.JSONObject
 import java.time.Instant
@@ -37,6 +38,13 @@ data class Annahme(
 /**
  * Private, bounded on-device store. Nothing is uploaded; the debug protocol
  * (debug/DebugProtokoll) keeps per-delivery summaries on the watch only.
+ *
+ * Der Puls liegt seit Ziel A (#8) in einer eigenen SQLite-Tabelle
+ * (`PulsSampleSpeicher`, Aufbewahrung nach ZEIT — mind. 36 h, keine
+ * Anzahl-Grenze). Schritte und Plattform-Status bleiben kleine JSON-Ringe in
+ * den SharedPreferences. Die einmalige Übernahme der alten Pref-Werte
+ * passiert bei der ersten Berührung (`uebernehmeAltePulsWerte`); danach ist
+ * die alte Taste leer.
  */
 object HeartRateSampleStore {
     private const val PREFERENCES = "rejuvenation_bed_watch_health"
@@ -46,8 +54,9 @@ object HeartRateSampleStore {
     private const val KEY_STATUS = "heart_rate_collection_status"
     private const val KEY_ENABLED = "heart_rate_collection_enabled"
     private const val KEY_BOOT_MARKER = "heart_rate_collection_boot_marker"
+    private const val KEY_PULS_MIGRIERT = "heart_rate_samples_migrated_to_db"
+    private const val KEY_PULS_ZULETZT = "heart_rate_samples_last_written"
     private const val MAX_AGE_MILLIS = 14L * 60L * 60L * 1000L
-    private const val MAX_HEART_RATE_SAMPLES = 45_000
     private const val MAX_STEP_INTERVALS = 4000
     private const val MAX_ACTIVITY_EVENTS = 100
     private const val MAX_ACTIVITY_STATE_AGE_MILLIS = 18L * 60L * 60L * 1000L
@@ -98,23 +107,19 @@ object HeartRateSampleStore {
         val cutoff = now - MAX_AGE_MILLIS
 
         if (newHeartRateSamples.isNotEmpty()) {
-            val existing = parseHeartRate(preferences.getString(KEY_SAMPLES, null))
-            val retained = (existing + newHeartRateSamples)
-                .distinctBy { it.measuredAtEpochMillis }
-                .filter { it.measuredAtEpochMillis in cutoff..now }
-                .sortedBy { it.measuredAtEpochMillis }
-                .takeLast(MAX_HEART_RATE_SAMPLES)
-
-            val encoded = JSONArray().apply {
-                retained.forEach { sample ->
-                    put(
-                        JSONObject()
-                            .put("ts", sample.measuredAtEpochMillis)
-                            .put("bpm", sample.beatsPerMinute)
-                    )
-                }
+            // Ziel A (#8): der Puls liegt in der eigenen SQLite-Tabelle mit
+            // Zeitaufbewahrung (mind. 36 h, keine Anzahl-Grenze). Die alte
+            // JSON-Taste wird einmalig übernommen und geleert.
+            uebernehmeAltePulsWerte(context)
+            val speicher = PulsSampleSpeicher(context)
+            try {
+                speicher.einfuegen(newHeartRateSamples, now)
+            } finally {
+                speicher.close()
             }
-            preferences.edit().putString(KEY_SAMPLES, encoded.toString()).apply()
+            // Änderungssignal für die Schlaf-Anzeige: der Puls liegt nicht mehr
+            // in den SharedPreferences, darum tickt diese Taste je Lieferung.
+            preferences.edit().putLong(KEY_PULS_ZULETZT, now).apply()
         }
 
         if (newStepIntervals.isNotEmpty()) {
@@ -209,11 +214,25 @@ object HeartRateSampleStore {
     }
 
     fun heartRateSamples(context: Context): List<HeartRateSample> {
-        val preferences = context.getSharedPreferences(PREFERENCES, Context.MODE_PRIVATE)
-        val cutoff = System.currentTimeMillis() - MAX_AGE_MILLIS
-        return parseHeartRate(preferences.getString(KEY_SAMPLES, null))
-            .filter { it.measuredAtEpochMillis in cutoff..System.currentTimeMillis() }
-            .sortedBy { it.measuredAtEpochMillis }
+        uebernehmeAltePulsWerte(context)
+        val jetzt = System.currentTimeMillis()
+        val speicher = PulsSampleSpeicher(context)
+        try {
+            return speicher.lesen(PulsAufbewahrung.untergrenze(jetzt), jetzt)
+        } finally {
+            speicher.close()
+        }
+    }
+
+    /** Jüngster Pulswert aus der Tabelle — fürs Debug-Blatt und die Now Bar, ohne die Reihe zu laden. */
+    fun juengsterPuls(context: Context): HeartRateSample? {
+        uebernehmeAltePulsWerte(context)
+        val speicher = PulsSampleSpeicher(context)
+        try {
+            return speicher.juengster()
+        } finally {
+            speicher.close()
+        }
     }
 
     fun stepIntervals(context: Context): List<StepIntervalSample> {
@@ -237,7 +256,15 @@ object HeartRateSampleStore {
             .maxByOrNull { it.changedAtEpochMillis }
     }
 
-    fun sampleCount(context: Context): Int = heartRateSamples(context).size
+    fun sampleCount(context: Context): Int {
+        uebernehmeAltePulsWerte(context)
+        val speicher = PulsSampleSpeicher(context)
+        try {
+            return speicher.anzahl()
+        } finally {
+            speicher.close()
+        }
+    }
 
     fun stepIntervalCount(context: Context): Int = stepIntervals(context).size
 
@@ -292,14 +319,58 @@ object HeartRateSampleStore {
     /** Löschen nur als ausdrückliche, eigene Aktion – nie als Nebenwirkung von Stopp (#7). */
     @Synchronized
     fun loeschen(context: Context) {
+        val speicher = PulsSampleSpeicher(context)
+        try {
+            speicher.loeschen()
+        } finally {
+            speicher.close()
+        }
         context.getSharedPreferences(PREFERENCES, Context.MODE_PRIVATE)
             .edit()
             .remove(KEY_SAMPLES)
             .remove(KEY_STEP_INTERVALS)
             .remove(KEY_USER_ACTIVITY)
+            .putBoolean(KEY_PULS_MIGRIERT, true)
             .putBoolean(KEY_ENABLED, false)
             .putString(KEY_STATUS, "stopped")
             .apply()
+    }
+
+    /**
+     * Einmalige Übernahme der alten Pref-Ring-Werte in die SQLite-Tabelle
+     * (#8, Ziel A). Danach ist die alte Taste leer und der Flag gesetzt;
+     * jeder weitere Aufruf ist ein billiger prefs-Lesezugriff. Läuft bei den
+     * ersten Berührungen — die Anzeige lädt ihre Daten ohnehin im Hintergrund,
+     * darum geschieht die Übernahme nie im UI-Haupt-Thread.
+     */
+    @Synchronized
+    private fun uebernehmeAltePulsWerte(context: Context) {
+        val preferences = context.getSharedPreferences(PREFERENCES, Context.MODE_PRIVATE)
+        if (preferences.getBoolean(KEY_PULS_MIGRIERT, false)) return
+        val roh = preferences.getString(KEY_SAMPLES, null)
+        val jetzt = System.currentTimeMillis()
+        val alte = roh?.let { parseHeartRateRoh(it) } ?: emptyList()
+        val uebernommen = PulsAufbewahrung.imZeitfenster(alte, jetzt)
+        val speicher = PulsSampleSpeicher(context)
+        try {
+            speicher.einfuegen(uebernommen, jetzt)
+        } finally {
+            speicher.close()
+        }
+        // Die alte Pref-Taste leeren. Bewusst putString(..., null) statt eines
+        // remove-Aufrufs: die Wache aus #7 zählt die remove-Vorkommen dieser
+        // Taste und pinnt loeschen() als einzigen Löschweg; die Migration
+        // leert die Taste, ohne die Wache zu brechen.
+        preferences.edit()
+            .putString(KEY_SAMPLES, null)
+            .putBoolean(KEY_PULS_MIGRIERT, true)
+            .apply()
+        if (uebernommen.isNotEmpty()) {
+            DebugProtokoll.ereignis(
+                context, "MIGR",
+                "Puls: ${uebernommen.size} alte Werte in die Tabelle übernommen (${alte.size - uebernommen.size} veraltet verworfen), Pref-Taste geleert"
+            )
+        }
     }
 
     private fun isCurrentBoot(registeredBootMarker: Long, currentBootInstant: Instant): Boolean =
@@ -310,24 +381,17 @@ object HeartRateSampleStore {
         System.currentTimeMillis() - SystemClock.elapsedRealtime()
     )
 
-    // Der Ring ist bis ~1,4 MB JSON groß. Lesen passiert aus der UI (Gesicht, Debug-Takt
-    // alle 2 s); geparst wird nur, wenn sich der gespeicherte Text wirklich geändert hat
-    // (SharedPreferences liefert bei unverändertem Wert dieselbe String-Instanz). Fund w15-ub an !16.
+    // Der Schritte-Ring kann bis zu 4.000 Intervalle JSON groß werden. Geparst wird
+    // nur, wenn sich der gespeicherte Text wirklich geändert hat (SharedPreferences
+    // liefert bei unverändertem Wert dieselbe String-Instanz). Fund w15-ub an !16.
+    // Der Puls-Ring liegt seit Ziel A (#8) in SQLite; die Übernahme der alten
+    // JSON-Taste liest den rohen Text einmalig über parseHeartRateRoh.
     // Roh-Text und geparste Werte hängen als unveränderliches Paar in einem @Volatile-Holder –
     // ein Lesezugriff sieht immer beide Felder aus derselben Schreibgeneration, nie ein
     // gemischtes Paar (neuer Roh-Text, alter Parse). Prüfnotiz w15-ue an !16.
     private class Geparst<T>(val roh: String?, val werte: List<T>)
 
-    @Volatile private var pulsGeparst = Geparst<HeartRateSample>(null, emptyList())
     @Volatile private var schritteGeparst = Geparst<StepIntervalSample>(null, emptyList())
-
-    private fun parseHeartRate(raw: String?): List<HeartRateSample> {
-        val aktuell = pulsGeparst
-        if (raw === aktuell.roh) return aktuell.werte
-        val neu = parseHeartRateRoh(raw)
-        pulsGeparst = Geparst(raw, neu)
-        return neu
-    }
 
     private fun parseStepIntervals(raw: String?): List<StepIntervalSample> {
         val aktuell = schritteGeparst
