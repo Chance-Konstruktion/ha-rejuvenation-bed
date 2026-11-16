@@ -235,7 +235,9 @@ private fun SchlafGesicht(experimentAktiv: Boolean) {
         }
         "Phase: $phase · ${(stand.schaetzung.confidence * 100).toInt()} %"
     } else {
-        "Phase: unbekannt"
+        // Ziel C (#8): „unbekannt“ allein hilft niemandem — das Gesicht nennt
+        // den Grund (Schalter AUS / keine IBI / zu wenige IBI / …).
+        "Phase: unbekannt · ${stand.schaetzung.grund}"
     }
     LaunchedEffect(stand.misst) {
         if (stand.misst) NowBar.starten(context, NowBarText.puls(stand.puls.lastOrNull()?.beatsPerMinute))
@@ -355,6 +357,13 @@ private fun SchlafInfo(
                 "${(stand.schaetzung.confidence * 100).toInt()} %",
             style = thema.daten.copy(textAlign = TextAlign.Center)
         )
+        if (stand.schaetzung.stage == net.schanz.rejuvenationbed.watch.sleep.SleepStage.UNKNOWN) {
+            // Ziel C (#8): deutlich und in Worten, warum keine Phase da ist.
+            BasicText(
+                "keine Phasen, weil: ${stand.schaetzung.grund}",
+                style = thema.daten.copy(color = thema.text, textAlign = TextAlign.Center)
+            )
+        }
         BasicText(
             if (experimentAktiv) "ABGLEICH AM SMARTPHONE SENDEN"
             else "Zum Senden erst das Experiment einschalten",
