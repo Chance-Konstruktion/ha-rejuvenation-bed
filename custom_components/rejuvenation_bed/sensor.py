@@ -14,6 +14,7 @@ from .device_info import (
     get_energy_device_info,
     get_sleep_device_info,
 )
+from .nachtbericht_sensoren import baue_nachtbericht_sensoren
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -151,6 +152,14 @@ async def async_setup_entry(hass, config_entry, async_add_entities):
     # BED-INTELLIGENCE SENSOR (Kalibrierung + Status)
     # ═══════════════════════════════════════════════════════════
     entities.append(BedIntelligenceSensor(coordinator))
+
+    # ═══════════════════════════════════════════════════════════
+    # NACHTBERICHT (Schlafaufzeichnung der Uhr — immer da)
+    #
+    # Ohne Übertrag zeigen die Sensoren unknown statt fehlen zu wollen:
+    # Der Nutzer sieht am Zustand, dass noch nichts angekommen ist.
+    # ═══════════════════════════════════════════════════════════
+    entities.extend(baue_nachtbericht_sensoren(coordinator))
 
     async_add_entities(entities)
 

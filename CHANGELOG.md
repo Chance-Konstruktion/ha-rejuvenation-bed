@@ -4,6 +4,25 @@ Alle Änderungen am Rejuvenation Bed Projekt.
 
 ## [Unreleased]
 
+### Nachtbericht (Schlafaufzeichnung der Uhr → HA, #9)
+- Die Integration nimmt die Schlafaufzeichnung der Uhr über einen **lokalen** Webhook an
+  (`local_only`, Schema `rejuvenation-bed-night-report-v1`): je Nacht Beginn/Ende,
+  Phasen-Zeitleiste mit Quelle und Güte, Puls min/Ø/max samt verdichtetem Verlauf,
+  IBI, Bewegung und Unterbrechungen. Der Pfad steht im Sensor „Bett Nachtbericht“ als
+  Attribut — absichtlich relativ, ohne Adresse.
+- Dreizehn neue Sensoren am Schlaf/Analyse-Gerät: die laufende Schlafphase (für Automationen,
+  fällt nach 10 Minuten ohne Nachschub auf `unknown` zurück), Schlafdauer, Anteile je Phase,
+  Ruhepuls, HRV (RMSSD aus IBI — mit denselben Grenzen wie der Schätzer auf der Uhr),
+  Schlafbeginn/-ende, Unterbrechungen und die Güte der **Messung**. Ohne Daten zeigen sie
+  `unknown` und nennen den Grund; nichts wird aus etwas anderem gerechnet — HRV kommt nur
+  aus IBI, nie aus dem Puls.
+- Ereignis `rejuvenation_bed_nacht_abgeschlossen` je angenommener Nacht (Kurzfassung ohne Messwerte).
+- Neue Karte `custom:rejuvenation-night-report` (selbst ausgeliefert, wie der Nachttischwecker):
+  Hypnogramm (grob geschätzte Segmente gestrichelt), Pulskurve, Kennzahlen und 7-Nächte-Vergleich;
+  Tabs oben, auf kleinen Schirmen unten. Fehlende Quellen stehen als eigener Kasten im Bericht,
+  „grobe Schätzung“ bleibt sichtbar. Beispiel-Dashboard unter `dashboards/schlafbericht.yaml`.
+- Details und Schema: `docs/NACHTBERICHT.md`.
+
 ### Uhr (Wear OS)
 - Stopp behält die Nachtdaten (#7): Der Stopp löscht nichts mehr – er beendet nur die Registrierung und
   die Now Bar; die aufgezeichneten Daten bleiben, bis sie regulär verdrängt werden. Der Puls-Ring reicht
