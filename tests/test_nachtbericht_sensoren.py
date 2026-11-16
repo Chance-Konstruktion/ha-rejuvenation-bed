@@ -38,7 +38,7 @@ from custom_components.rejuvenation_bed.nachtbericht_sensoren import (  # noqa: 
     MARKER,
     baue_nachtbericht_sensoren,
 )
-from tests.test_nachtbericht import SpeicherStub, synthetische_nacht  # noqa: E402
+from tests.test_nachtbericht import NACHT, SpeicherStub, synthetische_nacht  # noqa: E402
 
 
 class PseudoCoordinator:
@@ -261,18 +261,107 @@ def test_phase_sensor_faellt_nach_verfall_auf_unknown():
     assert "Minuten alt" in sensor.extra_state_attributes["grund"]
 
 
-def test_dreizehn_sensoren_kommen_alle_zuruck():
+def test_siebzehn_sensoren_kommen_alle_zuruck():
     coordinator = PseudoCoordinator()
     sensoren = baue_nachtbericht_sensoren(coordinator)
 
     namen = [s._attr_name for s in sensoren]
     # 1 Phase + 1 Dauer + 4 Anteile + 1 Puls + 1 HRV + 2 Grenzen
-    # + 1 Unterbrechungen + 1 Güte + 1 Bericht
-    assert len(sensoren) == 13
+    # + 1 Unterbrechungen + 1 Güte + 1 Schritte + 3 Kanäle + 1 Bericht
+    assert len(sensoren) == 17
     assert "Bett Schlafphase" in namen
     assert "Bett Nachtbericht" in namen
     for name in ("Bett Tiefschlaf-Anteil", "Bett Leichtschlaf-Anteil", "Bett REM-Anteil", "Bett Wach-Anteil"):
         assert name in namen
+    # Neu mit dem Schalter „Was geht an Home Assistant“: Schritte und die drei
+    # Kanäle, die die Uhr nur sendet, wenn sie sie wirklich liefert.
+    for name in ("Bett Schritte", "Bett Atemfrequenz", "Bett Sauerstoffsättigung", "Bett Hauttemperatur"):
+        assert name in namen
     # Alle hängen am Schlaf/Analyse-Gerät und haben eine feste Entity-ID.
     for s in sensoren:
         assert s._attr_unique_id.startswith("test123_nachtbericht_")
+
+
+# ── Schritte und die drei Kanäle (Schalter „Was geht an Home Assistant“) ────
+
+
+def test_schritte_lesen_den_bericht():
+    # Die Grund-Nacht der Mock-Suite bringt keine Bewegung mit — hier geht sie
+    # ausdrücklich hinein (synthetisch, wie alles in dieser Suite).
+    sensoren = _sensor_mit(_speicher_mit_nacht(movement={"steps_total": 41}))
+    sensor = sensoren["schritte"]
+
+    # Die synthetische Nacht meldet steps_total 41.
+    assert sensor.native_value == 41
+    attrs = sensor.extra_state_attributes
+    assert attrs["nacht"] == NACHT
+
+
+def test_schritte_ohne_bewegung_sind_unknown_nicht_null():
+    speicher = _speicher_mit_nacht(movement=None)
+    nacht = speicher.letzte_nacht()
+    nacht["bewegung"] = None
+    sensor = _sensor_mit(speicher)["schritte"]
+
+    assert sensor.native_value is None
+    assert "Keine Bewegungsdaten" in sensor.extra_state_attributes["status"]
+
+
+def test_kanale_sind_unverfuegbar_mit_grund_solang_nichts_kommt():
+    # Vor der ersten Nacht: der Kanal ist ehrlich nicht verfügbar, der Grund
+    # benannt — nie eine Zahl aus dem Puls abgeleitet.
+    sensoren = _sensor_mit(None)
+    for schluessel in ("kanal_respiratory_rate", "kanal_spo2", "kanal_skin_temperature"):
+        sensor = sensoren[schluessel]
+        assert sensor.available is False, schluessel
+        assert sensor.native_value is None, schluessel
+        assert sensor.extra_state_attributes["grund"], schluessel
+
+
+def test_kanale_bekommen_den_grund_vom_absender():
+    speicher = _speicher_mit_nacht(
+        channels={
+            "respiratory_rate": {"provided": False, "reason": "die Uhr stellt keinen Atemfrequenz-Kanal bereit"},
+            "spo2": {"provided": False, "reason": "die Uhr stellt keinen SpO2-Kanal bereit"},
+            "skin_temperature": {"provided": False, "reason": "die Uhr stellt keinen Hauttemperatur-Kanal bereit"},
+        }
+    )
+    sensoren = _sensor_mit(speicher)
+
+    spo2 = sensoren["kanal_spo2"]
+    assert spo2.available is False
+    assert "SpO2-Kanal" in spo2.extra_state_attributes["grund"]
+
+    atem = sensoren["kanal_respiratory_rate"]
+    assert "Atemfrequenz-Kanal" in atem.extra_state_attributes["grund"]
+
+
+def test_gelieferter_kanal_ist_ein_normaler_messwert():
+    speicher = _speicher_mit_nacht(
+        channels={"spo2": {"provided": True, "mean": 97.4, "min": 95.0, "max": 99.0, "source": "echt"}}
+    )
+    sensoren = _sensor_mit(speicher)
+
+    spo2 = sensoren["kanal_spo2"]
+    assert spo2.available is True
+    assert spo2.native_value == pytest.approx(97.4)
+    assert spo2.extra_state_attributes["quelle"] == "echt"
+    assert spo2.extra_state_attributes["min"] == 95.0
+
+
+def test_hauttemperatur_traegt_die_temperaturklasse():
+    from homeassistant.components.sensor import SensorDeviceClass, SensorStateClass
+    from homeassistant.const import UnitOfTemperature
+
+    sensoren = _sensor_mit(None)
+    haut = sensoren["kanal_skin_temperature"]
+    assert haut._attr_device_class == SensorDeviceClass.TEMPERATURE
+    assert haut._attr_state_class == SensorStateClass.MEASUREMENT
+    assert haut._attr_native_unit_of_measurement == UnitOfTemperature.CELSIUS
+
+
+def test_kanalsensoren_haben_feste_ids():
+    sensoren = _sensor_mit(None)
+    assert sensoren["kanal_respiratory_rate"]._attr_unique_id.endswith("kanal_respiratory_rate")
+    assert sensoren["kanal_spo2"]._attr_unique_id.endswith("kanal_spo2")
+    assert sensoren["kanal_skin_temperature"]._attr_unique_id.endswith("kanal_skin_temperature")
