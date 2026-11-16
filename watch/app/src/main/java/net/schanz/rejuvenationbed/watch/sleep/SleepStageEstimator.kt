@@ -20,9 +20,19 @@ object SleepStageEstimator {
     ): SleepStageEstimate {
         require(nowEpochMillis >= 0L) { "now must be non-negative" }
 
-        if (!enabled) return unknown(nowEpochMillis, 0.0, "Schätzer ausgeschaltet")
+        if (!enabled) return unknown(nowEpochMillis, 0.0, "Versuch ausgeschaltet (Schalter AUS)")
         if (!features.hasReliableIbi) {
-            return unknown(nowEpochMillis, features.ibiCoverage, "IBI-Qualität oder Abdeckung zu gering")
+            // Ziel C (#8): der Grund muss sichtbar sein — Schalter aus / keine
+            // IBI / zu wenige IBI (< 120) / Abdeckung / Güte.
+            val grund = when {
+                features.rawIbiCount == 0 -> "keine IBI vorhanden"
+                features.acceptedIbiCount < SleepHrvFeatures.MINIMUM_IBI_SAMPLES ->
+                    "zu wenige IBI (${features.acceptedIbiCount} < ${SleepHrvFeatures.MINIMUM_IBI_SAMPLES})"
+                features.ibiCoverage < SleepHrvFeatures.MINIMUM_IBI_COVERAGE -> "IBI-Abdeckung zu gering"
+                features.signalQuality < SleepHrvFeatures.MINIMUM_SIGNAL_QUALITY -> "IBI-Signalgüte zu gering"
+                else -> "IBI-Merkmale unvollständig"
+            }
+            return unknown(nowEpochMillis, features.ibiCoverage, grund)
         }
         if (features.movementVarianceStepsPerMinuteSquared == null ||
             features.movementCoverage < 0.50
@@ -80,7 +90,8 @@ object SleepStageEstimator {
             confidence = confidence,
             sampleCoverage = coverage,
             measuredAtEpochMillis = nowEpochMillis,
-            algorithmVersion = ALGORITHM_VERSION
+            algorithmVersion = ALGORITHM_VERSION,
+            grund = "regel: ${candidate.first.wireValue}"
         )
     }
 
@@ -91,12 +102,13 @@ object SleepStageEstimator {
         movementPenalty: Double
     ): Double = base + abs(rmssd) + abs(sdnn) - movementPenalty
 
-    private fun unknown(nowEpochMillis: Long, coverage: Double, @Suppress("UNUSED_PARAMETER") reason: String) =
+    private fun unknown(nowEpochMillis: Long, coverage: Double, reason: String) =
         SleepStageEstimate(
             stage = SleepStage.UNKNOWN,
             confidence = 0.0,
             sampleCoverage = coverage.coerceIn(0.0, 1.0),
             measuredAtEpochMillis = nowEpochMillis,
-            algorithmVersion = ALGORITHM_VERSION
+            algorithmVersion = ALGORITHM_VERSION,
+            grund = reason
         )
 }

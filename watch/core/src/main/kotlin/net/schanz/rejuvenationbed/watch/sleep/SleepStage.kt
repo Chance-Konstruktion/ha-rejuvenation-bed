@@ -20,19 +20,25 @@ enum class SleepStage(val wireValue: String) {
 
 /**
  * A local wellness estimate. It must not be treated as a medical measurement.
+ *
+ * [grund] erklärt den Zustand in kurzen Worten — bei UNKNOWN warum keine
+ * Phase geschätzt werden konnte (Schalter aus / keine IBI / zu wenige IBI …),
+ * bei einer Phase welche Regel traf. Die UI zeigt ihn deutlich (#8, Ziel C).
  */
 data class SleepStageEstimate(
     val stage: SleepStage,
     val confidence: Double,
     val sampleCoverage: Double,
     val measuredAtEpochMillis: Long,
-    val algorithmVersion: String
+    val algorithmVersion: String,
+    val grund: String = "unbekannt"
 ) {
     init {
         require(confidence in 0.0..1.0) { "confidence must be between 0 and 1" }
         require(sampleCoverage in 0.0..1.0) { "sampleCoverage must be between 0 and 1" }
         require(measuredAtEpochMillis >= 0) { "timestamp must be non-negative" }
         require(algorithmVersion.isNotBlank()) { "algorithmVersion must not be blank" }
+        require(grund.isNotBlank()) { "grund must not be blank" }
     }
 
     fun isUsable(

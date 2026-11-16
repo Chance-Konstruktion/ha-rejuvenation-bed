@@ -42,4 +42,22 @@ class SchlafBlattQuelltextTest {
         assertTrue("die „Nicht gesendet“-Zeile fehlt oder interpoliert nicht", "Nicht gesendet: \${" in text)
         assertTrue("die „Nicht bereit“-Zeile fehlt oder interpoliert nicht", "Nicht bereit: \${" in text)
     }
+
+    /**
+     * #8/Ziel C: „Phase: unbekannt“ ohne Wort ist für niemanden brauchbar.
+     * Das Gesicht nennt den Grund (Schalter AUS / keine IBI / zu wenige IBI),
+     * die Info-Ebene sagt es ausdrücklich in Worten.
+     */
+    @Test
+    fun derFehlendePhasenGrundIstSichtbar() {
+        val text = Files.readString(quelle())
+        assertTrue(
+            "das Gesicht muss den Grund der unbekannten Phase anzeigen",
+            "Phase: unbekannt · \${stand.schaetzung.grund}" in text
+        )
+        assertTrue(
+            "die Info-Ebene muss den Grund ausdrücklich benennen",
+            "keine Phasen, weil: \${stand.schaetzung.grund}" in text
+        )
+    }
 }
