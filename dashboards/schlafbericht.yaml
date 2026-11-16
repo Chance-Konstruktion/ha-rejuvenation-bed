@@ -1,0 +1,13 @@
+# Nachtbericht als eigene Ansicht — eine Panel-Seite, die Karte füllt den
+# Schirm. Die Karte findet den Bericht-Sensor von selbst; entdeckt sie zwei
+# (z. B. zwei Betten), steht die Entity-ID unten mit dabei:
+#
+#   - type: custom:rejuvenation-night-report
+#     entity: sensor.bett_nachtbericht
+#
+# Siehe docs/NACHTBERICHT.md.
+views:
+  - title: Nachtbericht
+    type: panel
+    cards:
+      - type: custom:rejuvenation-night-report

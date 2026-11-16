@@ -9,6 +9,8 @@ from homeassistant.helpers import config_validation as cv, device_registry as dr
 import voluptuous as vol
 from .const import DOMAIN, MANUFACTURER, SW_VERSION, local_now
 from .coordinator import RejuvenationBedCoordinator
+from .nachtbericht import NachtberichtSpeicher
+from .nachtbericht_api import richte_webhook_ab, richte_webhook_ein, webhook_pfad
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -24,6 +26,13 @@ CARD_URL = f"/{DOMAIN}/{CARD_FILENAME}"
 # URL erneuert den Browser-Cache nach einem Update der Integration.
 CARD_RESOURCE_URL = f"{CARD_URL}?v={SW_VERSION}"
 CARD_REGISTERED = f"{DOMAIN}_card_registered"
+
+# Nachtbericht-Karte (Schlafaufzeichnung der Uhr) — gleiches Muster, eigene
+# Registrierung, damit die Nachttisch-Karte unabhängig von ihr bleibt.
+REPORT_CARD_FILENAME = "rejuvenation-night-report-card.js"
+REPORT_CARD_URL = f"/{DOMAIN}/{REPORT_CARD_FILENAME}"
+REPORT_CARD_RESOURCE_URL = f"{REPORT_CARD_URL}?v={SW_VERSION}"
+REPORT_CARD_REGISTERED = f"{DOMAIN}_report_card_registered"
 
 MODEL_WASSERBETT = "Smart Wasserbett Controller"
 MODEL_HEIZMATTE = "Smart Heizmatte Controller"
@@ -115,6 +124,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     # 5. Device im Device Registry registrieren
     await _async_register_device(hass, entry)
 
+    # 5b. Nachtbericht-Speicher laden und lokale Annahme (Webhook) aufstellen.
+    #     Muss vor den Plattformen geschehen: die Nachtbericht-Sensoren lesen
+    #     den Speicher schon beim ersten Anlegen.
+    await _async_setup_nachtbericht(hass, entry, coordinator)
+
     # 6. Plattformen laden (climate.py, sensor.py, binary_sensor.py, switch.py)
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
 
@@ -125,10 +139,31 @@ async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
     #    (z.B. CO₂-Sensor nachträglich hinzugefügt → Score-Sensoren erstellen)
     entry.async_on_unload(entry.add_update_listener(_async_options_updated))
 
-    # 9. Lovelace-Karte im Frontend bereitstellen
+    # 9. Lovelace-Karten im Frontend bereitstellen
     await _async_register_card(hass)
+    await _async_register_report_card(hass)
 
     return True
+
+
+async def _async_setup_nachtbericht(hass: HomeAssistant, entry: ConfigEntry, coordinator) -> None:
+    """Schlafaufzeichnung der Uhr: Speicher laden, lokalen Endpunkt aufstellen.
+
+    Der Webhook ist nur lokal erreichbar (`local_only=True`) — die
+    Gesundheitsdaten verlassen das Haus nicht. Schlägt die Annahme fehl,
+    bleibt die Heizungssteuerung trotzdem voll funktionsfähig; es fehlt dann
+    eben der Bericht.
+    """
+    try:
+        speicher = NachtberichtSpeicher(hass)
+        await speicher.async_laden()
+        speicher.benachrichtigen = coordinator.async_update_listeners
+        coordinator.nachtbericht = speicher
+        webhook_id = await richte_webhook_ein(hass, speicher)
+        _LOGGER.info("Nachtbericht-Annahme bereit unter %s (nur im eigenen Netz)", webhook_pfad(webhook_id))
+    except Exception as err:  # pragma: no cover - defensiv, nie fatal
+        coordinator.nachtbericht = None
+        _LOGGER.warning("Nachtbericht-Annahme konnte nicht aufgestellt werden: %s", err)
 
 
 async def _async_register_card(hass: HomeAssistant) -> None:
@@ -153,7 +188,7 @@ async def _async_register_card(hass: HomeAssistant) -> None:
         # geladen — auf langsamen Geräten (Aussendisplay eines Falters) ist die
         # Karte dann noch nicht definiert und das Dashboard zeigt
         # "Konfigurationsfehler".
-        als_ressource = await _async_register_lovelace_resource(hass)
+        als_ressource = await _async_register_lovelace_resource(hass, CARD_URL, CARD_RESOURCE_URL)
         if not als_ressource:
             # YAML-Modus o.ä.: dort pflegt der Nutzer resources selbst, das
             # Extra-Skript bleibt der einzige Weg.
@@ -167,8 +202,37 @@ async def _async_register_card(hass: HomeAssistant) -> None:
         _LOGGER.warning("Nachttisch-Karte konnte nicht registriert werden: %s", err)
 
 
-async def _async_register_lovelace_resource(hass: HomeAssistant) -> bool:
-    """Die Karte in die Lovelace-Ressourcen eintragen.
+async def _async_register_report_card(hass: HomeAssistant) -> None:
+    """Die Nachtbericht-Karte ausliefern und ins Frontend laden.
+
+    Gleicher Weg wie die Nachttisch-Karte, eigene Wache — sie darf fehlen,
+    ohne dass die Integration das Setup abbricht.
+    """
+    if hass.data.get(REPORT_CARD_REGISTERED):
+        return
+
+    card_path = Path(__file__).parent / "frontend" / REPORT_CARD_FILENAME
+    if not card_path.is_file():
+        _LOGGER.warning("Karte %s nicht gefunden – Nachtbericht-Karte steht nicht zur Verfügung", card_path)
+        return
+
+    try:
+        await hass.http.async_register_static_paths(
+            [StaticPathConfig(REPORT_CARD_URL, str(card_path), cache_headers=False)]
+        )
+
+        als_ressource = await _async_register_lovelace_resource(hass, REPORT_CARD_URL, REPORT_CARD_RESOURCE_URL)
+        if not als_ressource:
+            frontend.add_extra_js_url(hass, REPORT_CARD_URL)
+
+        hass.data[REPORT_CARD_REGISTERED] = True
+        _LOGGER.debug("Nachtbericht-Karte unter %s registriert (Ressource: %s)", REPORT_CARD_URL, als_ressource)
+    except Exception as err:  # pragma: no cover - defensiv, nie fatal
+        _LOGGER.warning("Nachtbericht-Karte konnte nicht registriert werden: %s", err)
+
+
+async def _async_register_lovelace_resource(hass: HomeAssistant, card_url: str, resource_url: str) -> bool:
+    """Eine Karte in die Lovelace-Ressourcen eintragen.
 
     Gibt True zurück, wenn der Eintrag steht. Im YAML-Modus (oder wenn
     Lovelace noch gar nicht geladen ist) geht das nicht — dann False.
@@ -187,14 +251,14 @@ async def _async_register_lovelace_resource(hass: HomeAssistant) -> bool:
 
     for item in resources.async_items():
         url = str(item.get("url", ""))
-        if url.split("?")[0] != CARD_URL:
+        if url.split("?")[0] != card_url:
             continue
-        if url != CARD_RESOURCE_URL:
+        if url != resource_url:
             # Nach einem Update zeigt der alte Eintrag auf die alte Version.
-            await resources.async_update_item(item["id"], {"url": CARD_RESOURCE_URL})
+            await resources.async_update_item(item["id"], {"url": resource_url})
         return True
 
-    await resources.async_create_item({"res_type": "module", "url": CARD_RESOURCE_URL})
+    await resources.async_create_item({"res_type": "module", "url": resource_url})
     return True
 
 
@@ -438,6 +502,13 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
 
     # Plattformen entladen
     unload_ok = await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
+
+    # Lokale Nachtbericht-Annahme abmelden — kein Endpunkt ohne Integration.
+    coordinator = hass.data[DOMAIN].get(entry.entry_id)
+    if coordinator is not None:
+        speicher = getattr(coordinator, "nachtbericht", None)
+        if speicher is not None:
+            richte_webhook_ab(hass, speicher.webhook_id)
 
     # Speicher bereinigen
     if unload_ok:

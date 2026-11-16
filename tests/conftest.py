@@ -43,6 +43,7 @@ _HA_SUBMODULES = [
     "homeassistant.components.persistent_notification",
     "homeassistant.components.frontend",
     "homeassistant.components.http",
+    "homeassistant.components.webhook",
     "voluptuous",
     "voluptuous.humanize",
 ]
