@@ -68,7 +68,7 @@ class SamsungHealthSensorSdkIbiQuelle(
 
     override fun status(): IbiQuelleStatus =
         bruecke?.status() ?: IbiQuelleStatus.NichtVerfuegbar(
-            "Samsung-AAR fehlt; siehe docs/IBI_ADAPTER.md"
+            "Samsung-AAR fehlt (Partner-Zugang nötig); siehe docs/IBI_ADAPTER.md"
         )
 
     override fun starten(empfaenger: IbiEmpfaenger): IbiStartErgebnis =

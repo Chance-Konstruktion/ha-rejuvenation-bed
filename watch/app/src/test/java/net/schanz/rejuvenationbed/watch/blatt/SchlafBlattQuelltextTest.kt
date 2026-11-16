@@ -42,4 +42,18 @@ class SchlafBlattQuelltextTest {
         assertTrue("die „Nicht gesendet“-Zeile fehlt oder interpoliert nicht", "Nicht gesendet: \${" in text)
         assertTrue("die „Nicht bereit“-Zeile fehlt oder interpoliert nicht", "Nicht bereit: \${" in text)
     }
+
+    /**
+     * #8/Ziel B: Ohne echte IBI-Quelle schätzt der grobe Puls+Bewegungs-Ersatz —
+     * die Anzeige muss das offen als „grobe Schätzung“ beschriften, sonst liest
+     * sich eine unvalidierte Regel wie eine echte Messung.
+     */
+    @Test
+    fun dieGrobeSchaetzungIstBeschriftet() {
+        val text = Files.readString(quelle())
+        assertTrue(
+            "die grobe Schätzung muss als „grobe Schätzung“ beschriftet sein",
+            "grobe Schätzung" in text
+        )
+    }
 }

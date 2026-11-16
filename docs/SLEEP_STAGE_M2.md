@@ -22,6 +22,10 @@ Die feste Regelversion ist `m2-rules-0.1`. Ihre Schwellen sind ausdrücklich Hyp
 
 Der experimentelle Schalter ist in `SleepEstimatorSettings` persistent und standardmäßig AUS. In der Info-Ebene des Schlaf-Blatts wird er über die deutlich beschriftete Touch-Aktion „EXPERIMENT EINSCHALTEN/AUSSCHALTEN“ bedient; auf dem Hauptblatt bleibt die Anzeige ohne aktivierten Schalter oder bei einem fehlgeschlagenen Qualitäts-Gate „unbekannt“. `SleepStageEstimate.measuredAtEpochMillis` ist der Zeitpunkt der Schätzung, nicht der Mittelpunkt des 30-Minuten-Fensters.
 
+## Grobe Ersatz-Schätzung ohne IBI
+
+Solange die Samsung-AAR-Brücke fehlt (Fund-Notiz: `docs/IBI_ADAPTER.md`), schätzt `PulsBewegungsEstimator` (Version `puls-bewegung-grob-0.1`) aus dem letzten vollständigen 30-Minuten-Fenster: Herzfrequenz-Mittel und Streuung plus Schritt-Deltas. Die Regeln sind ausdrücklich grobe Hypothesen, nicht validiert. Die Schätzer-Kette wählt automatisch: mit verlässlicher IBI der `m2-rules-0.1`-Schätzer, ohne IBI die grobe Puls+Bewegungs-Schätzung; beide nur hinter dem Versuchs-Schalter (Standard AUS), beide `unknown` bei unzureichenden Daten. Die UI beschriftet die grobe Variante als „grobe Schätzung“, die Info-Ebene zeigt die Algorithmusversion. Beim Messstart benennt das Protokoll (Art `IBI`) den Zustand der echten IBI-Quelle — kein stiller Leerlauf.
+
 ## Health-Connect-Abgleich
 
 `watch/phone` enthält die Smartphone-Begleit-App. Sie fordert dort die Nutzerberechtigung `READ_SLEEP` an und liest Schlafphasen-Segmente aus `SleepSessionRecord.stages`. Es werden keine Daten zurückgeschrieben. Generische `SLEEPING`- und `UNKNOWN`-Segmente sind keine genaue Referenzklasse und werden vom Vergleich ausgeschlossen. Der Watch-Leser wurde entfernt, weil Health Connect nicht auf Wear OS verfügbar ist.
@@ -30,8 +34,8 @@ Der experimentelle Schalter ist in `SleepEstimatorSettings` persistent und stand
 
 ## Was die Implementierung noch nicht beweist
 
-1. Die Samsung-AAR-Brücke ist nicht enthalten. Echte IBI-Live-Erfassung auf der Watch 4 ist daher noch nicht belegt.
-2. Die Regeln sind noch nicht gegen eine echte, von Samsung Health nach Health Connect synchronisierte Referenznacht validiert.
+1. Die Samsung-AAR-Brücke ist nicht enthalten. Echte IBI-Live-Erfassung auf der Watch 4 ist daher noch nicht belegt. Der Weg ohne Partnerfreigabe wurde am 16.11.2026 recherchiert: AAR nur an registrierte Partner, Entwickler-Modus umgeht nur die Laufzeit-Politik; Details und Quellen in `docs/IBI_ADAPTER.md`.
+2. Die Regeln (sowohl `m2-rules-0.1` als auch die grobe `puls-bewegung-grob-0.1`) sind noch nicht gegen eine echte, von Samsung Health nach Health Connect synchronisierte Referenznacht validiert. Die grobe Schätzung nutzt keine IBI/HRV-Merkmale und ist damit noch unschärfer als der M2-Kandidat.
 3. Wear-Data-Layer-Übertragung und Smartphone-Abgleich müssen auf tatsächlich gekoppelten Geräten erprobt werden.
 4. Claude muss auf der Watch 4 eine Nacht mit eingeschaltetem Experiment beobachten und den lokalen Vergleich auf dem Smartphone prüfen. Erst danach darf eine andere Sitzung melden, dass die Schätzung „trägt“. Bis dahin bleibt die Standardausgabe `unknown`.
 

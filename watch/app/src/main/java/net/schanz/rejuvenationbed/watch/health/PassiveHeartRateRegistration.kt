@@ -53,6 +53,20 @@ object PassiveHeartRateRegistration {
                     result.exceptionOrNull()?.let { "Registrierung fehlgeschlagen: ${it.javaClass.simpleName} ${it.message ?: ""}" }
                         ?: "Registrierung bestätigt"
                 )
+                // Benannter Status der IBI-Quelle, kein stiller Leerlauf (#8):
+                // Das Protokoll soll jederzeit zeigen, warum Phasen (oder deren
+                // Ersatz) aus welcher Quelle kommen oder fehlen.
+                runCatching {
+                    val ibiQuelle = SamsungHealthSensorSdkIbiQuelle()
+                    val stand = when (val status = ibiQuelle.status()) {
+                        IbiQuelleStatus.Verfuegbar -> "verfügbar"
+                        is IbiQuelleStatus.NichtVerfuegbar -> "nicht verfügbar: ${status.grund}"
+                    }
+                    DebugProtokoll.ereignis(
+                        appContext, "IBI",
+                        "Quelle ${ibiQuelle.name}: $stand — ohne IBI nur grobe Puls+Bewegungs-Schätzung"
+                    )
+                }
                 onComplete(result)
             },
             appContext.mainExecutor
