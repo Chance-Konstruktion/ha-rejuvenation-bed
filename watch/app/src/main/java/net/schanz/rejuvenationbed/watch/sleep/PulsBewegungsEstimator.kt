@@ -82,16 +82,18 @@ object PulsBewegungsEstimator {
             confidence = candidate.second.coerceIn(0.0, 0.95),
             sampleCoverage = abdeckung,
             measuredAtEpochMillis = nowEpochMillis,
-            algorithmVersion = ALGORITHM_VERSION
+            algorithmVersion = ALGORITHM_VERSION,
+            grund = "regel grob: ${candidate.first.wireValue}"
         )
     }
 
-    private fun unknown(nowEpochMillis: Long, coverage: Double, @Suppress("UNUSED_PARAMETER") reason: String) =
+    private fun unknown(nowEpochMillis: Long, coverage: Double, reason: String) =
         SleepStageEstimate(
             stage = SleepStage.UNKNOWN,
             confidence = 0.0,
             sampleCoverage = coverage.coerceIn(0.0, 1.0),
             measuredAtEpochMillis = nowEpochMillis,
-            algorithmVersion = ALGORITHM_VERSION
+            algorithmVersion = ALGORITHM_VERSION,
+            grund = reason
         )
 }

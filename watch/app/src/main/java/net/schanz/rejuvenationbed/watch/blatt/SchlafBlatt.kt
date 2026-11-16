@@ -53,6 +53,7 @@ import net.schanz.rejuvenationbed.watch.health.SamsungHealthSensorSdkIbiQuelle
 import net.schanz.rejuvenationbed.watch.health.WearSleepPredictionSender
 import net.schanz.rejuvenationbed.watch.sleep.PulsBewegungsEstimator
 import net.schanz.rejuvenationbed.watch.sleep.SleepEstimatorSettings
+import net.schanz.rejuvenationbed.watch.sleep.SleepEstimatorWahl
 import net.schanz.rejuvenationbed.watch.sleep.SleepStageEstimator
 import net.schanz.rejuvenationbed.watch.debug.DebugProtokoll
 import net.schanz.rejuvenationbed.watch.debug.DebugText
@@ -174,17 +175,16 @@ private fun berechneSchlafStand(context: Context, experimentAktiv: Boolean): Sch
             startEpochMillis = fensterStart,
             endEpochMillis = fensterEnde
         )
-        // Schätzer-Kette: mit verlässlicher IBI der M2-Schätzer; ohne IBI die
-        // grobe Puls+Bewegungs-Schätzung (Fund-Notiz docs/IBI_ADAPTER.md).
-        val schaetzung = when {
-            !experimentAktiv -> SleepStageEstimator.estimate(hrv, jetzt, enabled = false)
-            hrv.hasReliableIbi -> SleepStageEstimator.estimate(hrv, jetzt, enabled = true)
-            else -> PulsBewegungsEstimator.estimate(
-                window = fenster.lastOrNull(),
-                hatBewegungsdaten = schritte.isNotEmpty(),
-                nowEpochMillis = jetzt
-            )
-        }
+        // Schätzer-Kette (Fund 39678 an !19): als JVM-geprüfte Funktion
+        // SleepEstimatorWahl — mit verlässlicher IBI der M2-Schätzer, ohne IBI
+        // die grobe Puls+Bewegungs-Schätzung; der Schalter geht an jeden Zweig.
+        val schaetzung = SleepEstimatorWahl.schaetzung(
+            hrv = hrv,
+            fenster = fenster.lastOrNull(),
+            hatBewegungsdaten = schritte.isNotEmpty(),
+            jetztEpochMillis = jetzt,
+            experimentAktiv = experimentAktiv
+        )
         val ibiStatus = when (val status = SamsungHealthSensorSdkIbiQuelle().status()) {
             IbiQuelleStatus.Verfuegbar -> "verfügbar"
             is IbiQuelleStatus.NichtVerfuegbar -> status.grund
