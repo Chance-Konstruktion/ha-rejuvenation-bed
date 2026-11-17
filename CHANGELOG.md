@@ -4,6 +4,17 @@ Alle Änderungen am Rejuvenation Bed Projekt.
 
 ## [Unreleased]
 
+### Uhr → HA: Sendungen kamen nie an (zwei Fehler, 17.11. auf der echten Uhr gefunden)
+
+- Android sperrt Klartext-HTTP seit API 28; HA im Heimnetz spricht `http://`.
+  Jede Sendung scheiterte mit „IOException“ und blieb in der Warteschlange.
+  Jetzt erlaubt eine Netz-Sicherheitsregel Klartext – die Heimnetz-Grenze
+  zieht weiterhin der Sender selbst, bevor ein Byte die Leitung berührt.
+- Fehlte der Messbeginn-Anker (Messung lief schon vor !23), war die „Nacht“
+  die jüngste Messung plus eine Minute: ein leerer Bericht mit dem Datum von
+  heute, die echte Nacht fehlte. Jetzt beginnt sie bei der frühesten Messung
+  der letzten 24 h (`NachtGrenzen`, JVM-geprüft).
+
 ### Uhr: echte Herzschläge (IBI) aus dem Samsung Health Sensor SDK
 
 - Der Bau schaltet selbst: liegt Samsungs `samsung-health-sensor-api.aar`
