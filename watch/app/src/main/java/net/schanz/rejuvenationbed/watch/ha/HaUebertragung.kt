@@ -47,6 +47,11 @@ object HaUebertragung {
         }
     }
 
+    /** Heimnetz-Woge einer Adresse auf dem Arbeitsfaden — für den Speichern-Hinweis des Schlaf-Blatts; das Ergebnis reist als Ruf (kein Netz im UI-Faden). */
+    fun adresseImHeimnetz(context: Context, adresse: String, onErgebnis: (Boolean) -> Unit) {
+        arbeitsfaden.execute { onErgebnis(HaWebhookSender.adresseLiegtImHeimnetz(adresse)) }
+    }
+
     /** Nach einer Lieferung von Health Services: die laufende Phase (falls frisch). */
     fun beimLiefern(context: Context) {
         arbeitsfaden.execute {
@@ -287,6 +292,24 @@ object HaUebertragung {
             if (ergebnis.erfolgreich) {
                 warte.alsErledigt(eintrag.schluessel)
                 gesendet += 1
+            } else if (!ergebnis.wiederholen) {
+                // ADRESSE NICHT IM HEIMNETZ (Hausregel „Gesundheitsdaten
+                // verlassen das Haus nie"): nichts wurde gesendet und nichts
+                // bleibt in der Warteschlange hängen — sonst Endlos-
+                // Wiederholung. Alle Einträge reiten auf dieselbe Adresse,
+                // also weicht die ganze Schlange, ehe einer hängen bleibt.
+                val wartende = warte.umfasst()
+                warte.leeren()
+                HaUebertragungsEinstellungen.sichereWarteschlange(context, warte)
+                HaUebertragungsEinstellungen.setzeLetzteAntwort(
+                    context,
+                    "Adresse liegt nicht im Heimnetz — $wartende Sendungen verworfen, nichts gesendet"
+                )
+                DebugProtokoll.ereignis(
+                    context, ART,
+                    "Adresse liegt nicht im Heimnetz: $wartende Sendungen verworfen — nichts gesendet"
+                )
+                break
             } else {
                 warte.alsFehlgeschlagen(eintrag.schluessel, System.currentTimeMillis())
                 DebugProtokoll.ereignis(
