@@ -21,7 +21,7 @@ import logging
 from homeassistant.components import webhook
 
 from .const import DOMAIN
-from .nachtbericht import NachtberichtFehler, NachtberichtSpeicher
+from .nachtbericht import TYPE_DATEN, NachtberichtFehler, NachtberichtSpeicher
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -99,9 +99,16 @@ async def verarbeite(request, speicher: NachtberichtSpeicher):
             await speicher.async_nacht_annehmen(payload)
         elif art == TYPE_PHASE:
             await speicher.async_phase_annehmen(payload)
+        elif art == TYPE_DATEN:
+            # Messreihen-Pakete der Stellung „Gesamtdaten“ — je 5 Minuten,
+            # über den Zeitstempel zusammengeführt, Wiederholungen doppeln nicht.
+            await speicher.async_daten_annehmen(payload)
         else:
             return web.json_response(
-                {"ok": False, "error": f"Unbekannter Typ {art!r} — erlaubt sind '{TYPE_NACHT}' und '{TYPE_PHASE}'"},
+                {
+                    "ok": False,
+                    "error": f"Unbekannter Typ {art!r} — erlaubt sind '{TYPE_NACHT}', '{TYPE_PHASE}' und '{TYPE_DATEN}'",
+                },
                 status=400,
             )
     except NachtberichtFehler as err:

@@ -1,0 +1,107 @@
+# Gesundheit — die Langzeit-Statistik der Schlafaufzeichnung, gebaut aus
+# HA-Bausteinen (statistics-graph über die Nachtbericht-Sensoren).
+#
+# Grundlage sind die Sensoren mit state_class measurement — damit Home
+# Assistant die Statistik überhaupt mitrechnet (Verlauf, Ø über Wochen):
+#   sensor.bett_ruhepuls        Ø/min/max der Nacht (bpm)
+#   sensor.bett_hrv             RMSSD aus IBI (ms)
+#   sensor.bett_tiefschlaf_anteil  Anteil Tiefschlaf (%)
+#   sensor.bett_schritte        Schritte der Nacht
+#
+# Die Kanäle Atemfrequenz, SpO2 und Hauttemperatur fehlen bewusst: die Uhr
+# liefert sie nicht (Sensor „unavailable" mit Grund im Nachtbericht) — in
+# eine Statistik gehört nur, was wirklich gemessen wurde.
+#
+# Zwei Ansichten: 7 Nächte und 30 Nächte (days_to_show). Die Karte findet
+# die Sensoren selbst; mit mehr als einem Bett stehen sie unten explizit:
+#   entities: [sensor.bett_ruhepuls]  → eigene Entity-IDs eintragen
+#
+# Siehe docs/NACHTBERICHT.md.
+views:
+  - title: Gesundheit · 7 Nächte
+    path: gesundheit-7
+    cards:
+      - type: statistics-graph
+        title: Ruhepuls je Nacht
+        entities:
+          - sensor.bett_ruhepuls
+        stat_types:
+          - mean
+          - min
+          - max
+        period: day
+        days_to_show: 7
+      - type: statistics-graph
+        title: HRV (RMSSD) je Nacht
+        entities:
+          - sensor.bett_hrv
+        stat_types:
+          - mean
+        period: day
+        days_to_show: 7
+      - type: statistics-graph
+        title: Tiefschlaf-Anteil je Nacht
+        entities:
+          - sensor.bett_tiefschlaf_anteil
+        stat_types:
+          - mean
+        period: day
+        days_to_show: 7
+      - type: statistics-graph
+        title: Bewegung je Nacht
+        entities:
+          - sensor.bett_schritte
+        stat_types:
+          - mean
+        period: day
+        days_to_show: 7
+      - type: markdown
+        title: Grenzen (ehrlich)
+        content: >-
+          Phasen der Uhr sind grob geschätzt (Quelle je Segment im
+          Nachtbericht). Atemfrequenz, SpO2 und Hauttemperatur sendet die Uhr
+          nicht — ihre Sensoren stehen auf „nicht verfügbar“ mit Grund,
+          sie erscheinen bewusst nicht in der Statistik.
+  - title: Gesundheit · 30 Nächte
+    path: gesundheit-30
+    cards:
+      - type: statistics-graph
+        title: Ruhepuls je Nacht
+        entities:
+          - sensor.bett_ruhepuls
+        stat_types:
+          - mean
+          - min
+          - max
+        period: day
+        days_to_show: 30
+      - type: statistics-graph
+        title: HRV (RMSSD) je Nacht
+        entities:
+          - sensor.bett_hrv
+        stat_types:
+          - mean
+        period: day
+        days_to_show: 30
+      - type: statistics-graph
+        title: Tiefschlaf-Anteil je Nacht
+        entities:
+          - sensor.bett_tiefschlaf_anteil
+        stat_types:
+          - mean
+        period: day
+        days_to_show: 30
+      - type: statistics-graph
+        title: Bewegung je Nacht
+        entities:
+          - sensor.bett_schritte
+        stat_types:
+          - mean
+        period: day
+        days_to_show: 30
+      - type: markdown
+        title: Grenzen (ehrlich)
+        content: >-
+          Der 30-Nächte-Vergleich braucht Langzeitstatistik: die Sensoren
+          tragen state_class measurement, Home Assistant rechnet ab der
+          ersten Nacht mit. Nächte ohne Übertrag erzeugen keine Punkte.
