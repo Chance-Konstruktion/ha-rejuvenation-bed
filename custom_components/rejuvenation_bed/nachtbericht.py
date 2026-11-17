@@ -35,6 +35,26 @@ _LOGGER = logging.getLogger(__name__)
 # Schema-Kennung des Übertrags. Eine neue Feldbedeutung = neue Kennung.
 SCHEMA_KENNUNG = "rejuvenation-bed-night-report-v1"
 
+# Stellung des Schalters „Was geht an Home Assistant“ auf der Uhr:
+# - phase_only (Standard): Ergebnis — laufende Phase, Phasen-Zeitleiste,
+#   Zusammenfassungen (Puls min/Ø/max, HRV aus IBI, Schritte gesamt); die
+#   Rohdaten bleiben auf der Uhr.
+# - gesamtdaten: zusätzlich alle Messreihen der Nacht, je 5 Minuten ein
+#   night_data-Paket. Die Stellung kommt in jeder Nutzlast mit (Feld `modus`);
+#   fehlt es, gilt die enge Stellung.
+MODUS_PHASE = "phase_only"
+MODUS_GESAMT = "gesamtdaten"
+MODUS_WERTE = (MODUS_PHASE, MODUS_GESAMT)
+MODUS_STANDARD = MODUS_PHASE
+
+# Messreihen-Pakete (type night_data) — kommen nur in der Stellung
+# „gesamtdaten“ und werden hier je Nacht über den Zeitstempel zusammengeführt
+# (Schlüssel der Einzelpunkte ist ihr Zeitstempel — Wiederholungen doppeln nicht).
+TYPE_DATEN = "night_data"
+
+# Plattform-Schlafstatus, wie die Uhr ihn meldet (grob schläft/wach, !19).
+PLATTFORM_ZUSTAENDE = ("ASLEEP", "AWAKE", "UNKNOWN")
+
 # Ereignis, wenn eine Nacht vollständig angenommen wurde.
 EVENT_NACHT_ABGESCHLOSSEN = "rejuvenation_bed_nacht_abgeschlossen"
 
@@ -269,6 +289,65 @@ def _ableitungen_unterbrechungen(segmente: list[dict], start: datetime, ende: da
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
+# KANÄLE — nur, wenn die Uhr sie wirklich liefert
+# ═══════════════════════════════════════════════════════════════════════════════
+
+# Die drei Kanäle, die der Auftrag nennt. Die Galaxy Watch 4 der Uhr-App
+# stellt keinen davon über den bestehenden Kanal bereit — der Absender meldet
+# sie daher „provided: false“ mit Grund. Die Sensoren zeigen dann
+# „nicht verfügbar“ mit eben diesem Grund; nichts wird aus dem Puls oder der
+# Bewegung abgeleitet.
+KANAL_NAMEN = ("respiratory_rate", "spo2", "skin_temperature")
+
+KANAL_GRENZEN = {
+    "respiratory_rate": (4.0, 60.0),
+    "spo2": (50.0, 100.0),
+    "skin_temperature": (20.0, 45.0),
+}
+
+
+def _lese_kanale(payload: dict) -> dict:
+    """Kanal-Blöcke lesen — provided/reason, bei Geliefertsein Mittel/Min/Max."""
+    roh = payload.get("channels")
+    if roh is None:
+        return {}
+    if not isinstance(roh, dict):
+        raise NachtberichtFehler("channels: muss ein Objekt sein")
+    kanale: dict[str, dict] = {}
+    for name in KANAL_NAMEN:
+        if name not in roh:
+            continue
+        eintrag = roh[name]
+        if not isinstance(eintrag, dict):
+            raise NachtberichtFehler(f"channels.{name}: muss ein Objekt sein")
+        geliefert = eintrag.get("provided")
+        if not isinstance(geliefert, bool):
+            raise NachtberichtFehler(f"channels.{name}.provided: muss wahr oder falsch sein")
+        kanal: dict[str, Any] = {"provided": geliefert}
+        grund = eintrag.get("reason")
+        if grund is not None:
+            if not isinstance(grund, str) or not grund.strip():
+                raise NachtberichtFehler(f"channels.{name}.reason: muss ein Text sein")
+            kanal["grund"] = grund
+        minimum, maximum = KANAL_GRENZEN[name]
+        if geliefert:
+            mittel = _zahl(eintrag.get("mean"), f"channels.{name}.mean", minimum, maximum, f"Kanal {name}")
+            if mittel is None:
+                raise NachtberichtFehler(f"channels.{name}: als geliefert gemeldet, aber kein Mittelwert")
+            kanal["mean"] = mittel
+            kanal["min"] = _zahl(eintrag.get("min"), f"channels.{name}.min", minimum, maximum, f"Kanal {name}")
+            kanal["max"] = _zahl(eintrag.get("max"), f"channels.{name}.max", minimum, maximum, f"Kanal {name}")
+            quelle = eintrag.get("source")
+            if quelle is not None and not isinstance(quelle, str):
+                raise NachtberichtFehler(f"channels.{name}.source: muss ein Text sein")
+            kanal["quelle"] = quelle or "echt"
+        if not geliefert and not kanal.get("grund"):
+            raise NachtberichtFehler(f"channels.{name}: nicht geliefert, aber ohne benannten Grund")
+        kanale[name] = kanal
+    return kanale
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
 # PULS
 # ═══════════════════════════════════════════════════════════════════════════════
 
@@ -479,6 +558,11 @@ def _lese_hrv(payload: dict, ibi_punkte: list[dict], start: datetime, ende: date
 
     agg = payload.get("hrv")
     if agg is None:
+        # Die Uhr kennt die Grenze ihrer IBI-Quelle genau (Schätzer-Kette, !19) —
+        # wenn sie einen Grund mitschickt, steht der da, sonst der eigene Satz.
+        grund = payload.get("hrv_grund")
+        if isinstance(grund, str) and grund.strip():
+            return None, grund
         return None, "keine IBI-Messwerte übermittelt — HRV wird nicht gerechnet, nicht geraten"
     if not isinstance(agg, dict):
         raise NachtberichtFehler("hrv: muss ein Objekt sein")
@@ -537,12 +621,18 @@ class Nachtbericht:
             raise NachtberichtFehler("device: muss ein Text sein")
         self.geraet = geraet or "Uhr"
 
+        modus = payload.get("modus", MODUS_STANDARD)
+        if modus not in MODUS_WERTE:
+            raise NachtberichtFehler(f"modus: unbekannte Schalterstellung {modus!r} — erlaubt sind {MODUS_WERTE}")
+        self.modus = modus
+
         self.segmente = _lese_phasen(payload, self.start, self.ende)
         self._phasen_minuten, self.luecken_minuten = _phasen_minuten(self.segmente, self.start, self.ende)
 
         self.puls = _lese_puls(payload, "Puls")
         ibi_punkte = _lese_ibi(payload, "IBI")
         self.hrv, self.hrv_grund = _lese_hrv(payload, ibi_punkte, self.start, self.ende)
+        self.kanale = _lese_kanale(payload)
 
         self.bewegung = self._lese_bewegung(payload)
 
@@ -651,6 +741,7 @@ class Nachtbericht:
             "start": self.start.isoformat(timespec="seconds"),
             "end": self.ende.isoformat(timespec="seconds"),
             "dauer_minuten": round(self.dauer_minuten, 1),
+            "modus": self.modus,
             "phasen_anteile": anteile,
             "phasen_minuten": {k: round(v, 1) for k, v in self._phasen_minuten.items()},
             "phasen_verlauf": [self._segment_fuer_karte(seg) for seg in self.segmente],
@@ -659,6 +750,7 @@ class Nachtbericht:
             "hrv": self.hrv,
             "hrv_grund": self.hrv_grund or None,
             "bewegung": self.bewegung,
+            "kanale": self.kanale,
             "unterbrechungen": {
                 "anzahl": self.unterbrechungen_anzahl,
                 "minuten": self.unterbrechungen_minuten,
@@ -783,6 +875,114 @@ class Nachtbericht:
 
 
 # ═══════════════════════════════════════════════════════════════════════════════
+# MESSREIHEN (night_data-Pakete)
+# ═══════════════════════════════════════════════════════════════════════════════
+
+
+def _daten_reihen(payload: dict, reihe: dict) -> dict[str, int]:
+    """Die Reihen eines night_data-Pakets lesen und per Zeitstempel einweben.
+
+    Der Schlüssel ist der Zeitstempel (naive Lokalzeit, Sekundenauflösung) —
+    derselbe Punkt wird nicht doppelt gezählt. Geprüft werden dieselben
+    Grenzen wie im Nachtbericht; unplausible Werte fliegen raus statt zu
+    landen. Liefert, wie viele Punkte JE Reihe neu sind (Protokoll zählt,
+    es liest keine Werte).
+    """
+    neu = {"puls": 0, "ibi": 0, "bewegung": 0, "plattform": 0}
+
+    pulse = payload.get("pulse")
+    if pulse is not None:
+        if not isinstance(pulse, dict):
+            raise NachtberichtFehler("pulse: muss ein Objekt sein")
+        samples = pulse.get("samples")
+        if samples is not None:
+            if not isinstance(samples, list):
+                raise NachtberichtFehler("pulse.samples: muss eine Liste sein")
+            for i, punkt in enumerate(samples):
+                if not isinstance(punkt, dict):
+                    raise NachtberichtFehler(f"pulse.samples[{i}]: muss ein Objekt sein")
+                zeit = ohne_offset(_parse_ts(punkt.get("t"), f"pulse.samples[{i}].t"))
+                bpm = _zahl(punkt.get("bpm"), f"pulse.samples[{i}].bpm", PULS_MIN_BPM, PULS_MAX_BPM, "Puls-Sample")
+                if bpm is None:
+                    continue
+                schluessel = zeit.isoformat(timespec="seconds")
+                if schluessel not in reihe["pulse"]:
+                    neu["puls"] += 1
+                reihe["pulse"][schluessel] = {"bpm": bpm}
+
+    ibi = payload.get("ibi")
+    if ibi is not None:
+        if not isinstance(ibi, list):
+            raise NachtberichtFehler("ibi: muss eine Liste sein")
+        for i, punkt in enumerate(ibi):
+            if not isinstance(punkt, dict):
+                raise NachtberichtFehler(f"ibi[{i}]: muss ein Objekt sein")
+            zeit = ohne_offset(_parse_ts(punkt.get("t"), f"ibi[{i}].t"))
+            intervall = _zahl(
+                punkt.get("interval_ms"),
+                f"ibi[{i}].interval_ms",
+                MIN_PLAUSIBLE_IBI_MS,
+                MAX_PLAUSIBLE_IBI_MS,
+                "IBI-Sample",
+            )
+            qualitaet = _anteil(punkt.get("quality"), f"ibi[{i}].quality", "IBI-Sample")
+            if intervall is None:
+                continue
+            schluessel = zeit.isoformat(timespec="seconds")
+            if schluessel not in reihe["ibi"]:
+                neu["ibi"] += 1
+            reihe["ibi"][schluessel] = {"interval_ms": intervall, "quality": qualitaet}
+
+    bewegung = payload.get("movement")
+    if bewegung is not None:
+        if not isinstance(bewegung, dict):
+            raise NachtberichtFehler("movement: muss ein Objekt sein")
+        fenster = bewegung.get("windows")
+        if fenster is not None:
+            if not isinstance(fenster, list):
+                raise NachtberichtFehler("movement.windows: muss eine Liste sein")
+            for i, f in enumerate(fenster):
+                if not isinstance(f, dict):
+                    raise NachtberichtFehler(f"movement.windows[{i}]: muss ein Objekt sein")
+                zeit = ohne_offset(_parse_ts(f.get("t"), f"movement.windows[{i}].t"))
+                schritte = f.get("steps")
+                if schritte is not None and (
+                    isinstance(schritte, bool) or not isinstance(schritte, (int, float)) or schritte < 0
+                ):
+                    raise NachtberichtFehler(f"movement.windows[{i}].steps: muss eine nicht-negative Zahl sein")
+                if schritte is None:
+                    continue
+                schluessel = zeit.isoformat(timespec="seconds")
+                if schluessel not in reihe["movement"]:
+                    neu["bewegung"] += 1
+                reihe["movement"][schluessel] = {"steps": schritte}
+
+    plattform = payload.get("platform")
+    if plattform is not None:
+        if not isinstance(plattform, list):
+            raise NachtberichtFehler("platform: muss eine Liste sein")
+        for i, wechsel in enumerate(plattform):
+            if not isinstance(wechsel, dict):
+                raise NachtberichtFehler(f"platform[{i}]: muss ein Objekt sein")
+            zeit = ohne_offset(_parse_ts(wechsel.get("t"), f"platform[{i}].t"))
+            zustand = wechsel.get("state")
+            if zustand not in PLATTFORM_ZUSTAENDE:
+                raise NachtberichtFehler(
+                    f"platform[{i}].state: unbekannter Zustand {zustand!r} — erlaubt sind {PLATTFORM_ZUSTAENDE}"
+                )
+            schluessel = zeit.isoformat(timespec="seconds")
+            if schluessel not in reihe["platform"]:
+                neu["plattform"] += 1
+            reihe["platform"][schluessel] = {"state": zustand}
+
+    if not any(reihe.values()):
+        fehlen = [k for k in ("pulse", "ibi", "movement", "platform") if k in payload]
+        if not fehlen:
+            raise NachtberichtFehler("night_data: keine Reihen enthalten — erwartet pulse, ibi, movement oder platform")
+    return neu
+
+
+# ═══════════════════════════════════════════════════════════════════════════════
 # SPEICHER
 # ═══════════════════════════════════════════════════════════════════════════════
 
@@ -806,6 +1006,10 @@ class NachtberichtSpeicher:
             self._store = Store(hass, self.STORAGE_VERSION, self.STORAGE_SCHLUESSEL)
         self.naechte: dict[str, dict] = {}
         self.phase: Optional[dict] = None
+        # Messreihen aus night_data-Paketen, je Nacht; die Einzelpunkte hängen
+        # an ihrem Zeitstempel (ISO-String) — Wiederholungen doppeln nicht.
+        # Im Haus geblieben: dieser Speicher schreibt nach `.storage/`.
+        self.messreihen: dict[str, dict] = {}
         self.webhook_id: Optional[str] = None
         self._geladen = False
         # Wird nach jeder Annahme gerufen, damit die Nachtbericht-Sensoren
@@ -814,11 +1018,12 @@ class NachtberichtSpeicher:
         self.benachrichtigen = None
 
     async def async_laden(self) -> None:
-        """Gespeicherte Nächte und Phase lesen — nach einem Neustart weiter da."""
+        """Gespeicherte Nächte, Messreihen und Phase lesen — nach einem Neustart weiter da."""
         daten = await self._store.async_load()
         if isinstance(daten, dict):
             self.naechte = daten.get("naechte", {})
             self.phase = daten.get("phase")
+            self.messreihen = daten.get("messreihen", {})
             self.webhook_id = daten.get("webhook_id")
         self._geladen = True
 
@@ -827,6 +1032,7 @@ class NachtberichtSpeicher:
             {
                 "naechte": self.naechte,
                 "phase": self.phase,
+                "messreihen": self.messreihen,
                 "webhook_id": self.webhook_id,
             }
         )
@@ -839,6 +1045,9 @@ class NachtberichtSpeicher:
         neu = bericht.bericht(self.vergleich(bericht.nacht))
         self.naechte[bericht.nacht] = neu
         self._kuerzen()
+        # Sind für die Nacht schon night_data-Pakete da (gesamtdaten), mischen
+        # sie sich jetzt in den Bericht — der Pulskurve der Karte, nichts sonst.
+        self._verknuepfe_messreihen(bericht.nacht)
         # Auch die anderen Nächte tragen den frischen Vergleich weiter.
         for nacht, daten in self.naechte.items():
             daten["vergleich"] = self.vergleich(nacht)
@@ -877,6 +1086,9 @@ class NachtberichtSpeicher:
         algorithmus = payload.get("algorithm")
         if algorithmus is not None and not isinstance(algorithmus, str):
             raise NachtberichtFehler("algorithm: muss ein Text sein")
+        modus = payload.get("modus", MODUS_STANDARD)
+        if modus not in MODUS_WERTE:
+            raise NachtberichtFehler(f"modus: unbekannte Schalterstellung {modus!r} — erlaubt sind {MODUS_WERTE}")
         self.phase = {
             "stage": stufe,
             "confidence": _anteil(payload.get("confidence"), "confidence", "Phase-Update"),
@@ -886,10 +1098,115 @@ class NachtberichtSpeicher:
             "source": quelle,
             "source_text": quell_text(quelle),
             "algorithm": algorithmus,
+            "modus": modus,
         }
         await self.async_speichern()
         self._sensoren_anstupsen()
         return dict(self.phase)
+
+    async def async_daten_annehmen(self, payload: dict) -> dict:
+        """Messreihen-Pakete (type night_data) annehmen — nur aus „gesamtdaten“.
+
+        Die Pakete kommen während bzw. nach der Nacht, bevor (oder ohne) der
+        eigentliche Nachtbericht da ist. Jede Reihe wird über den Zeitstempel
+        eingewebt: derselbe Punkt zweimal — etwa weil die Uhr wiederholt —
+        füllt nichts auf. Gerechnet wird hier nichts; die Pakete sind der
+        Rohstoff, die Zusammenfassungen liefert der Nachtbericht.
+        """
+        if payload.get("schema") != SCHEMA_KENNUNG:
+            raise NachtberichtFehler(f"schema: erwartet {SCHEMA_KENNUNG}, erhalten {payload.get('schema')!r}")
+        if payload.get("type") != TYPE_DATEN:
+            raise NachtberichtFehler("type: erwartet 'night_data'")
+        nacht = payload.get("night")
+        if not isinstance(nacht, str) or len(nacht) != 10 or nacht[4] != "-" or nacht[7] != "-":
+            raise NachtberichtFehler("night: Datum der Nacht im Format YYYY-MM-DD fehlt")
+        try:
+            datetime.strptime(nacht, "%Y-%m-%d")
+        except ValueError as err:
+            raise NachtberichtFehler(f"night: kein gültiges Datum ({nacht!r})") from err
+        modus = payload.get("modus", MODUS_GESAMT)
+        if modus not in MODUS_WERTE:
+            raise NachtberichtFehler(f"modus: unbekannte Schalterstellung {modus!r} — erlaubt sind {MODUS_WERTE}")
+        block = payload.get("block")
+        if block is not None:
+            if not isinstance(block, dict):
+                raise NachtberichtFehler("block: muss ein Objekt sein")
+            block_start = ohne_offset(_parse_ts(block.get("start"), "block.start"))
+            block_ende = ohne_offset(_parse_ts(block.get("end"), "block.end"))
+            if block_ende <= block_start:
+                raise NachtberichtFehler("block: end liegt vor oder genau auf start")
+
+        reihe = self.messreihen.setdefault(nacht, {"pulse": {}, "ibi": {}, "movement": {}, "platform": {}})
+        neu = _daten_reihen(payload, reihe)
+        if sum(neu.values()) == 0 and not any(reihe.values()):
+            raise NachtberichtFehler("night_data: keine Reihen enthalten — es gab nichts zu übernehmen")
+        self._kuerzen()
+        self._verknuepfe_messreihen(nacht)
+        await self.async_speichern()
+        self._sensoren_anstupsen()
+        # Zählungen, keine Werte — das Protokoll kennt keine Messpunkte.
+        _LOGGER.info(
+            "Messreihen Nacht %s: Puls %d (%d neu), IBI %d (%d neu), Bewegung %d (%d neu), Plattform %d (%d neu)",
+            nacht,
+            len(reihe["pulse"]),
+            neu["puls"],
+            len(reihe["ibi"]),
+            neu["ibi"],
+            len(reihe["movement"]),
+            neu["bewegung"],
+            len(reihe["platform"]),
+            neu["plattform"],
+        )
+        return {"nacht": nacht, "modus": modus, **neu}
+
+    def _verknuepfe_messreihen(self, nacht: str) -> None:
+        """Messreihen in den Nachtbericht einweben — Pulskurve für die Karte.
+
+        Der Bericht selbst bleibt Quelle der Zusammenfassungen; aus den Paketen
+        kommt nur, was er nicht haben kann: der verdichtete Verlauf. Fehlt im
+        Bericht auch die Zusammenfassung, entsteht sie aus den Paketen —
+        Zusammenfassung aus übermittelten Werten, kein Erfinden.
+        """
+        reihe = self.messreihen.get(nacht)
+        bericht = self.naechte.get(nacht)
+        if not reihe or not bericht:
+            return
+        pulspunkte = [
+            {
+                "t": datetime.fromisoformat(schluessel),
+                "bpm": wert["bpm"],
+            }
+            for schluessel, wert in sorted(reihe.get("pulse", {}).items())
+        ]
+        if pulspunkte:
+            if bericht.get("puls") is None:
+                werte = [p["bpm"] for p in pulspunkte]
+                start = datetime.fromisoformat(bericht["start"])
+                ende = datetime.fromisoformat(bericht["end"])
+                dauer_minuten = max((ende - start).total_seconds() / 60.0, 0.0001)
+                block_anzahl = max(1, int(dauer_minuten // 5.0) + (1 if dauer_minuten % 5.0 > 0 else 0))
+                # Belegte 5-Minuten-Blöcke, relativ zum Nachtbeginn — ohne
+                # Zeitzone-Falle (die Punkte sind naive Lokalzeit des Hauses).
+                belegt = len({(p["t"] - start).total_seconds() // 300.0 for p in pulspunkte})
+                bericht["puls"] = {
+                    "min": round(min(werte), 1),
+                    "mean": round(sum(werte) / len(werte), 1),
+                    "max": round(max(werte), 1),
+                    "coverage": round(min(1.0, belegt / block_anzahl), 3),
+                    "punkte": _verdichte_puls(pulspunkte),
+                    "sample_anzahl": len(pulspunkte),
+                }
+            elif not bericht["puls"].get("punkte"):
+                bericht["puls"]["punkte"] = _verdichte_puls(pulspunkte)
+                bericht["puls"]["sample_anzahl"] = len(pulspunkte)
+                bericht["puls"]["punkte_quelle"] = "aus den übermittelten Gesamtdaten-Paketen"
+        bericht["messreihen"] = {
+            "puls": len(reihe.get("pulse", {})),
+            "ibi": len(reihe.get("ibi", {})),
+            "bewegung": len(reihe.get("movement", {})),
+            "plattform": len(reihe.get("platform", {})),
+            "modus": bericht.get("modus", MODUS_STANDARD),
+        }
 
     def _sensoren_anstupsen(self) -> None:
         """Die Entities neu schreiben lassen — sofort, nicht erst im Takt."""
@@ -901,9 +1218,15 @@ class NachtberichtSpeicher:
             _LOGGER.debug("Sensoren konnten nicht angestoßen werden: %s", err)
 
     def _kuerzen(self) -> None:
-        """Nur die letzten MAX_NAECHTE Nächte behalten."""
-        uebrig = sorted(self.naechte, key=lambda n: self.naechte[n]["start"], reverse=True)[:MAX_NAECHTE]
-        self.naechte = {nacht: self.naechte[nacht] for nacht in uebrig}
+        """Nur die letzten MAX_NAECHTE Nächte behalten — Berichte wie Messreihen.
+
+        Nacht-Kennung und Beginn sind vertragsmäßig dasselbe Datum, darum
+        reicht das ISO-Datum als Ordnung; Nächte, deren Bericht noch fehlt
+        (Pakete sind zuerst da), zählen mit und altern genauso heraus.
+        """
+        uebrig = sorted(set(self.naechte) | set(self.messreihen), reverse=True)[:MAX_NAECHTE]
+        self.naechte = {nacht: self.naechte[nacht] for nacht in uebrig if nacht in self.naechte}
+        self.messreihen = {nacht: self.messreihen[nacht] for nacht in uebrig if nacht in self.messreihen}
 
     def letzte_nacht(self) -> Optional[dict]:
         """Der aktuellste Nachtbericht oder None."""

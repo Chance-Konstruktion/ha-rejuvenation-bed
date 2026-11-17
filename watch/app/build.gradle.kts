@@ -51,4 +51,7 @@ dependencies {
 
     debugImplementation("androidx.compose.ui:ui-tooling")
     testImplementation("junit:junit:4.13.2")
+    // org.json kommt im Android-Gerät vom System; für die JVM-Tests der
+    // Nutzlast-Bauer läuft dieselbe API aus einer Test-Abhängigkeit.
+    testImplementation("org.json:json:20240303")
 }

@@ -92,13 +92,27 @@ entsteht.
 
 ## Datengrenze
 
-IBI, HRV und Bewegungsdaten verbleiben lokal auf der Uhr. Nach ausdrücklichem
-Tastendruck darf die Watch ausschließlich abgeleitete Schlafphasenwerte
-(Phase, Zeitstempel, Konfidenz, Abdeckung und Algorithmusversion) über den
-Wear Data Layer an das gekoppelte Smartphone senden. IBI-/BPM-/Schritt-Rohwerte
-werden nicht übertragen. Health-Connect-Referenzdaten verbleiben lokal auf dem
-Smartphone; es gibt keinen Upload und keine HA-Strecke in M2.
+**Standard bleibt lokal.** IBI, HRV und Bewegungsdaten verbleiben auf der Uhr,
+bis der Nutzer sie ausdrücklich freigibt. Zwei Sende-Wege existieren, getrennt
+und je mit eigener Regel:
+
+1. **Wear Data Layer an das gekoppelte Smartphone** (M2-Abgleich): nach
+   ausdrücklichem Tastendruck ausschließlich abgeleitete Schlafphasenwerte
+   (Phase, Zeitstempel, Konfidenz, Abdeckung und Algorithmusversion).
+   IBI-/BPM-/Schritt-Rohwerte werden über diesen Weg weiterhin **nie**
+   übertragen. Health-Connect-Referenzdaten verbleiben lokal auf dem
+   Smartphone.
+2. **Lokaler Home-Assistant-Webhook** (seit dem Schalter „Was geht an Home
+   Assistant“): die Stellung „Nur Schlafphase“ sendet nur das Ergebnis —
+   Phase, Zeitleiste und Zusammenfassungen. Die Stellung „Gesamtdaten“ sendet
+   zusätzlich die Messreihen (Puls, IBI, Bewegungsfenster, Plattform-Status)
+   je 5 Minuten als Paket — aber **nur** über den lokalen Webhook der einmalig
+   in der App gespeicherten Adresse, nur im Heimnetz, nie Cloud, nie ein
+   fremder Dienst; die Uhr folgt keiner Umleitung. Beim Umschalten zeigt die
+   App einmal deutlich, welche Werte übertragen werden. Kanäle, die die Uhr
+   nicht liefert (Atemfrequenz, SpO2, Hauttemperatur), werden nie erfunden.
 
 Keine Rohdaten, echten Nächte, Gerätekennungen oder Hausdaten gehören in Git.
-Tests verwenden nur synthetische Werte. Eine Wellness-Schätzung ist keine
-medizinische Messung.
+Tests verwenden nur synthetische Werte; das Debug-Protokoll der Uhr nennt
+Anzahlen und Gründe, keine Messwerte und keine Adresse. Eine Wellness-Schätzung
+ist keine medizinische Messung.

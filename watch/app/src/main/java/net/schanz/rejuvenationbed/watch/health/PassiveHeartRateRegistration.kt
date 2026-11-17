@@ -44,6 +44,11 @@ object PassiveHeartRateRegistration {
                 val result = runCatching {
                     future.get()
                     HeartRateSampleStore.markRegistered(appContext)
+                    // Anker für Nacht-Kennung und Zeitleiste der HA-Übertragung.
+                    net.schanz.rejuvenationbed.watch.ha.HaUebertragungsEinstellungen.setzeMessungStart(
+                        appContext,
+                        System.currentTimeMillis()
+                    )
                 }
                 if (result.isFailure) {
                     HeartRateSampleStore.setStatus(appContext, "registration_failed")
@@ -98,6 +103,12 @@ object PassiveHeartRateRegistration {
                     appContext, "REG",
                     result.exceptionOrNull()?.let { "Stopp fehlgeschlagen: ${it.javaClass.simpleName}" } ?: "gestoppt, Daten behalten (Puls ${HeartRateSampleStore.sampleCount(appContext)}, Schritte ${HeartRateSampleStore.stepIntervalCount(appContext)})"
                 )
+                if (result.isSuccess) {
+                    // Nacht ist abgeschlossen: Bericht (und in „Gesamtdaten“ die
+                    // Messreihen-Pakete) anstellen und über den lokalen Webhook
+                    // versuchen. Läuft im eigenen Hintergrund-Faden, nicht hier.
+                    net.schanz.rejuvenationbed.watch.ha.HaUebertragung.nachStopp(appContext)
+                }
                 onComplete(result)
             },
             appContext.mainExecutor

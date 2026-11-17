@@ -15,19 +15,26 @@ Aufbau (alles am Schlaf/Analyse-Gerät):
 - `sensor.bett_schlafbeginn` / `…ende` — Beginn und Ende der Nacht
 - `sensor.bett_schlafunterbrechungen`  — Anzahl der Unterbrechungen
 - `sensor.bett_nachtguete`             — Güte der DATEN (0–100): war die Nacht gut gemessen?
+- `sensor.bett_schritte`               — Schritte der Nacht; die Reihe (Fenster) nur bei „Gesamtdaten“
+- `sensor.bett_atemfrequenz` / `…sauerstoffsaettigung` / `…hauttemperatur`
+                                       — Kanäle, die die Uhr NUR sendet, wenn sie sie
+                                         wirklich liefert; sonst „nicht verfügbar“ mit Grund
 - `sensor.bett_nachtbericht`           — der ganze Bericht (Karte liest ihn von hier)
 
 Ehrlichkeitsregel durchgezogen: Ohne Daten zeigt ein Sensor `unknown` und nennt
 den Grund im Attribut — nichts wird aus der Puls-Kurve geraten oder platt
 dupliziert. Die Schlafphase fällt nach 10 Minuten ohne Nachschub auf `unknown`
 zurück (Vertrag in docs/SMARTWATCH_ARCHITECTURE.md), damit das Bett auf eine
-alternde Schätzung nicht mehr reagiert.
+alternde Schätzung nicht mehr reagiert. Kanäle, die das Gerät nicht bereitstellt,
+zeigen „nicht verfügbar“ (unavailable) mit dem benannten Grund — es gibt für sie
+keine Zahl aus einer anderen Quelle.
 """
 
 import logging
 from datetime import datetime
 
 from homeassistant.components.sensor import SensorDeviceClass, SensorEntity, SensorStateClass
+from homeassistant.const import UnitOfTemperature
 
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
 
@@ -294,6 +301,157 @@ class BettHrvSensor(BettNachtZahlSensor):
         return {k: v for k, v in attrs.items() if v is not None}
 
 
+class BettSchritteSensor(BettNachtZahlSensor):
+    """Schritte der Nacht — Bewegung als grober Indikator, nie als Roh-Actigraphie.
+
+    Der Wert ist `movement.steps_total` aus dem Nachtbericht. Die Reihe je
+    Intervall (die Bewegungsfenster) kommt nur in der Stellung „Gesamtdaten“
+    und steht als Attribut-Zählung im Bericht (`messreihen`).
+    """
+
+    def __init__(self, coordinator):
+        super().__init__(
+            coordinator,
+            "Bett Schritte",
+            f"{coordinator.config_entry.entry_id}_nachtbericht_schritte",
+            "Schritte",
+            "mdi:shoe-print",
+            dezimalstellen=0,
+        )
+
+    @property
+    def native_value(self):
+        bericht = self._bericht()
+        if not bericht:
+            return None
+        bewegung = bericht.get("bewegung")
+        if not bewegung or bewegung.get("steps_total") is None:
+            return None
+        return bewegung["steps_total"]
+
+    @property
+    def extra_state_attributes(self):
+        bericht = self._bericht()
+        if not bericht:
+            return {"status": "Noch keine Nacht übermittelt"}
+        bewegung = bericht.get("bewegung")
+        if not bewegung:
+            return {"status": "Keine Bewegungsdaten in dieser Nacht"}
+        attrs = {
+            "nacht": bericht["nacht"],
+            "variance": bewegung.get("variance"),
+            "quelle": bewegung.get("quelle"),
+        }
+        messreihen = bericht.get("messreihen")
+        if messreihen:
+            attrs["messreihen_bewegung"] = messreihen.get("bewegung")
+        return {k: v for k, v in attrs.items() if v is not None}
+
+
+class BettKanalSensor(NachtberichtSensorBase):
+    """Ein Kanal, den die Uhr NUR sendet, wenn sie ihn wirklich liefert.
+
+    Atemfrequenz, SpO2 und Hauttemperatur stehen nicht in jeder Nacht — die
+    Galaxy Watch 4 der Uhr-App stellt keinen davon bereit. Solange nichts
+    geliefert wird, zeigt der Sensor „nicht verfügbar“ (unavailable) mit dem
+    benannten Grund im Attribut: nie eine Zahl aus dem Puls oder der Bewegung
+    abgeleitet, nie erfunden. Kommt der Kanal doch (eine künftige Uhr, die ihn
+    messen kann), ist er ein normaler Messwert mit state_class measurement und
+    fließt in die Langzeitstatistik.
+    """
+
+    def __init__(self, coordinator, kanal: str, name: str, einheit, icon, device_class=None):
+        super().__init__(coordinator)
+        self.kanal = kanal
+        self._attr_name = name
+        self._attr_unique_id = f"{coordinator.config_entry.entry_id}_nachtbericht_kanal_{kanal}"
+        self._attr_native_unit_of_measurement = einheit
+        self._attr_icon = icon
+        self._attr_state_class = SensorStateClass.MEASUREMENT
+        if device_class is not None:
+            self._attr_device_class = device_class
+
+    def _kanal(self):
+        bericht = self._bericht()
+        if not bericht:
+            return None
+        return (bericht.get("kanale") or {}).get(self.kanal)
+
+    def _fehlt_grund(self):
+        """Der benannte Grund, warum dieser Kanal gerade keine Zahl hat."""
+        kanal = self._kanal()
+        if kanal is None:
+            if self._bericht() is None:
+                return "die Uhr hat diesen Kanal bislang nicht gemeldet"
+            return f"der Nachtbericht nennt den Kanal '{self.kanal}' nicht"
+        if not kanal.get("provided"):
+            return kanal.get("grund") or "die Uhr liefert diesen Kanal nicht"
+        if kanal.get("mean") is None:
+            return "als geliefert gemeldet, aber ohne Mittelwert"
+        return None
+
+    @property
+    def available(self):
+        """Kein erfundener Ersatzwert: ohne gelieferten Kanal keine Zahl."""
+        return self._fehlt_grund() is None
+
+    @property
+    def native_value(self):
+        kanal = self._kanal()
+        if not kanal or kanal.get("mean") is None:
+            return None
+        return round(kanal["mean"], 1)
+
+    @property
+    def extra_state_attributes(self):
+        attrs: dict = {"kanal": self.kanal}
+        grund = self._fehlt_grund()
+        if grund:
+            attrs["grund"] = grund
+        kanal = self._kanal()
+        if kanal:
+            attrs["quelle"] = kanal.get("quelle")
+            attrs["min"] = kanal.get("min")
+            attrs["max"] = kanal.get("max")
+            bericht = self._bericht()
+            if bericht:
+                attrs["nacht"] = bericht["nacht"]
+        return attrs
+
+
+def baue_nachtbericht_kanal_sensoren(coordinator) -> list:
+    """Die drei Kanäle des Auftrags — nur einer davon hat heute eine Quelle.
+
+    Hauttemperatur trägt die Temperatur-Klasse (Einheit °C), für Atemfrequenz
+    und SpO2 gibt es in Home Assistant keine Geräteklassen — sie bleiben
+    ehrlich ohne, mit Einheit und Messwert-Klasse.
+    """
+    return [
+        BettKanalSensor(
+            coordinator,
+            "respiratory_rate",
+            "Bett Atemfrequenz",
+            "Atemzüge/min",
+            "mdi:lungs",
+        ),
+        BettKanalSensor(
+            coordinator,
+            "spo2",
+            "Bett Sauerstoffsättigung",
+            "%",
+            "mdi:air-filter",
+        ),
+        BettKanalSensor(
+            coordinator,
+            "skin_temperature",
+            "Bett Hauttemperatur",
+            UnitOfTemperature.CELSIUS,
+            "mdi:thermometer",
+            device_class=SensorDeviceClass.TEMPERATURE,
+        ),
+    ]
+
+
 class BettSchlafgrenzSensor(NachtberichtSensorBase):
     """Beginn oder Ende der Nacht als Zeitstempel-Sensor."""
 
@@ -444,7 +602,8 @@ def baue_nachtbericht_sensoren(coordinator) -> list:
 
     Ohne Übertrag zeigen die Sensoren `unknown`; die Integration ist damit
     ehrlich über den Zustand („noch nichts angekommen“), statt den Sensor
-    wegzulassen und den Nutzer im Ungewissen zu lassen.
+    wegzulassen und den Nutzer im Ungewissen zu lassen. Die Kanäle, die die
+    Uhr nicht liefert, zeigen von Anfang an „nicht verfügbar“ mit Grund.
     """
     return [
         BettSchlafphaseSensor(coordinator),
@@ -456,5 +615,7 @@ def baue_nachtbericht_sensoren(coordinator) -> list:
         BettSchlafgrenzSensor(coordinator, "end"),
         BettSchlafunterbrechungenSensor(coordinator),
         BettNachtgueteSensor(coordinator),
+        BettSchritteSensor(coordinator),
+        *baue_nachtbericht_kanal_sensoren(coordinator),
         BettNachtberichtSensor(coordinator),
     ]

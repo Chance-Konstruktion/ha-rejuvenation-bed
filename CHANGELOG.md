@@ -4,6 +4,45 @@ Alle Änderungen am Rejuvenation Bed Projekt.
 
 ## [Unreleased]
 
+### Schalter „Was geht an Home Assistant“ (Uhr + Nachtbericht)
+
+- Die Uhr-App hat im Schlaf-Blatt den Schalter „Was geht an Home Assistant“ mit
+  zwei Stellungen: **„Nur Schlafphase“** (Standard — die Rohdaten bleiben auf
+  der Uhr, an HA geht das Ergebnis: laufende Phase, Phasen-Zeitleiste,
+  Zusammenfassungen) und **„Gesamtdaten“** (zusätzlich alle Messreihen der
+  Nacht — Puls, IBI, Bewegungsfenster, Plattform-Schlafstatus — je 5 Minuten
+  ein Paket). Beim Umschalten auf „Gesamtdaten“ zeigt die Uhr einmal deutlich,
+  welche Werte übertragen werden und welche Kanäle die Uhr nicht liefert
+  (Atemfrequenz, SpO2, Hauttemperatur — sie werden nie erfunden). Der Schalter
+  ist dauerhaft gespeichert und wirkt nur auf das Senden; das Messen bleibt
+  unberührt.
+- Der Sender sitzt auf der Uhr und geht **nur** über den lokalen Webhook der
+  eigenen Instanz (`local_only`): nie Cloud, nie ein fremder Dienst, keine
+  Umleitung wird gefolgt. Die Adresse steht einmalig in der App (app-privat,
+  nie im Protokoll). Sendungen laufen in einer Warteschlange mit Wiederholung,
+  wenn HA nicht erreichbar war; Doppelungen sind ausgeschlossen — Zeitstempel
+  bzw. Nacht-Kennung sind die Schlüssel, HA fasst Punkte über ihren Zeitstempel
+  zusammen. „DATEN LÖSCHEN“ leert auch die Warteschlange. Kein Log schreibt
+  Messwerte oder Adressen — auf der Uhr wie in HA.
+- Nachtbericht-Annahme: neuer Typ `night_data` für die Messreihen-Pakete, das
+  Feld `modus` (die Schalterstellung) in jeder Nutzlast, `hrv_grund` vom
+  Absender (die Uhr kennt die Grenze ihrer IBI-Quelle genauer als die
+  Nachrechnung), der `channels`-Block für Kanäle, die nur gesendet werden,
+  wenn die Uhr sie wirklich liefert. Die Pakete weben sich je Nacht über den
+  Zeitstempel ein und liefern der Karte die Pulskurve, wenn der Bericht keine
+  Samples brachte.
+- Vier Sensoren am Schlaf/Analyse-Gerät: `sensor.bett_schritte` und die Kanäle
+  `sensor.bett_atemfrequenz`, `sensor.bett_sauerstoffsaettigung`,
+  `sensor.bett_hauttemperatur` — alle mit `state_class measurement` für die
+  Langzeitstatistik; die Kanäle stehen „unavailable“ mit benanntem Grund, solange
+  die Uhr sie nicht liefert (die Galaxy Watch 4 der App stellt keinen davon
+  bereit), Hauttemperatur trägt die Temperatur-Geräteklasse für eine künftige
+  Uhr, die ihn messen kann.
+- Neue Ansicht aus HA-Bausteinen: `dashboards/gesundheit.yaml` —
+  statistics-graph über 7 und 30 Nächte für Ruhepuls, HRV, Tiefschlaf-Anteil
+  und Bewegung. Details und Schema: `docs/NACHTBERICHT.md`, Grenzen des
+  Sendens: `watch/README.md` und `docs/IBI_ADAPTER.md`.
+
 ### Nachtbericht (Schlafaufzeichnung der Uhr → HA, #9)
 - Die Integration nimmt die Schlafaufzeichnung der Uhr über einen **lokalen** Webhook an
   (`local_only`, Schema `rejuvenation-bed-night-report-v1`): je Nacht Beginn/Ende,
