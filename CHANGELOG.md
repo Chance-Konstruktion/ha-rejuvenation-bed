@@ -27,6 +27,10 @@ Alle Änderungen am Rejuvenation Bed Projekt.
   in den privaten Speicher, Aufbewahrung nach Zeit (36 h statt 10 h).
   Beim Stopp werden gebündelte Schläge erst abgeholt, der Nachtbericht wartet
   darauf und liest ab Messbeginn (statt fest 12 h).
+- Fähigkeitsgetrieben: Die Brücke merkt sich, welche Tracker die Uhr anbietet.
+  Bietet sie `SKIN_TEMPERATURE_CONTINUOUS` (Galaxy Watch 5+), misst sie die
+  Hauttemperatur mit, und der Nachtbericht liefert den Kanal mit
+  Mittel/Min/Max. Ohne Sensor (Watch 4) steht er mit benanntem Grund da.
 - Richtigstellung zur Fund-Notiz in `docs/IBI_ADAPTER.md`: das SDK gibt es nach
   Anmeldung bei Samsung; die Partner-Anfrage braucht es nur für den Vertrieb –
   auf der eigenen Uhr genügt der Entwickler-Modus der Health Platform.
