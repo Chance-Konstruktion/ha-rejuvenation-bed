@@ -4,6 +4,23 @@ Alle Änderungen am Rejuvenation Bed Projekt.
 
 ## [Unreleased]
 
+### Gesundheitsdaten verlassen das Haus nie — im Sender erzwungen (Heilung Fund 40477)
+
+- Der Webhook-Sender der Uhr wägt vor jedem Senden den Host der gespeicherten
+  Adresse: aufgelöst werden nur private bzw. Link-Local-Adressen (RFC 1918,
+  169.254/16, 127/8, fc00::/7, fe80::/10) und Namen auf `.local` durchgelassen.
+  Jede andere Adresse — Cloud-URL, öffentlicher Name, Tippfehler — wird
+  abgewiesen, **bevor** irgendein Byte die Leitung berührt
+  („Adresse liegt nicht im Heimnetz – nichts gesendet“); fail-closed: auch ein
+  nicht auflösbarer Host gilt als nicht bewiesen im Heimnetz. Eine
+  abgewiesene Adresse wiederholt sich nie — die Warteschlange wird geleert,
+  statt Sendungen für immer an eine nie gesendete Adresse hängen zu lassen.
+- Das Schlaf-Blatt zeigt schon beim Speichern der Adresse den Hinweis
+  „nicht im Heimnetz“, wenn die Woge sie nicht trägt — dieselbe Prüfung wie
+  beim Senden, auf dem Hintergrund-Faden. Tests mit Attrappen-Auflösung
+  (öffentliche IP, öffentlicher Name, 192.168.1.10, 10.x, fe80::, .local)
+  und Mutationsbeleg: ohne die Woge fallen sie rot.
+
 ### Schalter „Was geht an Home Assistant“ (Uhr + Nachtbericht)
 
 - Die Uhr-App hat im Schlaf-Blatt den Schalter „Was geht an Home Assistant“ mit
