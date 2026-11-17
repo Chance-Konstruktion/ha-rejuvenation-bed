@@ -65,6 +65,15 @@ class NachtSendeWarteschlange(private val maximaleGroesse: Int = 96) {
         eintraege.remove(schluessel)
     }
 
+    /**
+     * Endgültig abgewiesene Adresse (nicht im Heimnetz): die ganze Schlange
+     * weicht — nichts bleibt für eine Adresse hängen, an die nie gesendet
+     * wird (sonst Endlos-Wiederholung bei jedem Abholen).
+     */
+    fun leeren() {
+        eintraege.clear()
+    }
+
     /** Fehlgeschlagen: Eintrag bleibt, Versuchszähler steigt — die Wiederholung. */
     fun alsFehlgeschlagen(schluessel: String, jetztEpochMillis: Long) {
         val vorhanden = eintraege[schluessel] ?: return

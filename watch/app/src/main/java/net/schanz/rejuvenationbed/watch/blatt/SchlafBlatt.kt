@@ -401,6 +401,11 @@ private fun SchlafInfo(
     var gesamtdatenHinweis by remember { mutableStateOf(false) }
     var adresseFeld by remember { mutableStateOf("") }
     var haSendenStatus by remember { mutableStateOf("Noch kein Nachtbericht gesendet.") }
+    // Hausregel „Gesundheitsdaten verlassen das Haus nie“: der Hinweis beim
+    // Speichern — liegt die Adresse nicht im Heimnetz, wird das hier gleich
+    // gesagt (die Woge läuft auf dem Arbeitsfaden, das Ergebnis als Ruf —
+    // derselbe Weg wie beim Senden).
+    var adresseHinweis by remember { mutableStateOf<String?>(null) }
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -592,6 +597,12 @@ private fun SchlafInfo(
             if (hatAdresse) "HA-Adresse: gesetzt" else "HA-Adresse: nicht gesetzt",
             style = thema.klein.copy(color = thema.grau2)
         )
+        adresseHinweis?.let { hinweis ->
+            BasicText(
+                hinweis,
+                style = thema.klein.copy(color = thema.text, textAlign = TextAlign.Center)
+            )
+        }
         BasicTextField(
             value = adresseFeld,
             onValueChange = { adresseFeld = it },
@@ -608,16 +619,31 @@ private fun SchlafInfo(
         )
         Row(horizontalArrangement = Arrangement.spacedBy(Raum.s2)) {
             UmrissKnopf("SPEICHERN") {
-                HaUebertragungsEinstellungen.setzeAdresse(context, adresseFeld)
+                val gespeichert = adresseFeld
+                HaUebertragungsEinstellungen.setzeAdresse(context, gespeichert)
                 adresseFeld = ""
                 if (HaUebertragungsEinstellungen.hatAdresse(context)) {
                     DebugProtokoll.ereignis(context, "HA", "Adresse gesetzt")
+                    // DIE HEIMNETZ-WOGE GLEICH BEIM SPEICHERN: zeigt hier an,
+                    // wenn die Adresse nicht im Heimnetz liegt — nichts geht
+                    // hinaus, ehe überhaupt gesendet wird. Die Woge reist auf
+                    // dem Arbeitsfaden (kein Netz im UI-Faden), das Ergebnis
+                    // als Ruf; der Hinweis nennt keine Adresse, nur den Befund.
+                    HaUebertragung.adresseImHeimnetz(context, gespeichert) { imHeimnetz ->
+                        adresseHinweis = if (imHeimnetz) {
+                            null
+                        } else {
+                            "Adresse liegt nicht im Heimnetz – Gesundheitsdaten gehen nie hinaus; beim Senden wird abgewiesen"
+                        }
+                    }
                 } else {
                     DebugProtokoll.ereignis(context, "HA", "leere Adresse — nichts geändert")
+                    adresseHinweis = null
                 }
             }
             UmrissKnopf("LEEREN") {
                 HaUebertragungsEinstellungen.setzeAdresse(context, null)
+                adresseHinweis = null
                 DebugProtokoll.ereignis(context, "HA", "Adresse entfernt")
             }
         }

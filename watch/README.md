@@ -62,6 +62,15 @@ Regeln, durchgezogen:
   einer Nutzlast. Nie Cloud, nie ein fremder Dienst; die Uhr folgt keiner
   Umleitung (ein 3xx bricht die Sendung ab, statt die Nutzlast anderswohin zu
   schicken).
+- **Gesundheitsdaten verlassen das Haus nie — im Sender erzwungen:** vor
+  jedem Senden wird der Host der Adresse aufgelöst und gewogen; erlaubt sind
+  nur private bzw. Link-Local-Adressen (RFC 1918, 169.254/16, 127/8,
+  fc00::/7, fe80::/10) und Namen auf `.local`. Jede andere Adresse — Cloud-
+  URL, öffentlicher Name, Tippfehler — wird abgewiesen, **bevor** irgendein
+  Byte gesendet wird („Adresse liegt nicht im Heimnetz – nichts gesendet“);
+  nichts bleibt dafür in der Warteschlange hängen. Schon beim Speichern
+  zeigt das Schlaf-Blatt den Hinweis „nicht im Heimnetz“, wenn die gewogene
+  Adresse nicht reicht.
 - Messen bleibt völlig unberührt — der Schalter wirkt nur auf das, was
   gesendet wird; alle Sendungen laufen auf einem eigenen Hintergrund-Faden.
 - HA nicht erreichbar? Die Sendungen bleiben in einer Warteschlange auf der
@@ -76,7 +85,10 @@ Regeln, durchgezogen:
 
 Einrichtung: Attribut `annahme_pfad` am Sensor `sensor.bett_nachtbericht`
 lesen, die eigene Home-Assistant-Adresse davor setzen, einmalig im Schlaf-Blatt
-unter „HA-ÜBERTRAGUNG“ speichern. Details und Schema: `docs/NACHTBERICHT.md`.
+unter „HA-ÜBERTRAGUNG“ speichern. Die Adresse muss im Heimnetz liegen (private
+IP wie eine 192.168.x.x, eine `…​.local`-mDNS-Adresse oder eine IPv6-ULA) —
+öffentlich auflösbare Adressen werden abgewiesen. Details und Schema:
+`docs/NACHTBERICHT.md`.
 
 ## Datenschutz und Berechtigungen
 

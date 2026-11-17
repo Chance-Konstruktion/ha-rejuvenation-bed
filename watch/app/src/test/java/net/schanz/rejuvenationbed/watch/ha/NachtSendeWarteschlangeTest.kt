@@ -2,6 +2,7 @@ package net.schanz.rejuvenationbed.watch.ha
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
+import org.junit.Assert.assertNull
 import org.junit.Assert.assertTrue
 import org.junit.Test
 
@@ -104,5 +105,22 @@ class NachtSendeWarteschlangeTest {
         assertTrue(NachtSendeWarteschlange.ausJson("").istLeer())
         assertTrue(NachtSendeWarteschlange.ausJson("kein JSON").istLeer())
         assertTrue(NachtSendeWarteschlange.ausJson("[{\"schluessel\":\"\",\"art\":\"x\",\"json\":\"{}\"}]").istLeer())
+    }
+
+    @Test
+    fun leerenWirftAllesHeraus() {
+        // Heilung des Funds 40477: eine Adresse außerhalb des Heimnetzes wird
+        // endgültig abgewiesen — die ganze Schlange weicht, sonst hinge jede
+        // Sendung an einer Adresse, an die nie gesendet wird (Endlos-
+        // Wiederholung bei jedem Abholen).
+        val warte = NachtSendeWarteschlange()
+        stellen(warte, "nacht-2026-11-16", "{}", jetzt = 100L)
+        stellen(warte, "daten-2026-11-16-0100", "{\"a\":1}", jetzt = 150L)
+        warte.alsFehlgeschlagen("nacht-2026-11-16", 200L)
+        warte.leeren()
+        assertTrue("alles weg — nichts bleibt hängen", warte.istLeer())
+        assertEquals(0, warte.umfasst())
+        assertNull("kein nächster Eintrag mehr", warte.naechster())
+        assertEquals("der JSON-Rundtrip bleibt leer", "[]", warte.alsJson())
     }
 }
