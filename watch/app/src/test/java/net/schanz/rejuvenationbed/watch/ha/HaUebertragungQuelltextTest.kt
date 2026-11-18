@@ -145,4 +145,25 @@ class HaUebertragungQuelltextTest {
             "OkHttp" in steuerung || "Retrofit" in steuerung || "Wearable" in steuerung
         )
     }
+
+    /**
+     * 18.11.: SPEICHERN mit leerem Feld hat die gespeicherte Adresse gelöscht
+     * und dabei „leere Adresse — nichts geändert“ protokolliert. Seitdem gilt:
+     * im SPEICHERN-Knopf wird erst auf ein nicht-leeres Feld geprüft, dann
+     * gesetzt; entfernt wird nur über LEEREN.
+     */
+    @Test
+    fun leeresSpeichernLoeschtDieAdresseNicht() {
+        val blatt = quelle("src/main/java/net/schanz/rejuvenationbed/watch/blatt/SchlafBlatt.kt")
+        val anfang = blatt.indexOf("UmrissKnopf(\"SPEICHERN\")")
+        val ende = blatt.indexOf("UmrissKnopf(\"LEEREN\")")
+        assertTrue("SPEICHERN- und LEEREN-Knopf gefunden", anfang in 0 until ende)
+        val speichern = blatt.substring(anfang, ende)
+        val pruefung = speichern.indexOf("isNotBlank()")
+        val setzen = speichern.indexOf("setzeAdresse(")
+        assertTrue("SPEICHERN prüft das Feld auf Inhalt", pruefung >= 0)
+        assertTrue("SPEICHERN setzt die Adresse", setzen >= 0)
+        assertTrue("erst prüfen, dann setzen", pruefung < setzen)
+        assertFalse("SPEICHERN löscht nie", "setzeAdresse(context, null)" in speichern)
+    }
 }

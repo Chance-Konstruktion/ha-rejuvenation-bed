@@ -620,9 +620,12 @@ private fun SchlafInfo(
         Row(horizontalArrangement = Arrangement.spacedBy(Raum.s2)) {
             UmrissKnopf("SPEICHERN") {
                 val gespeichert = adresseFeld
-                HaUebertragungsEinstellungen.setzeAdresse(context, gespeichert)
                 adresseFeld = ""
-                if (HaUebertragungsEinstellungen.hatAdresse(context)) {
+                // Leeres Feld + SPEICHERN darf die gespeicherte Adresse NICHT
+                // löschen (18.11.: genau so ging sie verloren, das Protokoll
+                // sagte „nichts geändert“). Entfernen nur über LEEREN.
+                if (gespeichert.isNotBlank()) {
+                    HaUebertragungsEinstellungen.setzeAdresse(context, gespeichert)
                     DebugProtokoll.ereignis(context, "HA", "Adresse gesetzt")
                     // DIE HEIMNETZ-WOGE GLEICH BEIM SPEICHERN: zeigt hier an,
                     // wenn die Adresse nicht im Heimnetz liegt — nichts geht
