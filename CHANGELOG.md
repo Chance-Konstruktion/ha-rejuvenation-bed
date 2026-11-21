@@ -4,6 +4,37 @@ Alle Änderungen am Rejuvenation Bed Projekt.
 
 ## [Unreleased]
 
+### Uhr → HA: Sendungen kamen nie an (zwei Fehler, 17.11. auf der echten Uhr gefunden)
+
+- Android sperrt Klartext-HTTP seit API 28; HA im Heimnetz spricht `http://`.
+  Jede Sendung scheiterte mit „IOException“ und blieb in der Warteschlange.
+  Jetzt erlaubt eine Netz-Sicherheitsregel Klartext – die Heimnetz-Grenze
+  zieht weiterhin der Sender selbst, bevor ein Byte die Leitung berührt.
+- Fehlte der Messbeginn-Anker (Messung lief schon vor !23), war die „Nacht“
+  die jüngste Messung plus eine Minute: ein leerer Bericht mit dem Datum von
+  heute, die echte Nacht fehlte. Jetzt beginnt sie bei der frühesten Messung
+  der letzten 24 h (`NachtGrenzen`, JVM-geprüft).
+
+### Uhr: echte Herzschläge (IBI) aus dem Samsung Health Sensor SDK
+
+- Der Bau schaltet selbst: liegt Samsungs `samsung-health-sensor-api.aar`
+  unter `watch/app/libs/` (nie im Repo, `.gitignore`), misst die echte Brücke;
+  ohne AAR bleibt die IBI-Quelle die benannte Lücke, und die App baut wie
+  bisher. Die CI holt die AAR aus einer privaten Paketablage; die Uhr-APK ist
+  darum nur noch für Projekt-Entwickler abrufbar.
+- Während der Schlafmessung läuft die Herzschlag-Messung im
+  Health-Vordergrunddienst; die Schläge gehen stapelweise in EINER Transaktion
+  in den privaten Speicher, Aufbewahrung nach Zeit (36 h statt 10 h).
+  Beim Stopp werden gebündelte Schläge erst abgeholt, der Nachtbericht wartet
+  darauf und liest ab Messbeginn (statt fest 12 h).
+- Fähigkeitsgetrieben: Die Brücke merkt sich, welche Tracker die Uhr anbietet.
+  Bietet sie `SKIN_TEMPERATURE_CONTINUOUS` (Galaxy Watch 5+), misst sie die
+  Hauttemperatur mit, und der Nachtbericht liefert den Kanal mit
+  Mittel/Min/Max. Ohne Sensor (Watch 4) steht er mit benanntem Grund da.
+- Richtigstellung zur Fund-Notiz in `docs/IBI_ADAPTER.md`: das SDK gibt es nach
+  Anmeldung bei Samsung; die Partner-Anfrage braucht es nur für den Vertrieb –
+  auf der eigenen Uhr genügt der Entwickler-Modus der Health Platform.
+
 ### Gesundheitsdaten verlassen das Haus nie — im Sender erzwungen (Heilung Fund 40477)
 
 - Der Webhook-Sender der Uhr wägt vor jedem Senden den Host der gespeicherten

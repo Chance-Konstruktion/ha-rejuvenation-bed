@@ -58,6 +58,9 @@ android-watch:
   variables:
     GRADLE_USER_HOME: "$CI_PROJECT_DIR/.gradle"
     GRADLE_OPTS: "-Dorg.gradle.daemon=false"
+    # Samsung Health Sensor SDK (IBI): privat abgelegt, nie im Repo – Samsung
+    # gibt die AAR nur nach Anmeldung heraus (docs/IBI_ADAPTER.md).
+    SAMSUNG_SDK_URL: "$CI_API_V4_URL/projects/255/packages/generic/samsung-health-sensor-sdk/1.4.1/samsung-health-sensor-api.aar"
   cache:
     key: "android-watch-gradle"
     paths:
@@ -73,8 +76,19 @@ android-watch:
     - test -d "$SDK_ROOT/platforms/android-37"
     - curl --fail --location --silent --show-error "https://services.gradle.org/distributions/gradle-9.3.1-bin.zip" --output /tmp/gradle.zip
     - unzip -q /tmp/gradle.zip -d /tmp
+    # Ohne Zugriff baut die Uhr wie bisher ohne IBI-Brücke (benannte Lücke) – kein Rot.
+    - mkdir -p watch/app/libs
+    - |
+      if curl --fail --location --silent --show-error --header "JOB-TOKEN: $CI_JOB_TOKEN" "$SAMSUNG_SDK_URL" --output watch/app/libs/samsung-health-sensor-api.aar; then
+        echo "Samsung Health Sensor SDK geholt: $(wc -c < watch/app/libs/samsung-health-sensor-api.aar) Bytes"
+      else
+        rm -f watch/app/libs/samsung-health-sensor-api.aar
+        echo "Samsung Health Sensor SDK NICHT geholt – Uhr baut ohne IBI-Brücke"
+      fi
     - /tmp/gradle-9.3.1/bin/gradle --no-daemon --stacktrace -p watch :core:test :app:assembleDebug :app:testDebugUnitTest :phone:assembleDebug :phone:testDebugUnitTest
   artifacts:
+    # Die Uhr-APK kann Samsungs SDK enthalten: nicht öffentlich ausliefern.
+    access: developer
     when: always
     expire_in: 7 days
     reports:
