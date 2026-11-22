@@ -190,7 +190,12 @@ class BedTemperatureSensor(RejuvenationBedZoneSensor):
     def native_value(self):
         data = self.coordinator.data
         if data and "zones" in data:
-            return data["zones"].get(self.internal_zone_name, {}).get("target")
+            wert = data["zones"].get(self.internal_zone_name, {}).get("target")
+            # Bei Not-Aus steht hier 'unknown' (Anzeige-Platzhalter des
+            # Coordinators). Für die Geräteklasse TEMPERATURE ist nur eine
+            # Zahl ein gültiger Zustand -- sonst None → unavailable, per
+            # isinstance wie beim Kondensationsrisiko.
+            return wert if isinstance(wert, (int, float)) else None
         return None
 
 
@@ -592,7 +597,11 @@ class BedThermalBatterySensor(RejuvenationBedEnergySensor):
         temps = []
         for zone_data in zones.values():
             t = zone_data.get("current")
-            if t is not None:
+            # Not-Aus/Degraded hinterlegen hier 'unknown' als Anzeige-
+            # Platzhalter (coordinator.py). Nur Zahlen dürfen ins Mittel
+            # (Muster: Kondensationsrisiko) -- ein String sprengt sum()
+            # mit TypeError und legt den Sensor bei jedem Update lahm.
+            if isinstance(t, (int, float)):
                 temps.append(t)
         return sum(temps) / len(temps) if temps else 28.0
 
