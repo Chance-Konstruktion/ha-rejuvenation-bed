@@ -28,6 +28,17 @@
       "zone_config": {
         "title": "Zoneneinstellungen",
         "description": "Konfiguration für: **{zone_info}**",
+        "sections": {
+          "main_zone": {
+            "name": "Hauptmatratze"
+          },
+          "left_side": {
+            "name": "Linke Seite"
+          },
+          "right_side": {
+            "name": "Rechte Seite"
+          }
+        },
         "data": {
           "heater": "Heizungsschalter",
           "temp_sensor": "Temperatursensor",

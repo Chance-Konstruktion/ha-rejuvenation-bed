@@ -22,6 +22,17 @@
       "zone_config": {
         "title": "Zone Configuration",
         "description": "Configuration for: {zone_info}",
+        "sections": {
+          "main_zone": {
+            "name": "Main mattress"
+          },
+          "left_side": {
+            "name": "Left side"
+          },
+          "right_side": {
+            "name": "Right side"
+          }
+        },
         "data": {
           "heater": "Heater switch / relay",
           "temp_sensor": "Temperature sensor (optional)",

@@ -27,8 +27,10 @@ set_boost:
   name: Boost aktivieren
   description: >-
     Aktiviert den Schnellheizen-Modus für alle Zonen.
-    Die Temperatur wird um den konfigurierten Boost-Offset über die aktuelle
-    Zieltemperatur angehoben. Safety-Cap bei 36°C.
+    Boost setzt die konfigurierte Boost-Zieltemperatur (Standard 34 °C,
+    geklemmt am Sicherheits-Maximum) als festen Wert — kein Offset über
+    die aktuelle Zieltemperatur. Standarddauer: 30 Minuten; der
+    Boost-Schalter in der UI läuft dagegen 60 Minuten.
   fields:
     duration_minutes:
       name: Dauer (Minuten)

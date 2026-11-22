@@ -20,6 +20,7 @@ from typing import Optional
 from homeassistant.core import HomeAssistant
 
 from .const import (
+    ABSOLUTE_MIN_TEMP,
     DEFAULT_BED_BOOST_SOC_THRESHOLD,
     DEFAULT_BED_BOOST_MIN_FORECAST_KWH,
     BED_BOOST_SOC_HYSTERESIS,
@@ -59,9 +60,6 @@ class EnergyStateResolver:
     SOLAR_BOOST_OFFSET = +1.5  # Solar-Überschuss → +1.5°C
     ECO_OFFSET = -2.0  # Teurer Strom → -2.0°C
     CRITICAL_OFFSET = -3.0  # Netz-Notfall → -3.0°C (sehr selten)
-
-    # Anti-Kalt-Garantie: Absolutes Minimum
-    ABSOLUTE_MIN_TEMP = 25.0  # Niemals unter 25°C, egal was passiert!
 
     def __init__(self, hass: HomeAssistant, config_entry):
         """
@@ -518,8 +516,9 @@ class EnergyStateResolver:
         """
         Berechnet den Temperatur-Offset basierend auf dem Modus.
 
-        WICHTIG: Offset wird zur Biorhythmus-Kurve ADDIERT,
-        aber NIEMALS unter ABSOLUTE_MIN_TEMP!
+        WICHTIG: Offset wird zur Biorhythmus-Kurve ADDIERT, klemmt aber
+        nicht hier — die Anti-Kalt-Garantie (ABSOLUTE_MIN_TEMP aus
+        const.py, 24 °C Wasserbett) greift erst im Ramp-Controller.
         """
         offsets = {
             EnergyMode.NORMAL: 0.0,
@@ -606,5 +605,5 @@ if __name__ == "__main__":
     print(f"  - Solar-Boost: +{EnergyStateResolver.SOLAR_BOOST_OFFSET}°C")
     print(f"  - Eco-Mode: {EnergyStateResolver.ECO_OFFSET}°C")
     print("  - Normal: ±0.0°C")
-    print(f"\n⚠️ Anti-Kalt-Garantie: Niemals unter {EnergyStateResolver.ABSOLUTE_MIN_TEMP}°C!")
+    print(f"\n⚠️ Anti-Kalt-Garantie: Niemals unter {ABSOLUTE_MIN_TEMP}°C!")
     print("\n" + "=" * 60)
