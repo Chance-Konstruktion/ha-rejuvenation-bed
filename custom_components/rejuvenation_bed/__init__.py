@@ -99,8 +99,12 @@ async def async_migrate_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             zone.setdefault("power_rating", 250)
             zone.setdefault("boost_target_temp", 34.0)
 
+        # alte Version merken: async_update_entry setzt entry.version
+        # bereits auf 2, das Log darunter würde sonst immer "v2 → v2"
+        # melden (Kleinigkeiten #14).
+        alte_version = entry.version
         hass.config_entries.async_update_entry(entry, data=new_data, version=2)
-        _LOGGER.info(f"Migration v{entry.version} → v2 erfolgreich")
+        _LOGGER.info(f"Migration v{alte_version} → v2 erfolgreich")
 
     return True
 

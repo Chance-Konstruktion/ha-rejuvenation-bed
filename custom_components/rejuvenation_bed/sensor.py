@@ -700,7 +700,12 @@ class BedSleepScoreSensor(RejuvenationBedZoneSensor):
     def extra_state_attributes(self):
         score = self.coordinator.sleep_score_calculator.get_last_score(self.zone_idx)
         if not score:
-            return {"status": "Noch keine Daten"}
+            return {
+                "status": "Noch keine Daten",
+                # Score-Historie lebt nur im RAM (_score_history im
+                # sleep_score_calculator); nach einem Neustart leer.
+                "historie": "nicht persistiert — beginnt nach jedem Neustart neu",
+            }
 
         attrs = {
             "datum": score.date.strftime("%Y-%m-%d"),
@@ -742,7 +747,10 @@ class BedSleepScoreWeeklySensor(RejuvenationBedZoneSensor):
     def extra_state_attributes(self):
         history = self.coordinator.sleep_score_calculator.get_score_history(self.zone_idx, 7)
         if not history:
-            return {"status": "Noch keine Daten"}
+            return {
+                "status": "Noch keine Daten",
+                "historie": "nicht persistiert — beginnt nach jedem Neustart neu",
+            }
 
         return {
             "tage_erfasst": len(history),

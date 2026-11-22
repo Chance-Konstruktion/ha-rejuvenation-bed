@@ -600,7 +600,11 @@ class SleepScoreCalculator:
         current = history[-1].total_score
 
         if len(history) >= 7:
-            week_avg = sum(s.total_score for s in history[-8:-1]) / 7
+            # Fenster der letzten 7 Nächte OHNE den heutigen; bei genau
+            # 7 Einträgen sind das 6 — daher durch dessen echte Länge
+            # teilen, nicht fix durch 7 (Kleinigkeiten #14).
+            window = history[-8:-1]
+            week_avg = sum(s.total_score for s in window) / len(window)
         else:
             week_avg = sum(s.total_score for s in history[:-1]) / len(history[:-1])
 

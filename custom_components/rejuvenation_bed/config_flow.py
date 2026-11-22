@@ -136,8 +136,9 @@ class RejuvenationBedConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                         selector.EntitySelectorConfig(domain="binary_sensor", device_class="occupancy")
                     ),
                     # ═══════════════════════════════════════════════════════════════════
-                    # FIX: Feuchtigkeitssensor - BEIDE Typen erlauben!
-                    # binary_sensor mit device_class moisture ODER normaler sensor mit humidity
+                    # Feuchtigkeitssensor: nur sensor mit device_class humidity.
+                    # binary_sensor (moisture) liefern true/false; der Coordinator
+                    # liest aber float-Zustände und kann damit nichts anfangen.
                     # ═══════════════════════════════════════════════════════════════════
                     vol.Optional("moisture_sensor"): selector.EntitySelector(
                         selector.EntitySelectorConfig(domain="sensor", device_class="humidity")
