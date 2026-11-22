@@ -9,7 +9,7 @@ import asyncio
 import sys
 import types
 from datetime import datetime, timedelta, timezone
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 import pytest
 
@@ -164,6 +164,33 @@ def test_beginn_und_ende_als_zeitstempel():
 
     ende = sensoren["end"].native_value
     assert (ende.hour, ende.minute) == (7, 42)
+
+
+def test_zeitstempel_haengt_an_der_ha_zone_nicht_am_host():
+    """#13: Naive Hauszeit trägt die HA-Zone, nicht die des Host-Betriebssystems.
+
+    astimezone() liest die System-Zone der Maschine, auf der HA läuft -- in
+    einem Container mit abweichender Zeitzone würden „Bett Schlafbeginn"
+    und „Bett Schlafende" um genau diese Differenz verschoben. Die HA-Zone
+    ist hier bewusst ein Objekt, das kein Host je hat: die Identitäts-
+    prüfung trennt die beiden Wege auf jedem Host.
+    """
+    ha_zone = timezone(timedelta(hours=9), "HA-Test-Zone")
+
+    with patch(
+        "custom_components.rejuvenation_bed.nachtbericht_sensoren.dt_util",
+        MagicMock(DEFAULT_TIME_ZONE=ha_zone),
+    ):
+        sensoren = _sensor_mit(_speicher_mit_nacht())
+
+        wert = sensoren["start"].native_value
+        assert wert.tzinfo is ha_zone
+        # Die Wanduhrzeit bleibt unverändert -- nur die Zone wird korrekt gesetzt.
+        assert (wert.hour, wert.minute) == (23, 10)
+
+        ende = sensoren["end"].native_value
+        assert ende.tzinfo is ha_zone
+        assert (ende.hour, ende.minute) == (7, 42)
 
 
 def test_unterbrechungen_als_zaehler():

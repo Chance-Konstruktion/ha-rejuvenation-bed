@@ -37,6 +37,7 @@ from homeassistant.components.sensor import SensorDeviceClass, SensorEntity, Sen
 from homeassistant.const import UnitOfTemperature
 
 from homeassistant.helpers.update_coordinator import CoordinatorEntity
+from homeassistant.util import dt as dt_util
 
 from .device_info import get_sleep_device_info
 from .nachtbericht import PHASEN, PHASEN_TEXTE, UNKNOWN
@@ -473,9 +474,14 @@ class BettSchlafgrenzSensor(NachtberichtSensorBase):
         wert = bericht.get(self.stufe)
         if not wert:
             return None
-        # Naive Lokalzeit des Hauses → bewusst als lokale Zeit deklariert,
-        # damit der Zeitstempel-Sensor die richtige Uhrzeit zeigt.
-        return datetime.fromisoformat(wert).astimezone()
+        # Naive Hauszeit → bewusst die in HA konfigurierte Zeitzone
+        # ansetzen, nicht die des Host-Betriebssystems: astimezone() liest
+        # time.localtime, und in einem Container mit abweichender
+        # System-Zone zeigen „Bett Schlafbeginn" und „Bett Schlafende"
+        # um genau diese Differenz verschobene Uhrzeiten. Die Hauszeit
+        # hängt nicht an der Maschine, auf der HA läuft (siehe
+        # ohne_offset in nachtbericht.py) -- hier gilt dasselbe.
+        return datetime.fromisoformat(wert).replace(tzinfo=dt_util.DEFAULT_TIME_ZONE)
 
     @property
     def extra_state_attributes(self):

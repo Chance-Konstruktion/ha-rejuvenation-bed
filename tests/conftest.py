@@ -64,6 +64,11 @@ for mod_name in _HA_SUBMODULES:
 import datetime as _datetime  # noqa: E402
 
 sys.modules["homeassistant.util"].dt.now = lambda: _datetime.datetime.now()
+# ... und so trägt der Mock eine echte Zeitzone: Code, der naive Hauszeit
+# mit dt_util.DEFAULT_TIME_ZONE qualmt (#13, nachtbericht_sensoren.py),
+# bekommt ein gültiges tzinfo statt eines Attrappen-Arguments, das
+# datetime.replace mit TypeError abweist.
+sys.modules["homeassistant.util"].dt.DEFAULT_TIME_ZONE = _datetime.timezone.utc
 
 
 # ── Fixtures ──
