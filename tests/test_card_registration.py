@@ -16,7 +16,10 @@ from custom_components.rejuvenation_bed import (
     CARD_REGISTERED,
     CARD_RESOURCE_URL,
     CARD_URL,
+    REPORT_CARD_REGISTERED,
+    REPORT_CARD_RESOURCE_URL,
     _async_register_card,
+    _async_unregister_cards,
 )
 
 
@@ -160,9 +163,18 @@ def test_fehlende_datei_bricht_setup_nicht_ab():
 
 
 def test_fehler_beim_registrieren_wird_geschluckt():
-    """Ein kaputtes Frontend darf die Heizungssteuerung nicht mitreißen."""
+    """Ein kaputter Frontend-Weg darf die Heizungssteuerung nicht mitreißen.
+
+    K13 hat die Toleranz geschärft: Ein Fehler am statischen Pfad ALLEIN ist
+    der Reload-Fall (Pfad besteht schon) und kein Abbruch — der Abbruch ist
+    erst ein Fehler im Ressourcen-Weg, und der wird weiterhin geschluckt.
+    """
     hass = _hass()
-    hass.http.async_register_static_paths.side_effect = RuntimeError("kaputt")
+    res = _resources([])
+    res.async_items = MagicMock(side_effect=RuntimeError("kaputt"))
+    lovelace = MagicMock()
+    lovelace.resources = res
+    hass.data["lovelace"] = lovelace
 
     with patch("custom_components.rejuvenation_bed.frontend"):
         asyncio.run(_async_register_card(hass))  # darf nicht werfen
@@ -293,3 +305,87 @@ def test_nachtruhe_dimmt_nicht_mehr_per_css():
     inhalt = _karte()
     assert ".root.dozing .clock { opacity: 0.42; }" not in inhalt
     assert "dozing ? this._dozeDim : this._dim" in inhalt
+
+
+# ── K13: die Unload-Bilanz der Karten ──────────────────────────────────────
+# Beim LETZTEN Coordinator-Unload gehen unsere Lovelace-Ressourcen-Einträge
+# und die Karten-Wachen; statische Pfade und add_extra_js_url bleiben (HA
+# bietet kein Abmelden), ein frisches Setup legt alles wieder an.
+
+
+async def test_unload_bilanz_raeumt_unsere_ressourcen_ab():
+    """Nur Einträge mit UNSERER URL gehen — fremde Ressourcen bleiben stehen."""
+    fremd = {"id": "fremd-1", "res_type": "module", "url": "/local/was-anderes.js"}
+    unsere = {"id": "unsere-1", "res_type": "module", "url": CARD_RESOURCE_URL}
+    bericht = {"id": "bericht-1", "res_type": "module", "url": REPORT_CARD_RESOURCE_URL}
+    hass, res = _hass_mit_lovelace([fremd, unsere, bericht])
+    res.async_delete_item = AsyncMock()
+    hass.data[CARD_REGISTERED] = True
+    hass.data[REPORT_CARD_REGISTERED] = True
+
+    await _async_unregister_cards(hass)
+
+    geloescht = [c.args[0] for c in res.async_delete_item.await_args_list]
+    assert geloescht == ["unsere-1", "bericht-1"]
+    assert CARD_REGISTERED not in hass.data
+    assert REPORT_CARD_REGISTERED not in hass.data
+
+
+async def test_unload_bilanz_ohne_lovelace_stuerzt_nicht():
+    """YAML-Modus: keine Ressourcen — die Wachen gehen trotzdem, kein Fehler."""
+    hass = _hass()
+    hass.data[CARD_REGISTERED] = True
+    hass.data[REPORT_CARD_REGISTERED] = True
+
+    await _async_unregister_cards(hass)
+
+    assert CARD_REGISTERED not in hass.data
+    assert REPORT_CARD_REGISTERED not in hass.data
+
+
+async def test_unload_bilanz_ohne_delete_item_laesst_alles_stehen():
+    """Ressourcen-Speicher ohne async_delete_item: nichts reißt, Wachen gehen."""
+    hass = _hass()
+
+    class _NurLesen:
+        loaded = True
+
+        async def async_load(self): ...
+
+        def async_items(self):
+            return []
+
+    lovelace = MagicMock()
+    lovelace.resources = _NurLesen()
+    hass.data["lovelace"] = lovelace
+    hass.data[CARD_REGISTERED] = True
+
+    await _async_unregister_cards(hass)
+
+    assert CARD_REGISTERED not in hass.data
+
+
+async def test_nach_dem_abriss_meldet_die_karte_wieder():
+    """Frisches Setup nach dem Unload: Ressource neu, Wache neu, kein Doppel."""
+    hass, res = _hass_mit_lovelace([])
+    await _async_register_card(hass)
+    assert hass.data[CARD_REGISTERED] is True
+    assert res.async_create_item.await_count == 1
+
+    await _async_unregister_cards(hass)
+    assert CARD_REGISTERED not in hass.data
+
+    await _async_register_card(hass)
+    assert hass.data[CARD_REGISTERED] is True
+    assert res.async_create_item.await_count == 2
+
+
+async def test_reload_vertraegt_bereits_angelegten_statischen_pfad():
+    """Steht der statische Pfad vom letzten Laden schon, bleibt die Karte gemeldet."""
+    hass, res = _hass_mit_lovelace([])
+    hass.http.async_register_static_paths = AsyncMock(side_effect=ValueError("duplicate route"))
+
+    await _async_register_card(hass)
+
+    assert hass.data[CARD_REGISTERED] is True
+    assert res.async_create_item.await_count == 1

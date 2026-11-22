@@ -180,9 +180,15 @@ async def _async_register_card(hass: HomeAssistant) -> None:
         _LOGGER.warning("Karte %s nicht gefunden – Dashboard-Karte steht nicht zur Verfügung", card_path)
         return
 
+    # Der statische Pfad darf beim erneuten Laden nach einem Unload schon
+    # stehen (K13): HA kann ihn nicht abmelden, eine zweite Anmeldung ist
+    # dann kein Fehler, sondern der normale Reload-Weg.
     try:
         await hass.http.async_register_static_paths([StaticPathConfig(CARD_URL, str(card_path), cache_headers=False)])
+    except Exception as err:  # pragma: no cover - Reload-Fall: Pfad besteht bereits
+        _LOGGER.debug("Statischer Pfad %s bereits vorhanden: %s", CARD_URL, err)
 
+    try:
         # Bevorzugt als Lovelace-Ressource: darauf wartet das Dashboard, bevor
         # es die Karten baut. Ein reines add_extra_js_url() wird nebenher
         # geladen — auf langsamen Geräten (Aussendisplay eines Falters) ist die
@@ -216,11 +222,16 @@ async def _async_register_report_card(hass: HomeAssistant) -> None:
         _LOGGER.warning("Karte %s nicht gefunden – Nachtbericht-Karte steht nicht zur Verfügung", card_path)
         return
 
+    # K13: gleiche Reload-Toleranz wie bei der Nachttisch-Karte — der
+    # statische Pfad darf schon stehen, die Anmeldung bleibt dann Debug.
     try:
         await hass.http.async_register_static_paths(
             [StaticPathConfig(REPORT_CARD_URL, str(card_path), cache_headers=False)]
         )
+    except Exception as err:  # pragma: no cover - Reload-Fall: Pfad besteht bereits
+        _LOGGER.debug("Statischer Pfad %s bereits vorhanden: %s", REPORT_CARD_URL, err)
 
+    try:
         als_ressource = await _async_register_lovelace_resource(hass, REPORT_CARD_URL, REPORT_CARD_RESOURCE_URL)
         if not als_ressource:
             frontend.add_extra_js_url(hass, REPORT_CARD_URL)
@@ -260,6 +271,58 @@ async def _async_register_lovelace_resource(hass: HomeAssistant, card_url: str, 
 
     await resources.async_create_item({"res_type": "module", "url": resource_url})
     return True
+
+
+async def _async_unregister_lovelace_resource(hass: HomeAssistant, card_url: str) -> bool:
+    """Den von uns gepflegten Lovelace-Ressourcen-Eintrag der Karte entfernen.
+
+    K13 — die Unload-Bilanz: Nur Einträge, deren URL auf DIESE Karte zeigt
+    (Version-Kürzel mit ?v= zählt dazu), gehen; alles andere bleibt
+    unberührt. Ohne Storage-Lovelace (YAML-Modus) gibt es nichts abzumelden.
+    """
+    lovelace = hass.data.get("lovelace")
+    resources = getattr(lovelace, "resources", None)
+    if resources is None and isinstance(lovelace, dict):
+        resources = lovelace.get("resources")
+    if resources is None or not hasattr(resources, "async_items"):
+        return False
+    if not hasattr(resources, "async_delete_item"):
+        return False
+
+    entfernt = False
+    for item in list(resources.async_items()):
+        url = str(item.get("url", ""))
+        if url.split("?")[0] != card_url:
+            continue
+        await resources.async_delete_item(item["id"])
+        entfernt = True
+    return entfernt
+
+
+async def _async_unregister_cards(hass: HomeAssistant) -> None:
+    """Karten-Registrierung zum LETZTEN Coordinator-Unload abbauen (K13).
+
+    Ehrliche Bilanz — was geht und was bleibt:
+      - Lovelace-Ressourcen-Einträge der Karten: werden entfernt. Wir haben
+        sie angelegt; solange die Integration abgemeldet ist, zeigt ein
+        Dashboard, das die Karte noch benutzt, ehrlich einen Fehler statt
+        einer Karte ohne Leben.
+      - Die Wachen CARD_REGISTERED / REPORT_CARD_REGISTERED: verlassen
+        hass.data — ein frisches Setup legt alles wieder an.
+      - Der statische Pfad und ein gesetztes add_extra_js_url: BLEIBEN.
+        HA bietet kein Abmelden dafür; beide überleben bis zum Neustart
+        und bedienen die Übergangszeit, in der ein Dashboard die Karte
+        noch referenziert. Ein Reload nach dem Unload meldet den Pfad
+        erneut — das zweite Anmelden ist harmlos (erster Treffer gewinnt).
+    """
+    entfernt = await _async_unregister_lovelace_resource(hass, CARD_URL)
+    entfernt |= await _async_unregister_lovelace_resource(hass, REPORT_CARD_URL)
+    hass.data.pop(CARD_REGISTERED, None)
+    hass.data.pop(REPORT_CARD_REGISTERED, None)
+    if entfernt:
+        _LOGGER.debug(
+            "Lovelace-Ressourcen der Karten abgemeldet; statische Pfade bleiben bis zum HA-Neustart (HA-Kante)"
+        )
 
 
 async def _async_options_updated(hass: HomeAssistant, entry: ConfigEntry):
@@ -526,5 +589,10 @@ async def async_unload_entry(hass: HomeAssistant, entry: ConfigEntry) -> bool:
             "preheat_bed",
         ]:
             hass.services.async_remove(DOMAIN, service)
+
+        # K13 — die Unload-Bilanz der Karten: Ressourcen-Einträge und Wachen
+        # gehen mit dem letzten Coordinator; die statischen Pfade bleiben
+        # (HA kann sie nicht abmelden), ein frisches Setup legt alles neu an.
+        await _async_unregister_cards(hass)
 
     return unload_ok
