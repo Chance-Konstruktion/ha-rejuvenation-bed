@@ -26,13 +26,9 @@ clear_emergency:
 set_boost:
   name: Boost aktivieren
   description: >-
-    Aktiviert den Schnellheizen-Modus für eine Zone.
+    Aktiviert den Schnellheizen-Modus für alle Zonen.
     Die Temperatur wird um den konfigurierten Boost-Offset über die aktuelle
     Zieltemperatur angehoben. Safety-Cap bei 36°C.
-  target:
-    entity:
-      integration: rejuvenation_bed
-      domain: climate
   fields:
     duration_minutes:
       name: Dauer (Minuten)
@@ -56,10 +52,6 @@ set_sick_mode:
     Aktiviert konstante Wärme für die Genesungszeit.
     Die Biorhythmus-Kurve wird pausiert und stattdessen eine
     feste Temperatur gehalten. Ideal bei Erkältung oder Rückenschmerzen.
-  target:
-    entity:
-      integration: rejuvenation_bed
-      domain: climate
   fields:
     temperature:
       name: Temperatur (°C)
@@ -97,10 +89,6 @@ set_vacation_mode:
     Aktiviert Frostschutz-Modus für Abwesenheit.
     Für Wasserbetten wird die Mindesttemperatur (24°C) zum
     Kondensationsschutz eingehalten. Heizmatten können komplett abschalten.
-  target:
-    entity:
-      integration: rejuvenation_bed
-      domain: climate
   fields:
     temperature:
       name: Frostschutz-Temperatur (°C)
@@ -136,10 +124,6 @@ cancel_special_mode:
   description: >-
     Beendet jeden aktiven Sondermodus (Boost, Krank oder Urlaub).
     Das Bett kehrt sofort zur normalen Biorhythmus-Steuerung zurück.
-  target:
-    entity:
-      integration: rejuvenation_bed
-      domain: climate
 
 preheat_bed:
   name: Bett vorheizen
@@ -147,10 +131,6 @@ preheat_bed:
     Heizt das Bett auf Komfort-Temperatur vor.
     Nützlich wenn Gäste kommen oder der Zeitplan unregelmäßig ist.
     Respektiert die Rampen-Begrenzung bei Wasserbetten (max 1°C/h).
-  target:
-    entity:
-      integration: rejuvenation_bed
-      domain: climate
   fields:
     target_temperature:
       name: Zieltemperatur (°C)
