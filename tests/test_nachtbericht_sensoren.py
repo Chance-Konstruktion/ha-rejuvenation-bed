@@ -32,7 +32,6 @@ sys.modules["homeassistant.components.sensor"].SensorEntity = sys.modules[
 from custom_components.rejuvenation_bed.nachtbericht import (  # noqa: E402
     NachtberichtSpeicher,
     SCHEMA_KENNUNG,
-    utc_naiv,
 )
 from custom_components.rejuvenation_bed.nachtbericht_sensoren import (  # noqa: E402
     MARKER,
@@ -74,7 +73,6 @@ def test_ohne_daten_ist_alles_unknown_nicht_erfunden():
 
 
 def test_ohne_speicher_faellt_phase_auf_unknown():
-    coordinator = PseudoCoordinator(None)
     phase = _sensor_mit(None)["schlafphase"]
 
     assert phase.native_value == "unknown"

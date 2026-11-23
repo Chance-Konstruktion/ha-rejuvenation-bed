@@ -16,7 +16,6 @@ import pytest
 from custom_components.rejuvenation_bed.nachtbericht import (
     EVENT_NACHT_ABGESCHLOSSEN,
     MAX_NAECHTE,
-    Nachtbericht,
     NachtberichtFehler,
     NachtberichtSpeicher,
     SCHEMA_KENNUNG,
