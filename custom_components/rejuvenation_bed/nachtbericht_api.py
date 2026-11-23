@@ -8,7 +8,7 @@ eine komplette Nacht (`type: "night_report"`) oder die laufende Phase
 
 Bewusst kein Dauer-Bearer-Token und keine Cloud-Route: Der Webhook hängt im
 eigenen Netz und wird von Home Assistant verwaltet. Die spätere Pairing-
-Strecke (M3, siehe docs/SMARTWATCH_ARCHITECTURE.md) kann diesen Endpunkt
+Strecke (M3) kann diesen Endpunkt
 übernehmen, ohne dass sich hier etwas ändert — nur die Transportstrecke davor.
 
 Hausregeln: Keine IP, kein Hostname, keine Adresse im Code oder in Meldungen —

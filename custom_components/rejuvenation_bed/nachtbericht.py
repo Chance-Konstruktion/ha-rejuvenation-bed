@@ -1,7 +1,7 @@
 """
 Nachtbericht — die Schlafaufzeichnung der Uhr, vollständig in Home Assistant.
 
-Die Uhr (Galaxy Watch, `watch/`) zeichnet die Nacht lokal auf: Puls, Bewegung,
+Die Uhr (Galaxy Watch, eigene App) zeichnet die Nacht lokal auf: Puls, Bewegung,
 Plattform-Schlafstatus und — wenn eine Quelle vorhanden ist — IBI. Der
 Nachtbericht ist der Vertrag, mit dem diese Aufzeichnung hier ankommt und aus
 dem die Integration Sensoren, ein „Nacht abgeschlossen“-Ereignis und die

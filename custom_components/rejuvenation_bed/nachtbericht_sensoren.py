@@ -24,7 +24,7 @@ Aufbau (alles am Schlaf/Analyse-Gerät):
 Ehrlichkeitsregel durchgezogen: Ohne Daten zeigt ein Sensor `unknown` und nennt
 den Grund im Attribut — nichts wird aus der Puls-Kurve geraten oder platt
 dupliziert. Die Schlafphase fällt nach 10 Minuten ohne Nachschub auf `unknown`
-zurück (Vertrag in docs/SMARTWATCH_ARCHITECTURE.md), damit das Bett auf eine
+zurück (Vertrag in docs/NACHTBERICHT.md), damit das Bett auf eine
 alternde Schätzung nicht mehr reagiert. Kanäle, die das Gerät nicht bereitstellt,
 zeigen „nicht verfügbar“ (unavailable) mit dem benannten Grund — es gibt für sie
 keine Zahl aus einer anderen Quelle.

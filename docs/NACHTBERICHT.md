@@ -1,6 +1,6 @@
 # Nachtbericht — die Schlafaufzeichnung der Uhr in Home Assistant
 
-Die Galaxy-Watch-App (`watch/`) zeichnet die Nacht lokal auf: Puls, Bewegung,
+Die Galaxy-Watch-App (eigene, private App) zeichnet die Nacht lokal auf: Puls, Bewegung,
 Plattform-Schlafstatus und — wenn eine Quelle vorhanden ist — IBI. Der
 Nachtbericht ist der Weg, mit dem diese Aufzeichnung vollständig in
 Rejuvenation Bed ankommt: Sensoren für Automationen, ein Ereignis je Nacht und
@@ -23,7 +23,7 @@ setzt man davor. Der Absender postet JSON:
 - `type: "night_data"` — ein 5-Minuten-Paket mit den Messreihen der Nacht
   (nur in der Stellung „Gesamtdaten“).
 
-**Der Sender ist die Uhr selbst** (Wear-OS-App, `watch/`): Im Schlaf-Blatt
+**Der Sender ist die Uhr selbst** (Wear-OS-App): Im Schlaf-Blatt
 steht der Schalter „Was geht an Home Assistant“ mit zwei Stellungen —
 
 - **„Nur Schlafphase“ (Standard)** — die Rohdaten bleiben auf der Uhr; an HA
@@ -42,7 +42,7 @@ nie im Protokoll, nie in einer Nutzlast) — gesendet wird nur dorthin, nie
 Cloud, nie ein fremder Dienst, Umleitungen folgen die Uhr bewusst nicht.
 
 Ein Dauer-Bearer-Token gibt es bewusst nicht; das ist der lokale Vorläufer der
-Pairing-Strecke aus M3 (`SMARTWATCH_ARCHITECTURE.md`), die den Endpunkt später
+Pairing-Strecke aus M3, die den Endpunkt später
 übernehmen kann, ohne dass sich hier etwas ändert.
 
 ## Schema `rejuvenation-bed-night-report-v1`
@@ -252,7 +252,7 @@ views:
 - Der Webhook ist `local_only` — Anfragen aus dem Internet bleiben ohne Wirkung.
 - Die Uhr sendet nur an die einmalig in der App gespeicherte Adresse des
   eigenen Home Assistant, nur über diesen Webhook, ohne Umleitung — nie
-  Cloud, nie ein fremder Dienst (`watch/app/…/ha/`, Quelltext-Wachen pinnt
+  Cloud, nie ein fremder Dienst (Quelltext-Wachen in der Uhr-App pinnen
   die Grenzen).
 - Was gesendet wird, entscheidet allein der Schalter „Was geht an Home
   Assistant“ auf der Uhr: Standard „Nur Schlafphase“ (Ergebnis ohne Rohreihen),
@@ -265,7 +265,7 @@ views:
   Güte, Quellen und **Anzahlen** — keine Puls-, IBI- oder HRV-Werte, keine
   Adresse.
 - In der Stellung „Nur Schlafphase“ bleiben die Rohreihen ausschließlich auf
-  der Uhr (`watch/README.md`); in „Gesamtdaten“ ist der Nachtbericht-Speicher
+  der Uhr; in „Gesamtdaten“ ist der Nachtbericht-Speicher
   die einzige Kopie im Haus, und sie bleibt im Haus. Löscht die Uhr ihre
   Daten, leert sie auch ihre ungesendeten Pakete.
 

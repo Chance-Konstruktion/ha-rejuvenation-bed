@@ -4,6 +4,13 @@ Alle Änderungen am Rejuvenation Bed Projekt.
 
 ## [Unreleased]
 
+### Uhr-App zieht in ein eigenes, privates Repo
+
+- Die Wear-OS-App (bisher `watch/`) und ihre drei Dokumente liegen jetzt im
+  privaten Repo `rejuvenation-bed-uhr` und werden nicht mehr veröffentlicht.
+  Die Integration nimmt Nachtbericht und laufende Phase unverändert über den
+  lokalen Webhook an (Schema `rejuvenation-bed-night-report-v1`).
+
 ### Uhr → HA: Sendungen kamen nie an (zwei Fehler, 17.11. auf der echten Uhr gefunden)
 
 - Android sperrt Klartext-HTTP seit API 28; HA im Heimnetz spricht `http://`.
