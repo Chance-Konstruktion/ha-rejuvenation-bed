@@ -20,3 +20,6 @@ htmlcov/
 custom_components/rejuvenation_bed/__pycache__/
 
 # Samsung Health Sensor SDK (nur nach Anmeldung bei Samsung, keine Weitergabe) – nie ins Repo
+
+# Samsung Health Sensor SDK – nie ins Repo (die Uhr-App liegt in rejuvenation-bed-uhr)
+watch/
